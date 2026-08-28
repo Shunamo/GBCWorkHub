@@ -22,6 +22,18 @@ Visual Studio에서 `GBCWorkHub.sln`을 연 뒤 **Restore NuGet Packages** → *
 
 실행 파일: `src\GBCWorkHub.UI\bin\Debug\GBCWorkHub.UI.exe`
 
+## 배포 (DLL 없이)
+
+Release 빌드하면 `Newtonsoft.Json`, `Oracle.ManagedDataAccess`, `GBCWorkHub.BIZ/DAC/DTO`, ClosedXML 계열 DLL이 **exe 안에 포함**됩니다 (Costura.Fody).
+
+배포할 것:
+
+- `GBCWorkHub.UI.exe`
+- `GBCWorkHub.UI.exe.config` (`App.config`가 빌드된 것 — DB/사이트 설정)
+- `Fonts\` 폴더 (Pretendard otf)
+
+zip에 DLL을 넣을 필요는 없습니다. PDB는 넣지 않아도 됩니다.
+
 ## 실행 전 설정
 
 ```bat
