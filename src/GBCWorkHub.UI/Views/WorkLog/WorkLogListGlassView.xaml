@@ -1,0 +1,890 @@
+﻿<UserControl x:Class="GBCWorkHub.UI.Views.WorkLog.WorkLogListGlassView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="GlassRoot"
+             Background="Transparent"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Display"
+             TextOptions.TextRenderingMode="ClearType">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogStyles.xaml" />
+                <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogGlassStyles.xaml" />
+                <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/SkeletonStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Grid Background="{StaticResource WlGlassAtmosphereBrush}" ClipToBounds="True">
+        <!-- (comment trimmed) -->
+        <Ellipse Width="520" Height="520" Fill="#338BB4E0"
+                 HorizontalAlignment="Right" VerticalAlignment="Top"
+                 Margin="0,-240,-180,0" IsHitTestVisible="False">
+            <Ellipse.Effect>
+                <BlurEffect Radius="90" />
+            </Ellipse.Effect>
+        </Ellipse>
+        <Ellipse Width="460" Height="460" Fill="#288FBFB8"
+                 HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                 Margin="-200,0,0,-180" IsHitTestVisible="False">
+            <Ellipse.Effect>
+                <BlurEffect Radius="80" />
+            </Ellipse.Effect>
+        </Ellipse>
+
+        <Grid Margin="24,68,24,24" HorizontalAlignment="Stretch">
+            <Border HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                    Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Grid}}"
+                    MaxWidth="1180">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                        <!-- Toolbar Glass -->
+                        <Border Grid.Row="0" Style="{StaticResource GlassSurfaceStyle}" Padding="14,12" Margin="0,0,0,14">
+                            <DockPanel LastChildFill="True">
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Style="{StaticResource GlassToolbarIconButton}"
+                                            Command="{Binding OpenImportCommand}"
+                                            ToolTip="{Binding ImportButtonLabel}"
+                                            Width="Auto" Height="Auto" MinWidth="22" MinHeight="20"
+                                            Margin="0,0,6,0">
+                                        <Border Background="#0078D4" CornerRadius="3" Width="22" Height="20" Padding="0"
+                                                SnapsToDevicePixels="True">
+                                            <TextBlock Text="TFS" FontSize="9" FontWeight="Bold"
+                                                       Foreground="White" FontFamily="Segoe UI"
+                                                       Margin="0,-1,0,0"
+                                                       VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                        </Border>
+                                    </Button>
+                                    <Button Style="{StaticResource GlassToolbarIconButton}"
+                                            Command="{Binding ImportCsvCommand}"
+                                            ToolTip="Excel 가져오기"
+                                            Width="Auto" Height="Auto" MinWidth="22" MinHeight="20"
+                                            Margin="0,0,6,0">
+                                        <Image Source="{StaticResource ExcelBrandIcon}" Width="22" Height="20"
+                                               Stretch="Uniform" SnapsToDevicePixels="True" />
+                                    </Button>
+                                    <Button Style="{StaticResource GlassToolbarIconButton}"
+                                            Command="{Binding NewWorkLogCommand}"
+                                            ToolTip="새 업무기록"
+                                            Width="Auto" Height="Auto" MinWidth="22" MinHeight="22"
+                                            Margin="0">
+                                        <Image Source="{StaticResource ChatPlusFillIcon}" Width="22" Height="22"
+                                               Stretch="Uniform" SnapsToDevicePixels="True" />
+                                    </Button>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button x:Name="SiteLabelButton"
+                                            Style="{StaticResource GlassSiteLabelButton}"
+                                            Command="{Binding ToggleSitePickerCommand}"
+                                            ToolTip="사이트 선택">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding SiteDisplayName}"
+                                                       FontSize="{StaticResource FontSize.Xl}" FontWeight="Bold"
+                                                       Foreground="{StaticResource WlGlassInk}"
+                                                       VerticalAlignment="Center" />
+                                            <Image Width="8" Height="8" Margin="5,1,0,0"
+                                                   VerticalAlignment="Center" Opacity="0.7"
+                                                   Stretch="Uniform">
+                                                <Image.Style>
+                                                    <Style TargetType="Image">
+                                                        <Setter Property="Source" Value="{StaticResource ExpandDownIcon}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsSitePickerOpen}" Value="True">
+                                                                <Setter Property="Source" Value="{StaticResource ExpandUpIcon}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Image.Style>
+                                            </Image>
+                                        </StackPanel>
+                                    </Button>
+
+                                    <Popup x:Name="SitePickerPopup"
+                                           IsOpen="{Binding IsSitePickerOpen, Mode=TwoWay}"
+                                           PlacementTarget="{Binding ElementName=SiteLabelButton}"
+                                           Placement="Bottom" HorizontalOffset="-4" VerticalOffset="6"
+                                           AllowsTransparency="True" PopupAnimation="None" StaysOpen="True"
+                                           Opened="SitePickerPopup_Opened">
+                                        <Border x:Name="SiteBubbleHost" Background="Transparent" BorderThickness="0"
+                                                Padding="2,4,0,6" RenderTransformOrigin="0,0" Opacity="0.5">
+                                            <Border.RenderTransform>
+                                                <ScaleTransform x:Name="SiteBubbleScale" ScaleX="0.96" ScaleY="0.96" />
+                                            </Border.RenderTransform>
+                                            <ItemsControl ItemsSource="{Binding SitePickerOptions}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Horizontal" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Style="{StaticResource GlassSiteChipButton}"
+                                                                Content="{Binding}"
+                                                                Command="{Binding DataContext.SelectSiteCommand, ElementName=GlassRoot}"
+                                                                CommandParameter="{Binding}" />
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </Border>
+                                    </Popup>
+
+                                    <Border Width="240" Height="30" Background="Transparent"
+                                            BorderThickness="0"
+                                            CornerRadius="0" Margin="0,2,10,2"
+                                            VerticalAlignment="Center">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="*" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <Grid Grid.Row="0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Grid>
+                                                    <TextBlock Text="검색어를 입력하세요." FontSize="{StaticResource FontSize.Base}" Foreground="#94A3B8"
+                                                               Margin="2,0,0,4" VerticalAlignment="Bottom"
+                                                               IsHitTestVisible="False">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding SearchText}" Value="">
+                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding SearchText}" Value="{x:Null}">
+                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                                             BorderThickness="0" Background="Transparent"
+                                                             Padding="2,0,4,4" FontSize="{StaticResource FontSize.Base}"
+                                                             VerticalContentAlignment="Bottom" />
+                                                </Grid>
+                                                <Image Grid.Column="1" Source="{StaticResource SearchLightIcon}"
+                                                       Width="14" Height="14" Margin="0,0,2,4"
+                                                       VerticalAlignment="Bottom" Opacity="0.65"
+                                                       IsHitTestVisible="False" />
+                                            </Grid>
+                                            <!-- SearchLightIcon: Pen #222222, Image Opacity 0.65 -->
+                                            <Rectangle Grid.Row="1" Height="0.8" Fill="#222222" Opacity="0.65"
+                                                       SnapsToDevicePixels="True" />
+                                        </Grid>
+                                    </Border>
+
+                                    <Button Style="{StaticResource GlassToolbarIconButton}" Margin="0,0,8,0"
+                                            Command="{Binding ToggleFilterCommand}"
+                                            ToolTip="필터">
+                                        <Grid>
+                                            <Image Source="{StaticResource FilterSlidersIcon}" Width="16" Height="16" />
+                                            <Ellipse Width="7" Height="7" Fill="#4F67D8"
+                                                     HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                     Margin="0,-1,-1,0"
+                                                     Visibility="{Binding HasActiveFilters, Converter={StaticResource GlassBoolToVis}}" />
+                                        </Grid>
+                                    </Button>
+
+                                    <!-- Title pills beside filter icon; options open like site picker chips -->
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                                Visibility="{Binding IsFilterExpanded, Converter={StaticResource GlassBoolToVis}}">
+
+                                        <Grid>
+                                            <Button x:Name="TypeFilterPill"
+                                                    Command="{Binding OpenFilterMenuCommand}" CommandParameter="type">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding TypeFilterPillLabel}" FontSize="11" FontWeight="SemiBold"
+                                                               TextTrimming="CharacterEllipsis" MaxWidth="120"
+                                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                               VerticalAlignment="Center" />
+                                                    <Image Width="7" Height="7" Margin="3,1,0,0"
+                                                           VerticalAlignment="Center" Opacity="0.7" Stretch="Uniform">
+                                                        <Image.Style>
+                                                            <Style TargetType="Image">
+                                                                <Setter Property="Source" Value="{StaticResource ExpandDownIcon}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsTypeMenuOpen}" Value="True">
+                                                                        <Setter Property="Source" Value="{StaticResource ExpandUpIcon}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Image.Style>
+                                                    </Image>
+                                                </StackPanel>
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource GlassFilterTitlePill}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsTypeFilterActive}" Value="True">
+                                                                <Setter Property="Background" Value="#FFFFFF" />
+                                                                <Setter Property="Foreground" Value="#334155" />
+                                                                <Setter Property="BorderBrush" Value="Transparent" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                            <Popup IsOpen="{Binding IsTypeMenuOpen, Mode=TwoWay}"
+                                                   PlacementTarget="{Binding ElementName=TypeFilterPill}"
+                                                   Placement="Bottom" HorizontalOffset="-4" VerticalOffset="6"
+                                                   AllowsTransparency="True" PopupAnimation="None" StaysOpen="True"
+                                                   Opened="FilterMenuPopup_Opened">
+                                                <Border Background="Transparent" BorderThickness="0"
+                                                        Padding="2,4,0,2" RenderTransformOrigin="0,0" Opacity="0.5"
+                                                        MaxWidth="260">
+                                                    <Border.RenderTransform>
+                                                        <ScaleTransform ScaleX="0.96" ScaleY="0.96" />
+                                                    </Border.RenderTransform>
+                                                    <ItemsControl ItemsSource="{Binding TypeFilterOptions}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel Orientation="Horizontal" />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Button Content="{Binding}"
+                                                                        Command="{Binding DataContext.SelectTypeFilterCommand, ElementName=GlassRoot}"
+                                                                        CommandParameter="{Binding}">
+                                                                    <Button.Style>
+                                                                        <Style TargetType="Button" BasedOn="{StaticResource GlassFilterChipButton}">
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Value="True">
+                                                                                    <DataTrigger.Binding>
+                                                                                        <MultiBinding Converter="{StaticResource GlassStringEquals}">
+                                                                                            <Binding Path="." />
+                                                                                            <Binding Path="DataContext.FilterType" ElementName="GlassRoot" />
+                                                                                        </MultiBinding>
+                                                                                    </DataTrigger.Binding>
+                                                                                    <Setter Property="Background" Value="#FFFFFF" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </Button.Style>
+                                                                </Button>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </Border>
+                                            </Popup>
+                                        </Grid>
+
+                                        <Grid Visibility="{Binding HasCategoryFilter, Converter={StaticResource GlassBoolToVis}}">
+                                            <Button x:Name="CategoryFilterPill"
+                                                    Command="{Binding OpenFilterMenuCommand}" CommandParameter="category">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding CategoryFilterPillLabel}" FontSize="11" FontWeight="SemiBold"
+                                                               TextTrimming="CharacterEllipsis" MaxWidth="120"
+                                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                               VerticalAlignment="Center" />
+                                                    <Image Width="7" Height="7" Margin="3,1,0,0"
+                                                           VerticalAlignment="Center" Opacity="0.7" Stretch="Uniform">
+                                                        <Image.Style>
+                                                            <Style TargetType="Image">
+                                                                <Setter Property="Source" Value="{StaticResource ExpandDownIcon}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsCategoryMenuOpen}" Value="True">
+                                                                        <Setter Property="Source" Value="{StaticResource ExpandUpIcon}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Image.Style>
+                                                    </Image>
+                                                </StackPanel>
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource GlassFilterTitlePill}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsCategoryFilterActive}" Value="True">
+                                                                <Setter Property="Background" Value="#FFFFFF" />
+                                                                <Setter Property="Foreground" Value="#334155" />
+                                                                <Setter Property="BorderBrush" Value="Transparent" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                            <Popup IsOpen="{Binding IsCategoryMenuOpen, Mode=TwoWay}"
+                                                   PlacementTarget="{Binding ElementName=CategoryFilterPill}"
+                                                   Placement="Bottom" HorizontalOffset="-4" VerticalOffset="6"
+                                                   AllowsTransparency="True" PopupAnimation="None" StaysOpen="True"
+                                                   Opened="FilterMenuPopup_Opened">
+                                                <Border Background="Transparent" BorderThickness="0"
+                                                        Padding="2,4,0,2" RenderTransformOrigin="0,0" Opacity="0.5"
+                                                        MaxWidth="260">
+                                                    <Border.RenderTransform>
+                                                        <ScaleTransform ScaleX="0.96" ScaleY="0.96" />
+                                                    </Border.RenderTransform>
+                                                    <ItemsControl ItemsSource="{Binding CategoryFilterOptions}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel Orientation="Horizontal" />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Button Content="{Binding}"
+                                                                        Command="{Binding DataContext.SelectCategoryFilterCommand, ElementName=GlassRoot}"
+                                                                        CommandParameter="{Binding}">
+                                                                    <Button.Style>
+                                                                        <Style TargetType="Button" BasedOn="{StaticResource GlassFilterChipButton}">
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Value="True">
+                                                                                    <DataTrigger.Binding>
+                                                                                        <MultiBinding Converter="{StaticResource GlassStringEquals}">
+                                                                                            <Binding Path="." />
+                                                                                            <Binding Path="DataContext.FilterCategory" ElementName="GlassRoot" />
+                                                                                        </MultiBinding>
+                                                                                    </DataTrigger.Binding>
+                                                                                    <Setter Property="Background" Value="#FFFFFF" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </Button.Style>
+                                                                </Button>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </Border>
+                                            </Popup>
+                                        </Grid>
+
+                                        <Grid>
+                                            <Button x:Name="DeployFilterPill"
+                                                    Command="{Binding OpenFilterMenuCommand}" CommandParameter="deploy">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding DeployFilterPillLabel}" FontSize="11" FontWeight="SemiBold"
+                                                               TextTrimming="CharacterEllipsis" MaxWidth="120"
+                                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                               VerticalAlignment="Center" />
+                                                    <Image Width="7" Height="7" Margin="3,1,0,0"
+                                                           VerticalAlignment="Center" Opacity="0.7" Stretch="Uniform">
+                                                        <Image.Style>
+                                                            <Style TargetType="Image">
+                                                                <Setter Property="Source" Value="{StaticResource ExpandDownIcon}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsDeployMenuOpen}" Value="True">
+                                                                        <Setter Property="Source" Value="{StaticResource ExpandUpIcon}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Image.Style>
+                                                    </Image>
+                                                </StackPanel>
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource GlassFilterTitlePill}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsDeployFilterActive}" Value="True">
+                                                                <Setter Property="Background" Value="#FFFFFF" />
+                                                                <Setter Property="Foreground" Value="#334155" />
+                                                                <Setter Property="BorderBrush" Value="Transparent" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                            <Popup IsOpen="{Binding IsDeployMenuOpen, Mode=TwoWay}"
+                                                   PlacementTarget="{Binding ElementName=DeployFilterPill}"
+                                                   Placement="Bottom" HorizontalOffset="-4" VerticalOffset="6"
+                                                   AllowsTransparency="True" PopupAnimation="None" StaysOpen="True"
+                                                   Opened="FilterMenuPopup_Opened">
+                                                <!-- ~3 chips/row so Staging+Production wrap to 2nd line -->
+                                                <Border Background="Transparent" BorderThickness="0"
+                                                        Padding="2,4,0,2" RenderTransformOrigin="0,0" Opacity="0.5"
+                                                        MaxWidth="178">
+                                                    <Border.RenderTransform>
+                                                        <ScaleTransform ScaleX="0.96" ScaleY="0.96" />
+                                                    </Border.RenderTransform>
+                                                    <ItemsControl ItemsSource="{Binding DeployFilterOptions}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel Orientation="Horizontal" Width="178" />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Button Content="{Binding}"
+                                                                        Command="{Binding DataContext.SelectDeployFilterCommand, ElementName=GlassRoot}"
+                                                                        CommandParameter="{Binding}">
+                                                                    <Button.Style>
+                                                                        <Style TargetType="Button" BasedOn="{StaticResource GlassFilterChipButton}">
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Value="True">
+                                                                                    <DataTrigger.Binding>
+                                                                                        <MultiBinding Converter="{StaticResource GlassStringEquals}">
+                                                                                            <Binding Path="." />
+                                                                                            <Binding Path="DataContext.FilterDeploy" ElementName="GlassRoot" />
+                                                                                        </MultiBinding>
+                                                                                    </DataTrigger.Binding>
+                                                                                    <Setter Property="Background" Value="#FFFFFF" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </Button.Style>
+                                                                </Button>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </Border>
+                                            </Popup>
+                                        </Grid>
+
+                                        <Grid Visibility="{Binding HasPcFilter, Converter={StaticResource GlassBoolToVis}}">
+                                            <Button x:Name="PcFilterPill"
+                                                    Command="{Binding OpenFilterMenuCommand}" CommandParameter="pc">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding PcFilterPillLabel}" FontSize="11" FontWeight="SemiBold"
+                                                               TextTrimming="CharacterEllipsis" MaxWidth="120"
+                                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                               VerticalAlignment="Center" />
+                                                    <Image Width="7" Height="7" Margin="3,1,0,0"
+                                                           VerticalAlignment="Center" Opacity="0.7" Stretch="Uniform">
+                                                        <Image.Style>
+                                                            <Style TargetType="Image">
+                                                                <Setter Property="Source" Value="{StaticResource ExpandDownIcon}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsPcMenuOpen}" Value="True">
+                                                                        <Setter Property="Source" Value="{StaticResource ExpandUpIcon}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Image.Style>
+                                                    </Image>
+                                                </StackPanel>
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource GlassFilterTitlePill}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsPcFilterActive}" Value="True">
+                                                                <Setter Property="Background" Value="#FFFFFF" />
+                                                                <Setter Property="Foreground" Value="#334155" />
+                                                                <Setter Property="BorderBrush" Value="Transparent" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                            <Popup IsOpen="{Binding IsPcMenuOpen, Mode=TwoWay}"
+                                                   PlacementTarget="{Binding ElementName=PcFilterPill}"
+                                                   Placement="Bottom" HorizontalOffset="-4" VerticalOffset="6"
+                                                   AllowsTransparency="True" PopupAnimation="None" StaysOpen="True"
+                                                   Opened="FilterMenuPopup_Opened">
+                                                <Border Background="Transparent" BorderThickness="0"
+                                                        Padding="2,4,0,2" RenderTransformOrigin="0,0" Opacity="0.5"
+                                                        MaxWidth="260">
+                                                    <Border.RenderTransform>
+                                                        <ScaleTransform ScaleX="0.96" ScaleY="0.96" />
+                                                    </Border.RenderTransform>
+                                                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                                                  HorizontalScrollBarVisibility="Disabled"
+                                                                  MaxHeight="160">
+                                                        <ItemsControl ItemsSource="{Binding PcFilterOptions}">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <WrapPanel Orientation="Horizontal" />
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Button Content="{Binding}"
+                                                                            Command="{Binding DataContext.SelectPcFilterCommand, ElementName=GlassRoot}"
+                                                                            CommandParameter="{Binding}">
+                                                                        <Button.Style>
+                                                                            <Style TargetType="Button" BasedOn="{StaticResource GlassFilterChipButton}">
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Value="True">
+                                                                                        <DataTrigger.Binding>
+                                                                                            <MultiBinding Converter="{StaticResource GlassStringEquals}">
+                                                                                                <Binding Path="." />
+                                                                                                <Binding Path="DataContext.FilterPcSelection" ElementName="GlassRoot" />
+                                                                                            </MultiBinding>
+                                                                                        </DataTrigger.Binding>
+                                                                                        <Setter Property="Background" Value="#FFFFFF" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Button.Style>
+                                                                    </Button>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </ScrollViewer>
+                                                </Border>
+                                            </Popup>
+                                        </Grid>
+
+                                        <Grid>
+                                            <Button x:Name="DateFilterPill"
+                                                    Command="{Binding OpenFilterMenuCommand}" CommandParameter="date">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding DateFilterPillLabel}" FontSize="11" FontWeight="SemiBold"
+                                                               TextTrimming="CharacterEllipsis" MaxWidth="140"
+                                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                               VerticalAlignment="Center" />
+                                                    <Image Width="7" Height="7" Margin="3,1,0,0"
+                                                           VerticalAlignment="Center" Opacity="0.7" Stretch="Uniform">
+                                                        <Image.Style>
+                                                            <Style TargetType="Image">
+                                                                <Setter Property="Source" Value="{StaticResource ExpandDownIcon}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsDateMenuOpen}" Value="True">
+                                                                        <Setter Property="Source" Value="{StaticResource ExpandUpIcon}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Image.Style>
+                                                    </Image>
+                                                </StackPanel>
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource GlassFilterTitlePill}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsDateFilterActive}" Value="True">
+                                                                <Setter Property="Background" Value="#FFFFFF" />
+                                                                <Setter Property="Foreground" Value="#334155" />
+                                                                <Setter Property="BorderBrush" Value="Transparent" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                            <Popup IsOpen="{Binding IsDateMenuOpen, Mode=TwoWay}"
+                                                   PlacementTarget="{Binding ElementName=DateFilterPill}"
+                                                   Placement="Bottom" HorizontalOffset="-4" VerticalOffset="6"
+                                                   AllowsTransparency="True" PopupAnimation="None" StaysOpen="True"
+                                                   Opened="FilterMenuPopup_Opened">
+                                                <Border Background="Transparent" BorderThickness="0"
+                                                        Padding="2,4,0,6" RenderTransformOrigin="0,0" Opacity="0.5">
+                                                    <Border.RenderTransform>
+                                                        <ScaleTransform ScaleX="0.96" ScaleY="0.96" />
+                                                    </Border.RenderTransform>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Border Style="{StaticResource GlassFilterDateField}" Margin="0,0,6,0">
+                                                            <Grid>
+                                                                <TextBlock Text="0000-00-00" FontSize="11" Foreground="#94A3B8"
+                                                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                           IsHitTestVisible="False">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding FilterFromText}" Value="">
+                                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                                </DataTrigger>
+                                                                                <DataTrigger Binding="{Binding FilterFromText}" Value="{x:Null}">
+                                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                                <TextBox Text="{Binding FilterFromText, UpdateSourceTrigger=PropertyChanged}"
+                                                                         BorderThickness="0" Background="Transparent"
+                                                                         FontSize="11" MaxLength="10"
+                                                                         TextAlignment="Center"
+                                                                         HorizontalContentAlignment="Center"
+                                                                         VerticalContentAlignment="Center"
+                                                                         ToolTip="숫자만 입력 → 0000-00-00" />
+                                                            </Grid>
+                                                        </Border>
+                                                        <TextBlock Text="~" Margin="0,0,6,0" VerticalAlignment="Center"
+                                                                   Foreground="#E5E7EB" FontSize="11" />
+                                                        <Border Style="{StaticResource GlassFilterDateField}">
+                                                            <Grid>
+                                                                <TextBlock Text="0000-00-00" FontSize="11" Foreground="#94A3B8"
+                                                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                           IsHitTestVisible="False">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding FilterToText}" Value="">
+                                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                                </DataTrigger>
+                                                                                <DataTrigger Binding="{Binding FilterToText}" Value="{x:Null}">
+                                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                                <TextBox Text="{Binding FilterToText, UpdateSourceTrigger=PropertyChanged}"
+                                                                         BorderThickness="0" Background="Transparent"
+                                                                         FontSize="11" MaxLength="10"
+                                                                         TextAlignment="Center"
+                                                                         HorizontalContentAlignment="Center"
+                                                                         VerticalContentAlignment="Center"
+                                                                         ToolTip="숫자만 입력 → 0000-00-00" />
+                                                            </Grid>
+                                                        </Border>
+                                                    </StackPanel>
+                                                </Border>
+                                            </Popup>
+                                        </Grid>
+
+                                        <Button Style="{StaticResource GlassToolbarIconButton}" Margin="2,0,0,0"
+                                                Command="{Binding ResetFiltersCommand}"
+                                                ToolTip="초기화">
+                                            <Image Source="{StaticResource Refresh2Icon}" Width="16" Height="16" />
+                                        </Button>
+                                    </StackPanel>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <!-- List -->
+                        <Grid Grid.Row="1">
+                            <!-- Skeleton -->
+                            <StackPanel Visibility="{Binding IsLoading, Converter={StaticResource GlassBoolToVis}}">
+                                <Border Style="{StaticResource SkeletonWorkLogRowStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <Border Style="{StaticResource SkeletonBoneStyle}" Width="120" Height="16" HorizontalAlignment="Left" />
+                                            <Border Style="{StaticResource SkeletonBoneStyle}" Width="220" Height="12" Margin="0,10,0,0" HorizontalAlignment="Left" />
+                                            <Border Style="{StaticResource SkeletonBoneStyle}" Width="160" Height="10" Margin="0,8,0,0" HorizontalAlignment="Left" />
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Style="{StaticResource SkeletonBoneStyle}" Width="56" Height="22" VerticalAlignment="Top" />
+                                    </Grid>
+                                </Border>
+                                <Border Style="{StaticResource SkeletonWorkLogRowStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <Border Style="{StaticResource SkeletonBoneStyle}" Width="96" Height="16" HorizontalAlignment="Left" />
+                                            <Border Style="{StaticResource SkeletonBoneStyle}" Width="260" Height="12" Margin="0,10,0,0" HorizontalAlignment="Left" />
+                                            <Border Style="{StaticResource SkeletonBoneStyle}" Width="140" Height="10" Margin="0,8,0,0" HorizontalAlignment="Left" />
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Style="{StaticResource SkeletonBoneStyle}" Width="56" Height="22" VerticalAlignment="Top" />
+                                    </Grid>
+                                </Border>
+                                <Border Style="{StaticResource SkeletonWorkLogRowStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <Border Style="{StaticResource SkeletonBoneStyle}" Width="140" Height="16" HorizontalAlignment="Left" />
+                                            <Border Style="{StaticResource SkeletonBoneStyle}" Width="200" Height="12" Margin="0,10,0,0" HorizontalAlignment="Left" />
+                                            <Border Style="{StaticResource SkeletonBoneStyle}" Width="180" Height="10" Margin="0,8,0,0" HorizontalAlignment="Left" />
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Style="{StaticResource SkeletonBoneStyle}" Width="56" Height="22" VerticalAlignment="Top" />
+                                    </Grid>
+                                </Border>
+                                <Border Style="{StaticResource SkeletonWorkLogRowStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <Border Style="{StaticResource SkeletonBoneStyle}" Width="110" Height="16" HorizontalAlignment="Left" />
+                                            <Border Style="{StaticResource SkeletonBoneStyle}" Width="240" Height="12" Margin="0,10,0,0" HorizontalAlignment="Left" />
+                                            <Border Style="{StaticResource SkeletonBoneStyle}" Width="150" Height="10" Margin="0,8,0,0" HorizontalAlignment="Left" />
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Style="{StaticResource SkeletonBoneStyle}" Width="56" Height="22" VerticalAlignment="Top" />
+                                    </Grid>
+                                </Border>
+                                <Border Style="{StaticResource SkeletonWorkLogRowStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <Border Style="{StaticResource SkeletonBoneStyle}" Width="128" Height="16" HorizontalAlignment="Left" />
+                                            <Border Style="{StaticResource SkeletonBoneStyle}" Width="190" Height="12" Margin="0,10,0,0" HorizontalAlignment="Left" />
+                                            <Border Style="{StaticResource SkeletonBoneStyle}" Width="170" Height="10" Margin="0,8,0,0" HorizontalAlignment="Left" />
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Style="{StaticResource SkeletonBoneStyle}" Width="56" Height="22" VerticalAlignment="Top" />
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                                        Visibility="{Binding ShowEmptyState, Converter={StaticResource GlassBoolToVis}}">
+                                <TextBlock Text="항목이 없습니다." FontSize="{StaticResource FontSize.Base}" FontWeight="SemiBold"
+                                           Foreground="{StaticResource WlGlassMuted}" HorizontalAlignment="Center" />
+                                <Button Style="{StaticResource GlassAccentButton}" Content="TFS 가져오기"
+                                        Margin="0,14,0,0" HorizontalAlignment="Center"
+                                        Command="{Binding OpenImportCommand}" />
+                            </StackPanel>
+
+                            <ScrollViewer Style="{StaticResource GlassScrollViewer}"
+                                          Padding="0,0,4,0"
+                                          Visibility="{Binding ShowListContent, Converter={StaticResource GlassBoolToVis}}">
+                                <ItemsControl ItemsSource="{Binding DateGroups}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="0,0,0,18">
+                                                <DockPanel Margin="2,0,2,8" LastChildFill="True">
+                                                    <Button DockPanel.Dock="Left" Style="{StaticResource WorkLogIconButton}"
+                                                            Width="22" Height="22" Margin="0,0,6,0"
+                                                            Command="{Binding ToggleExpandCommand}"
+                                                            ToolTip="펼치기/접기">
+                                                        <Image Width="8" Height="8" Opacity="0.7" Stretch="Uniform">
+                                                            <Image.Style>
+                                                                <Style TargetType="Image">
+                                                                    <Setter Property="Source" Value="{StaticResource ExpandDownIcon}" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsExpanded}" Value="False">
+                                                                            <Setter Property="Source" Value="{StaticResource ExpandRightIcon}" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Image.Style>
+                                                        </Image>
+                                                    </Button>
+                                                    <TextBlock Text="{Binding DateHeader}"
+                                                               Style="{StaticResource GlassDateGroupHeader}"
+                                                               VerticalAlignment="Center" />
+                                                </DockPanel>
+                                                <Border Height="1" Background="#80FFFFFF" Margin="0,0,0,6" />
+
+                                                <ItemsControl ItemsSource="{Binding Items}"
+                                                              Visibility="{Binding IsExpanded, Converter={StaticResource GlassBoolToVis}}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Style="{StaticResource GlassTicketRowStyle}">
+                                                                <Border.InputBindings>
+                                                                    <MouseBinding Gesture="LeftClick"
+                                                                                  Command="{Binding DataContext.SelectItemCommand, ElementName=GlassRoot}"
+                                                                                  CommandParameter="{Binding}" />
+                                                                </Border.InputBindings>
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="3" />
+                                                                        <ColumnDefinition Width="120" />
+                                                                        <ColumnDefinition Width="*" MinWidth="180" />
+                                                                        <ColumnDefinition Width="1.1*" MinWidth="200" />
+                                                                        <ColumnDefinition Width="28" />
+                                                                    </Grid.ColumnDefinitions>
+
+                                                                    <Border Grid.Column="0" Width="3" CornerRadius="2"
+                                                                            Background="{StaticResource WlGlassAccent}"
+                                                                            VerticalAlignment="Stretch" Margin="0,2,8,2"
+                                                                            Visibility="{Binding IsSelected, Converter={StaticResource GlassBoolToVis}}" />
+
+                                                                    <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="8,2,8,0">
+                                                                        <TextBlock Text="{Binding TicketNumberText}" FontSize="{StaticResource FontSize.Base}"
+                                                                                   FontWeight="SemiBold"
+                                                                                   Foreground="{StaticResource WlGlassAccent}"
+                                                                                   TextWrapping="Wrap"
+                                                                                   Visibility="{Binding HasTicket, Converter={StaticResource GlassBoolToVis}}" />
+                                                                    </StackPanel>
+
+                                                                    <StackPanel Grid.Column="2" VerticalAlignment="Top" Margin="0,0,14,0">
+                                                                        <TextBlock Text="{Binding ListTitleText}" FontSize="{StaticResource FontSize.Md}"
+                                                                                   FontWeight="SemiBold"
+                                                                                   Foreground="{StaticResource WlGlassInk}"
+                                                                                   TextWrapping="Wrap"
+                                                                                   ToolTip="{Binding ContentsTooltip}"
+                                                                                   Visibility="{Binding HasListTitle, Converter={StaticResource GlassBoolToVis}}" />
+                                                                        <TextBlock Text="{Binding ListMetaCompact}" FontSize="{StaticResource FontSize.Base}"
+                                                                                   Foreground="{StaticResource WlGlassMuted}"
+                                                                                   Margin="0,4,0,0" TextWrapping="Wrap"
+                                                                                   Visibility="{Binding HasListMetaCompact, Converter={StaticResource GlassBoolToVis}}" />
+                                                                    </StackPanel>
+
+                                                                    <!-- SoftWrap newlines only; NoWrap so WPF does not break at ':' -->
+                                                                    <TextBlock Grid.Column="3"
+                                                                               Text="{Binding ListCommentFullText}"
+                                                                               FontSize="{StaticResource FontSize.Base}"
+                                                                               Foreground="#405CC3"
+                                                                               TextWrapping="NoWrap"
+                                                                               TextAlignment="Right"
+                                                                               HorizontalAlignment="Right"
+                                                                               MaxWidth="520"
+                                                                               VerticalAlignment="Top"
+                                                                               LineHeight="18"
+                                                                               Margin="0,2,8,0"
+                                                                               Visibility="{Binding HasListCommentFull, Converter={StaticResource GlassBoolToVis}}" />
+
+                                                                    <TextBlock Grid.Column="4" Text="&#x203A;" FontSize="{StaticResource FontSize.Xxl}"
+                                                                               Foreground="{StaticResource WlGlassMuted}"
+                                                                               VerticalAlignment="Top" Margin="0,2,0,0"
+                                                                               HorizontalAlignment="Center" />
+                                                                </Grid>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Grid>
+
+                        <!-- (comment trimmed) -->
+                        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center"
+                                    Margin="0,12,0,0" VerticalAlignment="Bottom"
+                                    Visibility="{Binding ShowPagination, Converter={StaticResource GlassBoolToVis}}">
+                            <Button Style="{StaticResource GlassPagerNavButton}"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    Command="{Binding PrevPageCommand}" ToolTip="이전">
+                                <Image Source="{StaticResource ExpandLeftIcon}" Width="10" Height="10"
+                                       Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Button>
+                            <ItemsControl ItemsSource="{Binding PageNumbers}" Margin="0" Padding="0"
+                                          VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" Margin="0"
+                                                    VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource GlassPageNumberButton}"
+                                                Content="{Binding DisplayText}"
+                                                HorizontalContentAlignment="Center"
+                                                VerticalContentAlignment="Center"
+                                                Margin="0" Padding="0"
+                                                Command="{Binding DataContext.GoToPageCommand, ElementName=GlassRoot}"
+                                                CommandParameter="{Binding PageNumber}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Button Style="{StaticResource GlassPagerNavButton}"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    Command="{Binding NextPageCommand}" ToolTip="다음">
+                                <Image Source="{StaticResource ExpandRightIcon}" Width="10" Height="10"
+                                       Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Button>
+                        </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Dim: site picker or filter option bubble (same as site dropdown) -->
+        <Border Background="#66000000" Panel.ZIndex="50"
+                Visibility="{Binding IsSitePickerOpen, Converter={StaticResource GlassBoolToVis}}">
+            <Border.InputBindings>
+                <MouseBinding Gesture="LeftClick" Command="{Binding CloseSitePickerCommand}" />
+            </Border.InputBindings>
+        </Border>
+        <Border Background="#66000000" Panel.ZIndex="50"
+                Visibility="{Binding IsFilterMenuOpen, Converter={StaticResource GlassBoolToVis}}">
+            <Border.InputBindings>
+                <MouseBinding Gesture="LeftClick" Command="{Binding CloseFilterMenuCommand}" />
+            </Border.InputBindings>
+        </Border>
+    </Grid>
+</UserControl>

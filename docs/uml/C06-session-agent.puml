@@ -1,0 +1,62 @@
+﻿@startuml GBCWorkHub_C06_SessionAgent
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+title Remote SessionAgent ??Class Diagram (conceptual)
+
+class SessionAgentProgram <<Aurora/RC/CMC variants>> {
+  + Main(args)
+  + HandleConnect()
+  + HandleDisconnect()
+  - TryReadSyncRequest()
+  - TryCopyToClipboard()
+  - _userClipboardBackup
+}
+
+class ClipboardHelper {
+  + TrySetTextWithBackup()
+  + RestoreUserBackup()
+}
+
+class TfsRecentCollector {
+  + Collect()
+  -- REST _apis or OM QueryHistory --
+}
+
+class SyncRequest {
+  + TryReadFromClipboard()
+  + SessionToken
+  + RequestId
+}
+
+class SourceTreeSnapshot {
+  + CaptureBaseline()
+}
+
+class SnapshotDiff
+class SessionChangeClassifier
+class SessionChangeResult {
+  + ToClipboardText()
+  -- GBCWORKHUB_SESSION_RESULT:: --
+}
+
+class PendingTfsFile <<artifact>> {
+  PendingTfsRecent.json
+}
+
+SessionAgentProgram --> ClipboardHelper
+SessionAgentProgram --> TfsRecentCollector
+SessionAgentProgram --> SyncRequest
+SessionAgentProgram --> SourceTreeSnapshot
+SessionAgentProgram --> SnapshotDiff
+SessionAgentProgram --> SessionChangeClassifier
+SessionAgentProgram --> SessionChangeResult
+SessionAgentProgram --> PendingTfsFile
+
+note right of SessionAgentProgram
+  Short-lived process per connect/disconnect.
+  No FileSystemWatcher in shipped path.
+  CMC: wait SYNC_REQUEST before CONNECT write.
+end note
+
+@enduml
+

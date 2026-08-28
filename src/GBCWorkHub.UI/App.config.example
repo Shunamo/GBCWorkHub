@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+  <configSections>
+    <section name="oracle.manageddataaccess.client"
+             type="OracleInternal.Common.ODPMSectionHandler, Oracle.ManagedDataAccess, Version=4.122.19.1, Culture=neutral, PublicKeyToken=89b483f429c47342" />
+  </configSections>
+  <startup>
+    <supportedRuntime version="v4.0" sku=".NETFramework,Version=v4.8" />
+  </startup>
+  <connectionStrings>
+    <!-- Copy this file to App.config and fill in Oracle credentials. Do not commit App.config. -->
+    <add name="GbcWorkHubDb"
+         providerName="Oracle.ManagedDataAccess.Client"
+         connectionString="User Id=YOUR_USER;Password=YOUR_PASSWORD;Data Source=YOUR_TNS;" />
+  </connectionStrings>
+  <appSettings>
+    <add key="WorkLog.UseGlassmorphism" value="true" />
+    <add key="AURORA.Host" value="" />
+    <add key="AURORA.PcNames" value="" />
+    <add key="RC.Host" value="" />
+    <add key="RC.PcNames" value="" />
+    <add key="CMC.Host" value="" />
+    <add key="CMC.PcNames" value="" />
+    <add key="FortiClient.ExePath" value="" />
+    <add key="RemotePc.DbPollSeconds" value="2" />
+    <add key="Tfs.SkipAuthorFilter" value="false" />
+  </appSettings>
+  <runtime>
+    <assemblyBinding xmlns="urn:schemas-microsoft-com:asm.v1">
+      <dependentAssembly>
+        <assemblyIdentity name="Newtonsoft.Json" publicKeyToken="30ad4fe6b2a6aeed" culture="neutral" />
+        <bindingRedirect oldVersion="0.0.0.0-13.0.0.0" newVersion="13.0.0.0" />
+      </dependentAssembly>
+    </assemblyBinding>
+  </runtime>
+</configuration>

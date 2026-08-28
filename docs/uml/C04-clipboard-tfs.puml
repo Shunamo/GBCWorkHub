@@ -1,0 +1,110 @@
+﻿@startuml GBCWorkHub_C04_ClipboardTfs
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+title Clipboard Protocol + TFS Sync ??Class Diagram
+
+interface IClipboardAccessor {
+  + TryGetText()
+  + SetText()
+  + Clear()
+}
+
+class WpfClipboardAccessor
+class FakeClipboardAccessor
+
+class ClipboardProtocolLeaseManager {
+  - _activeLease
+  + BeginSyncRequest()
+  + TryRefreshSyncRequest()
+  + WriteTransientAck()
+  + CompleteAckLease()
+  + TryEndActiveSyncRequestLease()
+}
+
+class ClipboardProtocolLease {
+  + Kind
+  + WrittenText
+  + UserBackup
+  + IsDisplaced
+}
+
+enum ClipboardLeaseKind {
+  Ack
+  SyncRequest
+}
+enum ClipboardWriteOutcome {
+  Written
+  AlreadyCurrent
+  SkippedForeignInboundPresent
+  Displaced
+  Failed
+}
+
+class ClipboardWriteResult
+
+class TfsClipboardAckService <<static>> {
+  + AckPrefix
+  + SyncRequestPrefix
+  + SessionTokenAnnouncePrefix
+  + TryWriteAck()
+  + TryWriteSyncRequest()
+  + TryAnnounceSessionToken()
+  + TryClearSyncRequestIfPresent()
+}
+
+class TfsSyncCoordinator {
+  + HandleUserSessionEndedAsync()
+  + RunFetchAsync()
+  + TryAcceptTfsPayload()
+  + IsWaitingForPayload
+}
+
+class TfsSyncRequest {
+  + RemoteIp
+  + RequestId
+  + SessionToken
+  + ClipboardOnly
+}
+
+enum TfsSyncState
+enum TfsSyncFailReason
+
+class TfsPayloadIngestService <<static>>
+class TfsPendingSessionStore <<static>>
+class TfsSyncPromptGate <<static>>
+class ClipboardMonitorService
+class TfsClipboardPayloadService
+class TfsRecentChangesetsPayload
+class TfsSyncRequestClipboardDto
+class TfsWorkLogViewModel
+
+WpfClipboardAccessor ..|> IClipboardAccessor
+FakeClipboardAccessor ..|> IClipboardAccessor
+ClipboardProtocolLeaseManager --> IClipboardAccessor
+ClipboardProtocolLeaseManager o-- ClipboardProtocolLease
+ClipboardWriteResult --> ClipboardProtocolLease
+ClipboardProtocolLease --> ClipboardLeaseKind
+ClipboardWriteResult --> ClipboardWriteOutcome
+
+TfsClipboardAckService --> ClipboardProtocolLeaseManager
+TfsClipboardAckService --> WpfClipboardAccessor
+TfsClipboardAckService --> TfsSyncRequestClipboardDto
+TfsSyncCoordinator --> TfsClipboardAckService
+TfsSyncCoordinator --> TfsSyncRequest
+TfsSyncCoordinator --> TfsSyncState
+TfsSyncCoordinator --> TfsPayloadIngestService
+TfsSyncCoordinator --> TfsPendingSessionStore
+TfsSyncCoordinator --> TfsSyncPromptGate
+TfsSyncCoordinator --> TfsWorkLogViewModel
+ClipboardMonitorService ..> TfsClipboardAckService : ignore ACK/SYNC prefixes
+TfsPayloadIngestService --> TfsClipboardPayloadService
+TfsClipboardPayloadService --> TfsRecentChangesetsPayload
+
+note bottom of ClipboardProtocolLease
+  UserBackup lives in process RAM only.
+  Restore uses exact CAS:
+  current clipboard == WrittenText
+end note
+
+@enduml
+

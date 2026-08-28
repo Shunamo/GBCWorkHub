@@ -1,0 +1,70 @@
+﻿@startuml GBCWorkHub_C05_WorkLog
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+title WorkLog ??Class Diagram
+
+class WorkLogListViewModel {
+  + ReloadFromDbAsync()
+  + ImportCsv()
+  + OpenTfsImport()
+  + Save / Delete commands
+}
+
+class WorkLogEditDialogViewModel
+class WorkLogEditSession
+class WorkLogEditValidator <<static>>
+class WorkLogPersistenceService {
+  + GetPageAsync()
+  + SaveAsync()
+  + DeleteAsync()
+}
+class WorkLogImportService {
+  + ParseFile()
+  + SaveParsedRecordsAsync()
+}
+class WorkLogTfsImportCoordinator {
+  + ApplySelectedBatches()
+}
+class TfsImportDialogViewModel
+class WorkLogListItemViewModel
+
+class WorkLogBiz {
+  + GetPageAsync()
+  + SaveAsync()
+  + GetContentDedupKeysAsync()
+}
+class WorkLogExcelImporter <<static>>
+class WorkLogExcelXlsxImporter <<static>>
+class WorkLogExcelCsvImporter <<static>>
+class WorkLogContentDedup <<static>>
+class TfsWorkLogParser
+class TfsWorkLogCandidateClassifier <<static>>
+
+interface IWorkLogRepository
+class OracleWorkLogRepository
+class WorkLogRecordDto
+class WorkLogDraft
+
+WorkLogListViewModel --> WorkLogPersistenceService
+WorkLogListViewModel --> WorkLogImportService
+WorkLogListViewModel --> WorkLogTfsImportCoordinator
+WorkLogListViewModel --> WorkLogEditSession
+WorkLogListViewModel o-- WorkLogListItemViewModel
+WorkLogListViewModel --> TfsImportDialogViewModel
+WorkLogEditSession --> WorkLogEditDialogViewModel
+WorkLogEditDialogViewModel --> WorkLogEditValidator
+WorkLogPersistenceService --> WorkLogBiz
+WorkLogImportService --> WorkLogBiz
+WorkLogImportService --> WorkLogExcelImporter
+WorkLogImportService --> WorkLogContentDedup
+WorkLogExcelImporter --> WorkLogExcelXlsxImporter
+WorkLogExcelImporter --> WorkLogExcelCsvImporter
+WorkLogTfsImportCoordinator --> TfsWorkLogParser
+TfsWorkLogParser --> TfsWorkLogCandidateClassifier
+WorkLogBiz --> IWorkLogRepository
+OracleWorkLogRepository ..|> IWorkLogRepository
+WorkLogBiz --> WorkLogRecordDto
+TfsWorkLogParser --> WorkLogDraft
+
+@enduml
+

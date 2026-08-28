@@ -1,0 +1,34 @@
+﻿@startuml GBCWorkHub_S04_CmcPmp
+skinparam shadowing false
+title Sequence ??CMC PMP Web RDP Occupancy
+
+actor User
+participant "RemoteSessionController" as RSC
+participant "CmcPmpBrowserLauncher" as Br
+participant "Browser / PMP" as Pmp
+participant "CmcPmpSessionMonitor" as Mon
+participant "RemotePcShareBiz" as Share
+participant "TfsSyncCoordinator" as Tfs
+
+User -> RSC : ConnectCmcWithPmpAsync
+RSC -> Br : TryOpenAutoLogon()
+Br -> Pmp : open PassTrixMain AutoLogon
+RSC -> Mon : StartWatching(shareKey, pcName)
+RSC -> User : CMC / PMP info popup
+
+User -> Pmp : login + open web RDP
+Pmp -> Mon : rdp.ma / PMP RDP SESSION visible
+Mon -> RSC : SessionAppeared
+RSC -> Share : TryReserveAsync (CMC occupy)
+note right of RSC
+  VPN / list-only does NOT occupy.
+  Title watch drives occupancy.
+end note
+
+User -> Pmp : close rdp.ma window
+Mon -> RSC : SessionLost
+RSC -> Share : ReleaseAsync
+RSC -> Tfs : HandleUserSessionEndedAsync\n(ClipboardOnly = true)
+
+@enduml
+

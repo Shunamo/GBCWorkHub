@@ -1,0 +1,38 @@
+﻿@startuml GBCWorkHub_S06_WorkLogExcel
+skinparam shadowing false
+title Sequence ??WorkLog Excel Import
+
+actor User
+participant "WorkLogListViewModel" as List
+participant "OpenFileDialog" as Dlg
+participant "WorkLogImportService" as Imp
+participant "WorkLogExcelImporter" as Xls
+participant "WorkLogBiz" as Biz
+participant "OracleWorkLogRepository" as Repo
+
+User -> List : Excel 媛?몄삤湲?List -> Dlg : pick .xlsx/.csv
+List -> Imp : ParseFile(path) [Task.Run]
+Imp -> Xls : ParseFile
+Xls --> Imp : List<WorkLogRecordDto>
+List -> Imp : SaveParsedRecordsAsync(records, site)
+Imp -> Biz : GetContentDedupKeysAsync
+loop each record
+  alt fingerprint exists
+    Imp -> Imp : SkipCount++
+  else
+    Imp -> Biz : SaveAsync(dto)
+    Biz -> Repo : SaveCore Insert/Update
+  end
+end
+Imp --> List : WorkLogFileImportResult
+List -> List : Items + ReloadFromDbAsync
+List -> User : MessageBox summary
+
+note right
+  Dedup = content fingerprint skip.
+  Changed Excel rows currently INSERT
+  unless LogId is set (no Ticket upsert yet).
+end note
+
+@enduml
+

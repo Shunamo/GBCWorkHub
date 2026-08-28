@@ -1,0 +1,37 @@
+﻿@startuml GBCWorkHub_S05_TfsSync
+skinparam shadowing false
+title Sequence ??TFS Clipboard Handshake (Aurora/RC)
+
+actor User
+participant "TfsSyncCoordinator" as Coord
+participant "PopupService" as Pop
+participant "TfsClipboardAckService" as Ack
+participant "ClipboardProtocolLeaseManager" as Lease
+participant "RdpSessionTrackingService" as Track
+participant "Clipboard + rdpclip" as Clip
+participant "SessionAgent" as Agent
+participant "ClipboardMonitorService" as Mon
+participant "TfsClipboardPayloadService" as Parse
+participant "TfsWorkLogViewModel" as TfsVm
+
+User -> Coord : session ended / 媛?몄삤湲?Coord -> Pop : ShowConfirmAsync
+User -> Pop : Primary = 媛?몄삤湲?Coord -> Ack : TryWriteSyncRequest(dto)
+Ack -> Lease : Begin/Refresh SyncRequest\n(backup UserBackup in RAM)
+Lease -> Clip : GBCWORKHUB_TFS_SYNC_REQUEST::
+Coord -> Coord : settle ~2s
+Coord -> Track : mstsc reconnect (TfsSync)
+Track -> Agent : RDP reconnect
+Agent -> Clip : read SYNC_REQUEST
+Agent -> Clip : GBCWORKHUB:: CONNECT (reply)
+Agent -> Agent : harvest TFS\n(QueryHistory or REST)
+Agent -> Clip : GBCWORKHUB_TFS:: JSON
+Clip -> Mon : WM_CLIPBOARDUPDATE
+Mon -> Coord : TryAcceptTfsPayload
+Coord -> Parse : TryHandleClipboardText
+Coord -> TfsVm : apply candidates
+Coord -> Ack : TryWriteAck(deliveryId)
+Ack -> Lease : WriteTransientAck\n(+ restore UserBackup CAS)
+Coord -> Track : close mstsc
+
+@enduml
+

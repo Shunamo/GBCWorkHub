@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="980" viewBox="0 0 1280 980">
+  <defs>
+    <marker id="mk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 1.2 L9 5 L0 8.8 z" fill="#2D3748"/>
+    </marker>
+    <marker id="mkI" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0 L12 6 L0 12 z" fill="none" stroke="#2D3748" stroke-width="1.2"/>
+    </marker>
+  </defs>
+  <style>
+    .f { font-family: Helvetica, Arial, sans-serif; }
+    .pkg { font-size: 11px; font-weight: 700; fill: #718096; letter-spacing: 0.08em; }
+    .ct { font-size: 12px; font-weight: 700; fill: #1A202C; }
+    .cm { font-size: 10px; fill: #4A5568; }
+    .ci { font-size: 11px; font-weight: 700; font-style: italic; fill: #1A202C; }
+    .cap { font-size: 12px; font-style: italic; fill: #4A5568; }
+    .leg { font-size: 10px; fill: #2D3748; }
+  </style>
+  <rect width="1280" height="980" fill="#ffffff"/>
+
+  <text x="40" y="28" class="f ct">Clipboard / TFS protocol  class diagram</text>
+  <text x="40" y="46" class="f cm">Local Work Hub (UI/BIZ/DTO) and remote SessionAgent. Solid arrow = uses; hollow triangle = implements.</text>
+
+  <!-- legend -->
+  <rect x="900" y="16" width="340" height="40" rx="3" fill="#F7FAFC" stroke="#A0AEC0" stroke-width="1"/>
+  <line x1="920" y1="30" x2="960" y2="30" stroke="#2D3748" stroke-width="1.2" marker-end="url(#mk)"/>
+  <text x="970" y="33" class="f leg">uses / calls</text>
+  <line x1="1060" y1="30" x2="1100" y2="30" stroke="#2D3748" stroke-width="1.2" marker-end="url(#mkI)"/>
+  <text x="1110" y="33" class="f leg">implements</text>
+  <rect x="920" y="40" width="28" height="10" fill="#E8E0D6" stroke="#8D7F6E"/>
+  <text x="954" y="49" class="f leg">class</text>
+  <rect x="1000" y="40" width="28" height="10" fill="#EDF2F7" stroke="#718096" stroke-dasharray="3 2"/>
+  <text x="1034" y="49" class="f leg">interface / static facade</text>
+
+  <!-- ========== PACKAGE: UI Host ========== -->
+  <text x="40" y="78" class="f pkg">UI HOST</text>
+  <rect x="40" y="86" width="200" height="118" rx="3" fill="#E8E0D6" stroke="#8D7F6E" stroke-width="1.15"/>
+  <line x1="40" y1="110" x2="240" y2="110" stroke="#8D7F6E" stroke-width="1"/>
+  <text x="140" y="104" text-anchor="middle" class="f ct">MainWindow</text>
+  <text x="52" y="128" class="f cm">+ ClipboardMonitorService</text>
+  <text x="52" y="144" class="f cm">+ MainViewModel</text>
+  <text x="52" y="160" class="f cm">OnGbcClipboardReceived()</text>
+  <text x="52" y="176" class="f cm">OnTfsClipboardReceived()</text>
+  <text x="52" y="192" class="f cm">ReprocessCurrentClipboard()</text>
+
+  <rect x="260" y="86" width="220" height="118" rx="3" fill="#E8E0D6" stroke="#8D7F6E" stroke-width="1.15"/>
+  <line x1="260" y1="110" x2="480" y2="110" stroke="#8D7F6E" stroke-width="1"/>
+  <text x="370" y="104" text-anchor="middle" class="f ct">MainViewModel</text>
+  <text x="272" y="128" class="f cm">+ TfsSyncCoordinator</text>
+  <text x="272" y="144" class="f cm">+ RemoteWorkspaceViewModel</text>
+  <text x="272" y="160" class="f cm">HandleClipboardText()</text>
+  <text x="272" y="176" class="f cm">HandleTfsClipboardText()</text>
+  <text x="272" y="192" class="f cm">routes RDP vs TFS</text>
+
+  <rect x="500" y="86" width="220" height="118" rx="3" fill="#E8E0D6" stroke="#8D7F6E" stroke-width="1.15"/>
+  <line x1="500" y1="110" x2="720" y2="110" stroke="#8D7F6E" stroke-width="1"/>
+  <text x="610" y="104" text-anchor="middle" class="f ct">ClipboardMonitorService</text>
+  <text x="512" y="128" class="f cm">AddClipboardFormatListener</text>
+  <text x="512" y="144" class="f cm">event GbcClipboardReceived</text>
+  <text x="512" y="160" class="f cm">event TfsClipboardReceived</text>
+  <text x="512" y="176" class="f cm">event SessionChangeResult</text>
+  <text x="512" y="192" class="f cm">ProcessClipboardText()</text>
+
+  <rect x="740" y="86" width="220" height="118" rx="3" fill="#E8E0D6" stroke="#8D7F6E" stroke-width="1.15"/>
+  <line x1="740" y1="110" x2="960" y2="110" stroke="#8D7F6E" stroke-width="1"/>
+  <text x="850" y="104" text-anchor="middle" class="f ct">RemoteSessionController</text>
+  <text x="752" y="128" class="f cm">StartRemoteSession()</text>
+  <text x="752" y="144" class="f cm">ConnectRc / ConnectCmc</text>
+  <text x="752" y="160" class="f cm">TryHandleRdpClipboard()</text>
+  <text x="752" y="176" class="f cm">prompts TfsSync on end</text>
+  <text x="752" y="192" class="f cm">SESSION_TOKEN announce</text>
+
+  <rect x="980" y="86" width="260" height="118" rx="3" fill="#E8E0D6" stroke="#8D7F6E" stroke-width="1.15"/>
+  <line x1="980" y1="110" x2="1240" y2="110" stroke="#8D7F6E" stroke-width="1"/>
+  <text x="1110" y="104" text-anchor="middle" class="f ct">RemoteWorkspaceViewModel</text>
+  <text x="992" y="128" class="f cm">gallery / connect</text>
+  <text x="992" y="144" class="f cm">HandleClipboardText (RDP)</text>
+  <text x="992" y="160" class="f cm">RefreshRcVpnBadges()</text>
+  <text x="992" y="176" class="f cm">uses RemoteSessionController</text>
+  <text x="992" y="192" class="f cm">FortiVpnStatus</text>
+
+  <!-- host arrows -->
+  <path d="M240 120 H 260" fill="none" stroke="#2D3748" stroke-width="1.15" marker-end="url(#mk)"/>
+  <path d="M140 204 V 220 H 610 V 204" fill="none" stroke="#2D3748" stroke-width="1.15" marker-end="url(#mk)"/>
+  <path d="M370 204 V 220 H 850 V 204" fill="none" stroke="#2D3748" stroke-width="1.15" marker-end="url(#mk)"/>
+  <path d="M480 145 H 500" fill="none" stroke="#2D3748" stroke-width="1.15" marker-end="url(#mk)"/>
+  <path d="M960 145 H 980" fill="none" stroke="#2D3748" stroke-width="1.15" marker-end="url(#mk)"/>
+
+  <!-- ========== PACKAGE: Lease / Accessor ========== -->
+  <text x="40" y="248" class="f pkg">CLIPBOARD LEASE (safe write / restore)</text>
+
+  <rect x="40" y="256" width="240" height="100" rx="3" fill="#EDF2F7" stroke="#718096" stroke-width="1.15" stroke-dasharray="4 2"/>
+  <line x1="40" y1="280" x2="280" y2="280" stroke="#718096" stroke-width="1"/>
+  <text x="160" y="274" text-anchor="middle" class="f ci">&lt;&lt;interface&gt;&gt; IClipboardAccessor</text>
+  <text x="52" y="300" class="f cm">TryGetText(out text)</text>
+  <text x="52" y="316" class="f cm">SetText(text)</text>
+  <text x="52" y="332" class="f cm">Clear()</text>
+
+  <rect x="300" y="256" width="200" height="100" rx="3" fill="#E8E0D6" stroke="#8D7F6E" stroke-width="1.15"/>
+  <line x1="300" y1="280" x2="500" y2="280" stroke="#8D7F6E" stroke-width="1"/>
+  <text x="400" y="274" text-anchor="middle" class="f ct">WpfClipboardAccessor</text>
+  <text x="312" y="300" class="f cm">System.Windows.Clipboard</text>
+  <text x="312" y="316" class="f cm">UI Dispatcher marshal</text>
+  <text x="312" y="332" class="f cm">prod implementation</text>
+
+  <rect x="520" y="256" width="200" height="100" rx="3" fill="#E8E0D6" stroke="#8D7F6E" stroke-width="1.15"/>
+  <line x1="520" y1="280" x2="720" y2="280" stroke="#8D7F6E" stroke-width="1"/>
+  <text x="620" y="274" text-anchor="middle" class="f ct">FakeClipboardAccessor</text>
+  <text x="532" y="300" class="f cm">in-memory string</text>
+  <text x="532" y="316" class="f cm">UI.Tests only</text>
+  <text x="532" y="332" class="f cm">deterministic CAS tests</text>
+
+  <rect x="740" y="256" width="250" height="100" rx="3" fill="#E8E0D6" stroke="#8D7F6E" stroke-width="1.15"/>
+  <line x1="740" y1="280" x2="990" y2="280" stroke="#8D7F6E" stroke-width="1"/>
+  <text x="865" y="274" text-anchor="middle" class="f ct">ClipboardProtocolLeaseManager</text>
+  <text x="752" y="300" class="f cm">_activeLease : Lease</text>
+  <text x="752" y="316" class="f cm">Begin / Refresh SyncRequest</text>
+  <text x="752" y="332" class="f cm">WriteTransientAck / TryEnd</text>
+  <text x="752" y="348" class="f cm">exact CAS restore</text>
+
+  <rect x="1010" y="256" width="230" height="100" rx="3" fill="#E8E0D6" stroke="#8D7F6E" stroke-width="1.15"/>
+  <line x1="1010" y1="280" x2="1240" y2="280" stroke="#8D7F6E" stroke-width="1"/>
+  <text x="1125" y="274" text-anchor="middle" class="f ct">ClipboardProtocolLease</text>
+  <text x="1022" y="300" class="f cm">Kind, RequestId</text>
+  <text x="1022" y="316" class="f cm">WrittenText, WrittenHash</text>
+  <text x="1022" y="332" class="f cm">UserBackup (RAM)</text>
+  <text x="1022" y="348" class="f cm">IsDisplaced</text>
+
+  <path d="M400 256 V 240 H 160 V 256" fill="none" stroke="#2D3748" stroke-width="1.15" marker-end="url(#mkI)"/>
+  <path d="M620 256 V 240 H 160 V 256" fill="none" stroke="#2D3748" stroke-width="1.15" marker-end="url(#mkI)"/>
+  <path d="M740 300 H 280" fill="none" stroke="#2D3748" stroke-width="1.15" marker-end="url(#mk)"/>
+  <path d="M990 306 H 1010" fill="none" stroke="#2D3748" stroke-width="1.15" marker-end="url(#mk)"/>
+
+  <!-- enums row -->
+  <rect x="40" y="372" width="170" height="72" rx="3" fill="#F7FAFC" stroke="#A0AEC0" stroke-width="1"/>
+  <text x="125" y="392" text-anchor="middle" class="f ci">&lt;&lt;enum&gt;&gt; LeaseKind</text>
+  <text x="52" y="412" class="f cm">Ack</text>
+  <text x="52" y="428" class="f cm">SyncRequest</text>
+
+  <rect x="230" y="372" width="200" height="72" rx="3" fill="#F7FAFC" stroke="#A0AEC0" stroke-width="1"/>
+  <text x="330" y="392" text-anchor="middle" class="f ci">&lt;&lt;enum&gt;&gt; WriteOutcome</text>
+  <text x="242" y="412" class="f cm">Written / AlreadyCurrent</text>
+  <text x="242" y="428" class="f cm">SkippedForeign / Displaced / Failed</text>
+
+  <rect x="450" y="372" width="200" height="72" rx="3" fill="#E8E0D6" stroke="#8D7F6E" stroke-width="1.15"/>
+  <line x1="450" y1="396" x2="650" y2="396" stroke="#8D7F6E" stroke-width="1"/>
+  <text x="550" y="390" text-anchor="middle" class="f ct">ClipboardWriteResult</text>
+  <text x="462" y="416" class="f cm">Outcome</text>
+  <text x="462" y="432" class="f cm">Lease</text>
+
+  <path d="M865 356 V 408 H 650" fill="none" stroke="#2D3748" stroke-width="1.1" marker-end="url(#mk)"/>
+  <path d="M1125 356 V 430 H 650" fill="none" stroke="#2D3748" stroke-width="1.1" marker-end="url(#mk)"/>
+
+  <!-- ========== PACKAGE: Protocol facade ========== -->
+  <text x="40" y="470" class="f pkg">PROTOCOL FACADE / INGEST / ORCHESTRATION</text>
+
+  <rect x="40" y="478" width="260" height="130" rx="3" fill="#EDF2F7" stroke="#718096" stroke-width="1.15" stroke-dasharray="4 2"/>
+  <line x1="40" y1="502" x2="300" y2="502" stroke="#718096" stroke-width="1"/>
+  <text x="170" y="496" text-anchor="middle" class="f ci">&lt;&lt;static&gt;&gt; TfsClipboardAckService</text>
+  <text x="52" y="522" class="f cm">AckPrefix / SyncRequestPrefix</text>
+  <text x="52" y="538" class="f cm">SessionTokenAnnouncePrefix</text>
+  <text x="52" y="554" class="f cm">TryWriteAck / SyncRequest</text>
+  <text x="52" y="570" class="f cm">TryAnnounceSessionToken</text>
+  <text x="52" y="586" class="f cm">TryClearSyncRequestIfPresent</text>
+  <text x="52" y="602" class="f cm">owns LeaseManager + WpfAccessor</text>
+
+  <rect x="320" y="478" width="250" height="130" rx="3" fill="#E8E0D6" stroke="#8D7F6E" stroke-width="1.15"/>
+  <line x1="320" y1="502" x2="570" y2="502" stroke="#8D7F6E" stroke-width="1"/>
+  <text x="445" y="496" text-anchor="middle" class="f ct">TfsSyncCoordinator</text>
+  <text x="332" y="522" class="f cm">TfsSyncRequest / State / Result</text>
+  <text x="332" y="538" class="f cm">PromptAfterSessionEnd()</text>
+  <text x="332" y="554" class="f cm">RunFetch / ClipboardOnly</text>
+  <text x="332" y="570" class="f cm">TryAcceptTfsPayload()</text>
+  <text x="332" y="586" class="f cm">WaitForPayload + ACK + close</text>
+  <text x="332" y="602" class="f cm">mstsc reconnect / timeout 60s</text>
+
+  <rect x="590" y="478" width="250" height="130" rx="3" fill="#EDF2F7" stroke="#718096" stroke-width="1.15" stroke-dasharray="4 2"/>
+  <line x1="590" y1="502" x2="840" y2="502" stroke="#718096" stroke-width="1"/>
+  <text x="715" y="496" text-anchor="middle" class="f ci">&lt;&lt;static&gt;&gt; TfsPayloadIngestService</text>
+  <text x="602" y="522" class="f cm">TryIngest(clipboardText)</text>
+  <text x="602" y="538" class="f cm">parse + author filter</text>
+  <text x="602" y="554" class="f cm">apply candidates to UI</text>
+  <text x="602" y="570" class="f cm">write ACK on success</text>
+  <text x="602" y="586" class="f cm">TfsPayloadIngestResult</text>
+  <text x="602" y="602" class="f cm">used when not mid-sync wait</text>
+
+  <rect x="860" y="478" width="180" height="130" rx="3" fill="#E8E0D6" stroke="#8D7F6E" stroke-width="1.15"/>
+  <line x1="860" y1="502" x2="1040" y2="502" stroke="#8D7F6E" stroke-width="1"/>
+  <text x="950" y="496" text-anchor="middle" class="f ct">TfsSyncRequest</text>
+  <text x="872" y="522" class="f cm">RemoteIp, RequestId</text>
+  <text x="872" y="538" class="f cm">SessionToken</text>
+  <text x="872" y="554" class="f cm">SessionStarted/Ended</text>
+  <text x="872" y="570" class="f cm">ClipboardOnly</text>
+  <text x="872" y="586" class="f cm">in-process (not wire)</text>
+
+  <rect x="1060" y="478" width="180" height="130" rx="3" fill="#F7FAFC" stroke="#A0AEC0" stroke-width="1"/>
+  <text x="1150" y="500" text-anchor="middle" class="f ci">&lt;&lt;enum&gt;&gt; TfsSyncState</text>
+  <text x="1072" y="520" class="f cm">Idle ... WaitingPayload</text>
+  <text x="1072" y="536" class="f cm">AckWritten ClosingRdp</text>
+  <text x="1072" y="552" class="f cm">Completed Failed TimedOut</text>
+  <text x="1072" y="576" class="f ci">&lt;&lt;enum&gt;&gt; FailReason</text>
+  <text x="1072" y="592" class="f cm">Timeout Cancelled ...</text>
+
+  <path d="M170 478 V 444 H 865" fill="none" stroke="#2D3748" stroke-width="1.15" marker-end="url(#mk)"/>
+  <path d="M320 530 H 300" fill="none" stroke="#2D3748" stroke-width="1.15" marker-end="url(#mk)"/>
+  <path d="M590 540 H 570" fill="none" stroke="#2D3748" stroke-width="1.15" marker-end="url(#mk)"/>
+  <path d="M445 478 V 460 H 170 V 478" fill="none" stroke="#2D3748" stroke-width="1.1" marker-end="url(#mk)"/>
+  <path d="M570 540 H 590" fill="none" stroke="#2D3748" stroke-width="1.1"/>
+  <path d="M715 478 V 460 H 445" fill="none" stroke="#2D3748" stroke-width="1.1" marker-end="url(#mk)"/>
+  <path d="M570 520 H 860" fill="none" stroke="#2D3748" stroke-width="1.1" marker-end="url(#mk)"/>
+  <path d="M1040 530 H 1060" fill="none" stroke="#2D3748" stroke-width="1.1" marker-end="url(#mk)"/>
+
+  <!-- helpers -->
+  <rect x="40" y="624" width="200" height="70" rx="3" fill="#EDF2F7" stroke="#718096" stroke-width="1" stroke-dasharray="4 2"/>
+  <text x="140" y="646" text-anchor="middle" class="f ci">TfsPendingSessionStore</text>
+  <text x="52" y="666" class="f cm">Upsert / Remove Later</text>
+  <text x="52" y="682" class="f cm">badge retry source</text>
+
+  <rect x="260" y="624" width="180" height="70" rx="3" fill="#EDF2F7" stroke="#718096" stroke-width="1" stroke-dasharray="4 2"/>
+  <text x="350" y="646" text-anchor="middle" class="f ci">TfsSyncPromptGate</text>
+  <text x="272" y="666" class="f cm">skip duplicate prompt</text>
+  <text x="272" y="682" class="f cm">per session</text>
+
+  <path d="M445 608 V 640 H 240" fill="none" stroke="#2D3748" stroke-width="1.1" marker-end="url(#mk)"/>
+  <path d="M445 608 V 640 H 260" fill="none" stroke="#2D3748" stroke-width="1.1" marker-end="url(#mk)"/>
+
+  <!-- ========== BIZ + DTO ========== -->
+  <text x="460" y="640" class="f pkg">BIZ PARSERS</text>
+  <rect x="460" y="648" width="230" height="90" rx="3" fill="#C5D0DB" stroke="#5C6B7A" stroke-width="1.15"/>
+  <line x1="460" y1="672" x2="690" y2="672" stroke="#5C6B7A" stroke-width="1"/>
+  <text x="575" y="666" text-anchor="middle" class="f ct">TfsClipboardPayloadService</text>
+  <text x="472" y="692" class="f cm">ClipboardPrefix GBCWORKHUB_TFS::</text>
+  <text x="472" y="708" class="f cm">TryHandleClipboardText()</text>
+  <text x="472" y="724" class="f cm">’ TfsRecentChangesetsPayload</text>
+
+  <rect x="710" y="648" width="210" height="90" rx="3" fill="#C5D0DB" stroke="#5C6B7A" stroke-width="1.15"/>
+  <line x1="710" y1="672" x2="920" y2="672" stroke="#5C6B7A" stroke-width="1"/>
+  <text x="815" y="666" text-anchor="middle" class="f ct">RdpStatusBiz</text>
+  <text x="722" y="692" class="f cm">ClipboardPrefix GBCWORKHUB::</text>
+  <text x="722" y="708" class="f cm">RC status line regex</text>
+  <text x="722" y="724" class="f cm">’ RdpStatusPayload</text>
+
+  <text x="950" y="640" class="f pkg">DTO (wire)</text>
+  <rect x="950" y="648" width="290" height="90" rx="3" fill="#FEF3C7" stroke="#C4A574" stroke-width="1.15"/>
+  <line x1="950" y1="672" x2="1240" y2="672" stroke="#C4A574" stroke-width="1"/>
+  <text x="1095" y="666" text-anchor="middle" class="f ct">Wire DTOs</text>
+  <text x="962" y="692" class="f cm">TfsSyncRequestClipboardDto  (SYNC_REQUEST)</text>
+  <text x="962" y="708" class="f cm">TfsRecentChangesetsPayload + ChangesetItem</text>
+  <text x="962" y="724" class="f cm">RdpStatusPayload  (CONNECT / DISCONNECT)</text>
+
+  <path d="M715 608 V 648" fill="none" stroke="#2D3748" stroke-width="1.1" marker-end="url(#mk)"/>
+  <path d="M445 608 V 620 H 575 V 648" fill="none" stroke="#2D3748" stroke-width="1.1" marker-end="url(#mk)"/>
+  <path d="M850 204 V 230 H 815 V 648" fill="none" stroke="#2D3748" stroke-width="1.1" marker-end="url(#mk)"/>
+  <path d="M575 738 H 950" fill="none" stroke="#2D3748" stroke-width="1.1" marker-end="url(#mk)"/>
+  <path d="M815 738 V 760 H 1095 V 738" fill="none" stroke="#2D3748" stroke-width="1.1" marker-end="url(#mk)"/>
+  <path d="M170 608 V 620 H 1095 V 648" fill="none" stroke="#2D3748" stroke-width="1.05" marker-end="url(#mk)"/>
+
+  <!-- ========== REMOTE ========== -->
+  <text x="40" y="770" class="f pkg">REMOTE SessionAgent (tools/*_SessionAgent_Program.cs)</text>
+  <rect x="40" y="778" width="600" height="110" rx="3" fill="#C5D0DB" stroke="#5C6B7A" stroke-width="1.15"/>
+  <line x1="40" y1="802" x2="640" y2="802" stroke="#5C6B7A" stroke-width="1"/>
+  <text x="340" y="796" text-anchor="middle" class="f ct">Aurora / RC / CMC SessionAgent</text>
+  <text x="52" y="822" class="f cm">HandleConnect / HandleDisconnect</text>
+  <text x="52" y="838" class="f cm">TryReadSyncRequest ’ TryCopyToClipboard(CONNECT / TFS)</text>
+  <text x="52" y="854" class="f cm">_userClipboardBackup (static RAM) + hold restore</text>
+  <text x="52" y="870" class="f cm">PendingTfsRecent.json fallback | harvest: QueryHistory / REST</text>
+
+  <rect x="660" y="778" width="280" height="110" rx="3" fill="#E2E8F0" stroke="#8A8A82" stroke-width="1.15"/>
+  <line x1="660" y1="802" x2="940" y2="802" stroke="#8A8A82" stroke-width="1"/>
+  <text x="800" y="796" text-anchor="middle" class="f ct">Windows Clipboard + rdpclip</text>
+  <text x="672" y="822" class="f cm">single text slot (not a queue)</text>
+  <text x="672" y="838" class="f cm">local Monitor listens WM_CLIPBOARDUPDATE</text>
+  <text x="672" y="854" class="f cm">remote SetText / GetText</text>
+  <text x="672" y="870" class="f cm">shared across RDP session</text>
+
+  <rect x="960" y="778" width="280" height="110" rx="3" fill="#E8E0D6" stroke="#8D7F6E" stroke-width="1.15"/>
+  <line x1="960" y1="802" x2="1240" y2="802" stroke="#8D7F6E" stroke-width="1"/>
+  <text x="1100" y="796" text-anchor="middle" class="f ct">RdpSessionTrackingService</text>
+  <text x="972" y="822" class="f cm">mstsc / published .rdp</text>
+  <text x="972" y="838" class="f cm">used by TfsSync reconnect</text>
+  <text x="972" y="854" class="f cm">IsConnectionConfirmed</text>
+  <text x="972" y="870" class="f cm">ForceEnd / Exited</text>
+
+  <path d="M640 830 H 660" fill="none" stroke="#2D3748" stroke-width="1.2" marker-end="url(#mk)"/>
+  <path d="M610 204 V 760 H 800 V 778" fill="none" stroke="#2D3748" stroke-width="1.1" marker-end="url(#mk)"/>
+  <path d="M445 608 V 760 H 1100 V 778" fill="none" stroke="#2D3748" stroke-width="1.1" marker-end="url(#mk)"/>
+  <path d="M940 830 H 960" fill="none" stroke="#2D3748" stroke-width="1.1" marker-end="url(#mk)"/>
+
+  <text x="640" y="920" text-anchor="middle" class="f cap">Figure 3. Clipboard protocol classes. LeaseManager keeps UserBackup in RAM and restores only on exact CAS.</text>
+  <text x="640" y="940" text-anchor="middle" class="f cap">Monitor classifies inbound prefixes; Coordinator orchestrates SYNC_REQUEST ’ reconnect ’ TFS ’ ACK; Agent mirrors backup on remote.</text>
+  <text x="640" y="970" font-family="Arial" font-size="1" fill="#ffffff">.</text>
+</svg>

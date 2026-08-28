@@ -1,0 +1,29 @@
+﻿@startuml GBCWorkHub_M03_CmcComm
+skinparam shadowing false
+title Communication - CMC Occupancy Collaboration
+
+object User
+object "RemoteSessionController" as RSC
+object "CmcPmpBrowserLauncher" as Br
+object "CmcPmpSessionMonitor" as Mon
+object "BrowserPmp" as Pmp
+object "RemotePcShareBiz" as Share
+object "TfsSyncCoordinator" as Tfs
+object "Gallery" as RW
+
+User --> RSC : 1 ConnectCmcWithPmpAsync
+RSC --> Br : 2 TryOpenAutoLogon
+Br --> Pmp : 3 open AutoLogon page
+RSC --> Mon : 4 StartWatching
+User --> Pmp : 5 open rdp.ma
+Pmp --> Mon : 6 title/tab visible
+Mon --> RSC : 7 SessionAppeared
+RSC --> Share : 8 reserve occupy
+RSC --> RW : 9 gallery IN_USE
+User --> Pmp : 10 close window
+Mon --> RSC : 11 SessionLost
+RSC --> Share : 12 release
+RSC --> Tfs : 13 ClipboardOnly TFS prompt
+
+@enduml
+

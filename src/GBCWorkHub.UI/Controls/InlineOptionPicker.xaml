@@ -1,0 +1,7 @@
+<UserControl x:Class="GBCWorkHub.UI.Controls.InlineOptionPicker"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root">
+    <!-- 항상 펼쳐진 칩 나열. Popup/배경 박스 없음. -->
+    <WrapPanel x:Name="PART_Options" Orientation="Horizontal" />
+</UserControl>

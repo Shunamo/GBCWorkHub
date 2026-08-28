@@ -1,0 +1,67 @@
+<UserControl x:Class="GBCWorkHub.UI.Views.MainTabBar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <Style x:Key="TabBarButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#64748B" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#99FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+        <Button Content="원격 PC"
+                Command="{Binding SelectMainTabCommand}" CommandParameter="Remote">
+            <Button.Style>
+                <Style TargetType="Button" BasedOn="{StaticResource TabBarButton}">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsRemoteTab}" Value="True">
+                            <Setter Property="Background" Value="#CCE8F0FF" />
+                            <Setter Property="Foreground" Value="#1E293B" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Button.Style>
+        </Button>
+        <Button Content="업무기록" Margin="6,0,0,0"
+                Command="{Binding SelectMainTabCommand}" CommandParameter="WorkLog">
+            <Button.Style>
+                <Style TargetType="Button" BasedOn="{StaticResource TabBarButton}">
+                    <Setter Property="Content" Value="업무기록" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsWorkLogTab}" Value="True">
+                            <Setter Property="Background" Value="#CCE8F0FF" />
+                            <Setter Property="Foreground" Value="#1E293B" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding HasPendingTfs}" Value="True">
+                            <Setter Property="Content" Value="업무기록 ●" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding WorkLogList.HasNewCandidates}" Value="True">
+                            <Setter Property="Content" Value="업무기록 ●" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Button.Style>
+        </Button>
+    </StackPanel>
+</UserControl>

@@ -1,0 +1,36 @@
+﻿@startuml GBCWorkHub_S03_RcForti
+skinparam shadowing false
+title Sequence ??RC Forti VPN + Published RDP
+
+actor User
+participant "RemoteWorkspaceViewModel" as RW
+participant "RemoteSessionController" as RSC
+participant "FortiVpnStatus" as Vpn
+participant "FortiClientLauncher" as Forti
+participant "PublishedRdpLauncher" as Pub
+participant "RemotePcShareBiz" as Share
+participant "RdpSessionTrackingService" as Track
+
+User -> RW : click RC PC
+RW -> RSC : ConnectRcWithPublishedRdpAsync
+RSC -> Vpn : IsConnected()
+alt VPN down
+  RSC -> Forti : TryLaunch()
+  Forti -> User : FortiClient SSL VPN window
+  RSC -> Forti : WaitUntilMainWindowClosedAsync
+  RSC -> Vpn : IsConnected() again
+  alt still down
+    RSC -> User : FortiClient popup\n(abort)
+  end
+end
+RSC -> Pub : TryFindForPc(site, pcName)
+Pub --> RSC : .rdp path
+RSC -> Share : TryReserveAsync
+RSC -> Track : TryStartPublishedRdp(path)
+note right
+  After launch: same clipboard
+  CONNECT / release path as Aurora
+end note
+
+@enduml
+

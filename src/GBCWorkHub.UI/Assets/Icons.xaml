@@ -1,0 +1,805 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 사이트 타일: 비활성 -->
+    <DrawingImage x:Key="SiteIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#E2E8F0">
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="32,32" RadiusX="28" RadiusY="28" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#94A3B8">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="3" RadiusY="3" Rect="16,18,32,22" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#CBD5E1">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="1.5" RadiusY="1.5" Rect="19,21,26,16" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#94A3B8">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="30,40,4,6" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#94A3B8">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="2" RadiusY="2" Rect="22,46,20,3" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- 사이트 타일: 활성 -->
+    <DrawingImage x:Key="SiteIconActive">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#DBEAFE">
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="32,32" RadiusX="28" RadiusY="28" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#2563EB">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="3" RadiusY="3" Rect="16,18,32,22" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Brush>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#EFF6FF" Offset="0" />
+                            <GradientStop Color="#BFDBFE" Offset="1" />
+                        </LinearGradientBrush>
+                    </GeometryDrawing.Brush>
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="1.5" RadiusY="1.5" Rect="19,21,26,16" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#60A5FA">
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="32,29" RadiusX="5" RadiusY="5" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#2563EB">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="30,40,4,6" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#2563EB">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="2" RadiusY="2" Rect="22,46,20,3" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- 하위 호환 -->
+    <DrawingImage x:Key="MonitorIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#E2E8F0">
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="32,32" RadiusX="28" RadiusY="28" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#94A3B8">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="3" RadiusY="3" Rect="16,18,32,22" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#CBD5E1">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="1.5" RadiusY="1.5" Rect="19,21,26,16" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#94A3B8">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="30,40,4,6" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#94A3B8">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="2" RadiusY="2" Rect="22,46,20,3" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <DrawingImage x:Key="MonitorIconActive">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#DBEAFE">
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="32,32" RadiusX="28" RadiusY="28" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#2563EB">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="3" RadiusY="3" Rect="16,18,32,22" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Brush>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#EFF6FF" Offset="0" />
+                            <GradientStop Color="#BFDBFE" Offset="1" />
+                        </LinearGradientBrush>
+                    </GeometryDrawing.Brush>
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="1.5" RadiusY="1.5" Rect="19,21,26,16" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#60A5FA">
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="32,29" RadiusX="5" RadiusY="5" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#2563EB">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="30,40,4,6" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#2563EB">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="2" RadiusY="2" Rect="22,46,20,3" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <DrawingImage x:Key="PcMonitorIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#1E293B">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="4" RadiusY="4" Rect="10,8,44,30" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Brush>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#E0F2FE" Offset="0" />
+                            <GradientStop Color="#BAE6FD" Offset="1" />
+                        </LinearGradientBrush>
+                    </GeometryDrawing.Brush>
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="2" RadiusY="2" Rect="13,11,38,24" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#38BDF8">
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="32,23" RadiusX="6" RadiusY="6" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#475569">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="30,38,4,8" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#475569">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="2" RadiusY="2" Rect="22,46,20,4" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <DrawingImage x:Key="PcMonitorIconInUse">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#0F172A">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="4" RadiusY="4" Rect="10,8,44,30" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#1E293B">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="2" RadiusY="2" Rect="13,11,38,24" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#F87171">
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="32,20" RadiusX="5" RadiusY="5" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#FCA5A5">
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="32,30" RadiusX="8" RadiusY="5" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#94A3B8">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="30,38,4,8" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#94A3B8">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="2" RadiusY="2" Rect="22,46,20,4" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <DrawingImage x:Key="PcMonitorIconConnecting">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#92400E">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="4" RadiusY="4" Rect="10,8,44,30" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Brush>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#FEF3C7" Offset="0" />
+                            <GradientStop Color="#FDE68A" Offset="1" />
+                        </LinearGradientBrush>
+                    </GeometryDrawing.Brush>
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="2" RadiusY="2" Rect="13,11,38,24" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#F59E0B">
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="24,23" RadiusX="3" RadiusY="3" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#FBBF24">
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="32,23" RadiusX="3" RadiusY="3" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#F59E0B">
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="40,23" RadiusX="3" RadiusY="3" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#B45309">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="30,38,4,8" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#B45309">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="2" RadiusY="2" Rect="22,46,20,4" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Add_ring_fill_light.svg -->
+    <DrawingImage x:Key="AddRingIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#448AE6">
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry FillRule="EvenOdd"
+                                      Figures="M21,12C21,16.9706 16.9706,21 12,21C7.02944,21 3,16.9706 3,12C3,7.02944 7.02944,3 12,3C16.9706,3 21,7.02944 21,12ZM12.5,12.5V17H11.5V12.5H7V11.5H11.5V7H12.5V11.5H17V12.5H12.5Z" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Save_fill.svg -->
+    <DrawingImage x:Key="SaveFillIcon">
+        <DrawingImage.Drawing>
+            <GeometryDrawing Brush="#448AE6"
+                             Geometry="F0 M3,9C3,6.17157 3,4.75736 3.87868,3.87868C4.75736,3 6.17157,3 9,3H15.3431C16.1606,3 16.5694,3 16.9369,3.15224C17.3045,3.30448 17.5935,3.59351 18.1716,4.17157L19.8284,5.82843C20.4065,6.40649 20.6955,6.69552 20.8478,7.06306C21,7.4306 21,7.83935 21,8.65685V15C21,17.8284 21,19.2426 20.1213,20.1213C19.48,20.7626 18.5534,20.9359 17,20.9827V18L17,17.9384C17.0001,17.2843 17.0001,16.6965 16.9362,16.2208C16.8663,15.7015 16.7042,15.1687 16.2678,14.7322C15.8313,14.2958 15.2985,14.1337 14.7792,14.0638C14.3034,13.9999 13.7157,13.9999 13.0616,14L13,14H10L9.93839,14C9.28427,13.9999 8.69655,13.9999 8.22084,14.0638C7.70149,14.1337 7.16867,14.2958 6.73223,14.7322C6.29579,15.1687 6.13366,15.7015 6.06383,16.2208C5.99988,16.6965 5.99993,17.2843 6,17.9384L6,18V20.9239C5.02491,20.828 4.36857,20.6112 3.87868,20.1213C3,19.2426 3,17.8284 3,15V9ZM15,18V21H9C8.64496,21 8.31221,21 8,20.9983V18C8,17.2646 8.00212,16.8137 8.046,16.4873C8.08457,16.2005 8.13942,16.1526 8.14592,16.1469L8.14645,16.1464L8.14692,16.1459C8.1526,16.1394 8.20049,16.0846 8.48734,16.046C8.81369,16.0021 9.26462,16 10,16H13C13.7354,16 14.1863,16.0021 14.5127,16.046C14.7995,16.0846 14.8474,16.1394 14.8531,16.1459L14.8536,16.1464L14.8541,16.1469C14.8606,16.1526 14.9154,16.2005 14.954,16.4873C14.9979,16.8137 15,17.2646 15,18ZM7,7C6.44772,7 6,7.44772 6,8C6,8.55228 6.44772,9 7,9H12C12.5523,9 13,8.55228 13,8C13,7.44772 12.5523,7 12,7H7Z" />
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Edit_fill.svg -->
+    <DrawingImage x:Key="EditFillIcon">
+        <DrawingImage.Drawing>
+            <GeometryDrawing Brush="#448AE6"
+                             Geometry="F0 M17.204,10.796L19,9C19.5453,8.45475 19.8179,8.18213 19.9636,7.88803C20.2409,7.32848 20.2409,6.67152 19.9636,6.11197C19.8179,5.81788 19.5453,5.54525 19,5C18.4548,4.45475 18.1821,4.18213 17.888,4.03639C17.3285,3.75911 16.6715,3.75911 16.112,4.03639C15.8179,4.18213 15.5453,4.45475 15,5L13.1814,6.81866C14.1452,8.46926 15.5314,9.84482 17.204,10.796ZM11.7269,8.27311L4.8564,15.1436C4.43134,15.5687 4.21881,15.7812 4.07907,16.0423C3.93934,16.3034 3.88039,16.5981 3.7625,17.1876L3.1471,20.2646C3.08058,20.5972 3.04732,20.7635 3.14193,20.8581C3.23654,20.9527 3.40284,20.9194 3.73545,20.8529L6.81243,20.2375C7.40189,20.1196 7.69661,20.0607 7.95771,19.9209C8.21881,19.7812 8.43134,19.5687 8.8564,19.1436L15.7458,12.2542C14.1241,11.2386 12.7524,9.87627 11.7269,8.27311Z" />
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Trash_duotone.svg -->
+    <DrawingImage x:Key="TrashDuotoneIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#C4C4C4"
+                                 Geometry="M4,7.5 C4,7.2643 4,7.14645 4.07322,7.07322 C4.14645,7 4.2643,7 4.5,7 H19.5 C19.7357,7 19.8536,7 19.9268,7.07322 C20,7.14645 20,7.2643 20,7.5 V7.75155 C20,7.84249 20,7.88797 19.986,7.92806 C19.974,7.96233 19.9547,7.99358 19.9294,8.01963 C19.8998,8.0501 19.8591,8.07044 19.7778,8.11111 C19.127,8.43649 18.8017,8.59917 18.565,8.84298 C18.3626,9.0514 18.2082,9.30138 18.1122,9.57554 C18,9.89627 18,10.2601 18,10.9876 V16 C18,17.8856 18,18.8284 17.4142,19.4142 C16.8284,20 15.8856,20 14,20 H10 C8.11438,20 7.17157,20 6.58579,19.4142 C6,18.8284 6,17.8856 6,16 V10.9876 C6,10.2601 6,9.89627 5.88778,9.57554 C5.79185,9.30138 5.63735,9.0514 5.43503,8.84298 C5.19835,8.59917 4.87297,8.43649 4.22222,8.11111 C4.14088,8.07044 4.10021,8.0501 4.07062,8.01963 C4.04533,7.99358 4.02602,7.96233 4.01403,7.92806 C4,7.88797 4,7.84249 4,7.75155 V7.5 Z" />
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.2" StartLineCap="Round" EndLineCap="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M10.0681,4.37059 C10.1821,4.26427 10.4332,4.17033 10.7825,4.10332 C11.1318,4.03632 11.5597,4 12,4 C12.4403,4 12.8682,4.03632 13.2175,4.10332 C13.5668,4.17033 13.8179,4.26427 13.9319,4.37059" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#222222">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="0.5" RadiusY="0.5" Rect="14,11,1,6" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#222222">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="0.5" RadiusY="0.5" Rect="9,11,1,6" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Remove_fill.svg — 삭제 -->
+    <DrawingImage x:Key="RemoveDuotoneLineIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#F86C6C">
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry FillRule="EvenOdd"
+                                      Figures="M12,21C16.9706,21 21,16.9706 21,12C21,7.02944 16.9706,3 12,3C7.02944,3 3,7.02944 3,12C3,16.9706 7.02944,21 12,21ZM7,13H17V11H7V13Z" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Refresh_light.svg — 새로고침 -->
+    <DrawingImage x:Key="RefreshLightIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M14,15 L10,19 L14,23" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.2" StartLineCap="Round" EndLineCap="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M5.93782,15.5 C5.14475,14.1264 4.84171,12.5241 5.07833,10.9557 C5.31495,9.38734 6.07722,7.94581 7.24024,6.86729 C8.40327,5.78877 9.8981,5.13721 11.4798,5.01935 C13.0616,4.90149 14.6365,5.32432 15.9465,6.21856 C17.2565,7.1128 18.224,8.42544 18.6905,9.94144 C19.1569,11.4574 19.0947,13.0869 18.5139,14.5629 C17.9332,16.0389 16.8684,17.2739 15.494,18.0656 C14.1196,18.8573 12.517,19.1588 10.9489,18.9206" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Refresh_2.svg — 필터 초기화 -->
+    <DrawingImage x:Key="Refresh2Icon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#334155" Thickness="1.6" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M14,15 L10,19 L14,23" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#334155" Thickness="1.6" StartLineCap="Round" EndLineCap="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M18.0622,8.5 C18.6766,9.56413 19,10.7712 19,12 C19,13.2288 18.6766,14.4359 18.0622,15.5 C17.4478,16.5641 16.5641,17.4478 15.5,18.0622 C14.4359,18.6766 13.2288,19 12,19" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#334155" Thickness="1.6" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M10,9 L14,5 L10,1" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#334155" Thickness="1.6" StartLineCap="Round" EndLineCap="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M5.93782,15.5 C5.32344,14.4359 5,13.2288 5,12 C5,10.7712 5.32344,9.56413 5.93782,8.5 C6.5522,7.43587 7.43587,6.5522 8.5,5.93782 C9.56413,5.32344 10.7712,5 12,5" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Search_light.svg — 검색 -->
+    <DrawingImage x:Key="SearchLightIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.2" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="11,11" RadiusX="6" RadiusY="6" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.2" StartLineCap="Round" EndLineCap="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <LineGeometry StartPoint="17,17" EndPoint="20,20" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Menu (1).svg — 리스트형 전환 -->
+    <DrawingImage x:Key="ListViewIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.2" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="1" RadiusY="1" Rect="4,5,16,5" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.2" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="1" RadiusY="1" Rect="4,14,16,5" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- darhboard.svg — 카드형 전환 -->
+    <DrawingImage x:Key="DashboardViewIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.2" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="1" RadiusY="1" Rect="4,4,6,6" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.2" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="1" RadiusY="1" Rect="14,4,6,6" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.2" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="1" RadiusY="1" Rect="4,14,6,6" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.2" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="1" RadiusY="1" Rect="14,14,6,6" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Expand_left_light.svg — 뒤로 / 이전 -->
+    <DrawingImage x:Key="ExpandLeftIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M15,6 L9,12 L15,18" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Expand_right_light.svg — 다음 -->
+    <DrawingImage x:Key="ExpandRightIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M9,6 L15,12 L9,18" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Expand down — dropdown / expanded -->
+    <DrawingImage x:Key="ExpandDownIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#64748B" Thickness="1.2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M7,9.5 L12,14.5 L17,9.5" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Expand up — dropdown open -->
+    <DrawingImage x:Key="ExpandUpIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#64748B" Thickness="1.2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M7,14.5 L12,9.5 L17,14.5" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- 필터(슬라이더) -->
+    <DrawingImage x:Key="FilterSlidersIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#334155" Thickness="1.4" StartLineCap="Round" EndLineCap="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M4,7 H20 M4,12 H20 M4,17 H20" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#334155">
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="9,7" RadiusX="2.2" RadiusY="2.2" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#334155">
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="15,12" RadiusX="2.2" RadiusY="2.2" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#334155">
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="11,17" RadiusX="2.2" RadiusY="2.2" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- 구 키 호환 (다운로드) -->
+    <DrawingImage x:Key="ImportDownloadIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#334155" Thickness="1.4" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M12,4 V14 M8,11 L12,15 L16,11" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#334155" Thickness="1.4" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M5,17 V19 H19 V17" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- TFS 배지는 툴바에서 TextBlock(흰 TFS + 파란 배경)으로 그림. 키만 호환 유지 -->
+    <DrawingImage x:Key="TfsBrandIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#0078D4">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="2" RadiusY="2" Rect="1,4,22,16" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Excel 브랜드 톤: 초록 사각 + X -->
+    <DrawingImage x:Key="ExcelBrandIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#217346">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="3" RadiusY="3" Rect="2,2,20,20" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#185C37">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="0" RadiusY="0" Rect="2,2,7,20" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#FFFFFF" Thickness="2.2" StartLineCap="Round" EndLineCap="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M5.2,8 L10.2,16 M10.2,8 L5.2,16" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#E6FFFFFF" Thickness="1.1" StartLineCap="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M13,8 H20 M13,12 H20 M13,16 H20" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- 구 키 호환 → Excel 브랜드 아이콘과 동일 -->
+    <DrawingImage x:Key="ExcelSheetIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#217346">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="3" RadiusY="3" Rect="2,2,20,20" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#185C37">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="0" RadiusY="0" Rect="2,2,7,20" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#FFFFFF" Thickness="2.2" StartLineCap="Round" EndLineCap="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M5.2,8 L10.2,16 M10.2,8 L5.2,16" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#E6FFFFFF" Thickness="1.1" StartLineCap="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M13,8 H20 M13,12 H20 M13,16 H20" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+
+    <!-- Done_light.svg — 체크 표시 -->
+    <DrawingImage x:Key="DoneLightIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M5,14 L9,17 L18,6" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Code_light.svg — 소스 파일 -->
+    <DrawingImage x:Key="CodeLightIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M16,7 L20,12 L16,17" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M8,7 L4,12 L8,17" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Chat_plus_fill.svg — 새 업무기록 -->
+    <DrawingImage x:Key="ChatPlusFillIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#448AE6"
+                                 Geometry="F0 M13.7586,3.00598 C13.2404,3 12.6591,3 12,3 C9.20435,3 7.80653,3 6.7039,3.45672 C5.23373,4.06569 4.06569,5.23373 3.45672,6.7039 C3,7.80653 3,9.20435 3,12 V15 C3,17.8284 3,19.2426 3.87868,20.1213 C4.75736,21 6.17157,21 9,21 H12 C14.7956,21 16.1935,21 17.2961,20.5433 C18.7663,19.9343 19.9343,18.7663 20.5433,17.2961 C21,16.1935 21,14.7956 21,12 C21,11.3409 21,10.7596 20.994,10.2414 C20.464,10.7133 19.7655,11 19,11 C17.3431,11 16,9.65685 16,8 C14.3431,8 13,6.65685 13,5 C13,4.23453 13.2867,3.53602 13.7586,3.00598 Z M9,8.99966 C8.44772,8.99966 8,9.44738 8,9.99966 C8,10.5519 8.44772,10.9997 9,10.9997 H15 C15.5523,10.9997 16,10.5519 16,9.99966 C16,9.44738 15.5523,8.99966 15,8.99966 H9 Z M9,12.9997 C8.44772,12.9997 8,13.4474 8,13.9997 C8,14.5519 8.44772,14.9997 9,14.9997 H12 C12.5523,14.9997 13,14.5519 13,13.9997 C13,13.4474 12.5523,12.9997 12,12.9997 H9 Z" />
+                <GeometryDrawing Geometry="M19,8 L19,2 M16,5 H22">
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#448AE6" Thickness="2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Lable_fill.svg — Menu (트리) -->
+    <DrawingImage x:Key="LabelDuotoneFillIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#00C0E8"
+                                 Geometry="M3.29289,6.29289 C3,6.58579 3,7.05719 3,8 V16 C3,16.9428 3,17.4142 3.29289,17.7071 C3.58579,18 4.05719,18 5,18 H14.8593 C15.9072,18 16.4312,18 16.8733,17.7633 C17.3155,17.5267 17.6062,17.0907 18.1875,16.2188 L19.5208,14.2188 C20.2378,13.1433 20.5963,12.6056 20.5963,12 C20.5963,11.3944 20.2378,10.8567 19.5208,9.7812 L18.1875,7.7812 C17.6062,6.90927 17.3155,6.4733 16.8733,6.23665 C16.4312,6 15.9072,6 14.8593,6 H5 C4.05719,6 3.58579,6 3.29289,6.29289 Z M15,14 C16.1046,14 17,13.1046 17,12 C17,10.8954 16.1046,10 15,10 C13.8954,10 13,10.8954 13,12 C13,13.1046 13.8954,14 15,14 Z" />
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- 3d_box_fill.svg — Type (트리). SVG 자체는 미사용, 여기 DrawingImage가 실제 표시. -->
+    <DrawingImage x:Key="Box3dFillIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#FFC64B"
+                                 Geometry="M9.67505,19.3393 L6.67505,17.1964 C5.8539,16.6099 5.44333,16.3167 5.22166,15.8859 C5,15.4552 5,14.9506 5,13.9415 V10.0585 C5,9.73711 5,9.46693 5.00716,9.234 L11,13.5146 V20.2313 C10.6433,20.0309 10.227,19.7335 9.67505,19.3393 Z M13,20.2313 C13.3567,20.0309 13.773,19.7335 14.325,19.3393 L17.325,17.1964 C18.1461,16.6099 18.5567,16.3167 18.7783,15.8859 C19,15.4552 19,14.9506 19,13.9415 V10.0585 C19,9.73711 19,9.46693 18.9928,9.234 L13,13.5146 V20.2313 Z M18.1276,7.39426 L12,11.7711 L5.87244,7.39426 C6.08372,7.2259 6.34653,7.03818 6.67505,6.80352 L9.67505,4.66067 C10.7977,3.85875 11.3591,3.45779 12,3.45779 C12.6409,3.45779 13.2023,3.85875 14.325,4.66067 L17.325,6.80352 C17.6535,7.03818 17.9163,7.2259 18.1276,7.39426 Z" />
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Arhive_fill.svg — Category (트리) -->
+    <DrawingImage x:Key="ArchiveFillIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#67DE9D"
+                                 Geometry="M2,7 C2,5.11438 2,4.17157 2.58579,3.58579 C3.17157,3 4.11438,3 6,3 H18 C19.8856,3 20.8284,3 21.4142,3.58579 C22,4.17157 22,5.11438 22,7 C22,7.94281 22,8.41421 21.7071,8.70711 C21.4142,9 20.9428,9 20,9 H4 C3.05719,9 2.58579,9 2.29289,8.70711 C2,8.41421 2,7.94281 2,7 Z" />
+                <GeometryDrawing Brush="#67DE9D"
+                                 Geometry="M4.87868,20.1213 C4,19.2426 4,17.8284 4,15 V11 H20 V15 C20,17.8284 20,19.2426 19.1213,20.1213 C18.2426,21 16.8284,21 14,21 H10 C7.17157,21 5.75736,21 4.87868,20.1213 Z M10,15 C9.44772,15 9,15.4477 9,16 C9,16.5523 9.44772,17 10,17 H14 C14.5523,17 15,16.5523 15,16 C15,15.4477 14.5523,15 14,15 H10 Z" />
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Folder_line.svg — Project (트리) -->
+    <DrawingImage x:Key="FolderLineIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#CD94FF"
+                                 Geometry="M3,7 H19 C20.1046,7 21,7.89543 21,9 H3 V7 Z" />
+                <GeometryDrawing Brush="#CD94FF"
+                                 Geometry="M3,11 H21 V15.2 C21,16.8802 21,17.7202 20.673,18.362 C20.3854,18.9265 19.9265,19.3854 19.362,19.673 C18.7202,20 17.8802,20 16.2,20 H7.8 C6.11984,20 5.27976,20 4.63803,19.673 C4.07354,19.3854 3.6146,18.9265 3.32698,18.362 C3,17.7202 3,16.8802 3,15.2 V11 Z" />
+                <GeometryDrawing Brush="#CD94FF"
+                                 Geometry="M3,7 C3,6.06812 3,5.60218 3.15224,5.23463 C3.35523,4.74458 3.74458,4.35523 4.23463,4.15224 C4.60218,4 5.06812,4 6,4 H8.34315 C9.16065,4 9.5694,4 9.93694,4.15224 C10.3045,4.30448 10.5935,4.59351 11.1716,5.17157 L13,7 H3 Z" />
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+</ResourceDictionary>

@@ -1,0 +1,26 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!--
+      ThemeConfig = Tailwind theme.fontSize / fontFamily
+      Change numbers here to scale typography app-wide.
+
+      Usage:
+        FontSize="{StaticResource FontSize.Base}"
+        FontFamily="{StaticResource AppFontFamily}"
+    -->
+
+    <FontFamily x:Key="AppFontFamily">Segoe UI, Malgun Gothic</FontFamily>
+
+    <!-- fontSize (px): xs sm base md lg xl xxl xxxl -->
+    <sys:Double x:Key="FontSize.Xs">10</sys:Double>
+    <sys:Double x:Key="FontSize.Sm">11</sys:Double>
+    <sys:Double x:Key="FontSize.Base">12</sys:Double>
+    <sys:Double x:Key="FontSize.Md">13</sys:Double>
+    <sys:Double x:Key="FontSize.Lg">14</sys:Double>
+    <sys:Double x:Key="FontSize.Xl">16</sys:Double>
+    <sys:Double x:Key="FontSize.Xxl">18</sys:Double>
+    <sys:Double x:Key="FontSize.Xxxl">20</sys:Double>
+
+</ResourceDictionary>

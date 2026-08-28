@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{A1B2C3D4-E5F6-7890-ABCD-444444444444}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>GBCWorkHub.UI</RootNamespace>
+    <AssemblyName>GBCWorkHub.UI</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <WarningLevel>4</WarningLevel>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\Newtonsoft.Json.13.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="Oracle.ManagedDataAccess, Version=4.122.19.1, Culture=neutral, PublicKeyToken=89b483f429c47342, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\Oracle.ManagedDataAccess.19.21.0\lib\net40\Oracle.ManagedDataAccess.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Xaml">
+      <RequiredTargetFramework>4.0</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="WindowsBase" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="UIAutomationClient" />
+    <Reference Include="UIAutomationTypes" />
+  </ItemGroup>
+  <ItemGroup>
+    <ApplicationDefinition Include="App.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </ApplicationDefinition>
+    <Compile Include="App.xaml.cs">
+      <DependentUpon>App.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Page Include="MainWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Compile Include="MainWindow.xaml.cs">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Services\ClipboardMonitorService.cs" />
+    <Compile Include="Services\CmcPmpBrowserLauncher.cs" />
+    <Compile Include="Services\CmcPmpSessionMonitor.cs" />
+    <Compile Include="Services\DiagnosticLogger.cs" />
+    <Compile Include="Services\FortiClientLauncher.cs" />
+    <Compile Include="Services\FortiVpnStatus.cs" />
+    <Compile Include="Services\PublishedRdpLauncher.cs" />
+    <Compile Include="Services\WorkHubUserProfile.cs" />
+    <Compile Include="Services\RdpSessionTrackingService.cs" />
+    <Compile Include="Services\Popup\PopupService.cs" />
+    <Compile Include="Services\TfsSync\TfsClipboardAckService.cs" />
+    <Compile Include="Services\TfsSync\IClipboardAccessor.cs" />
+    <Compile Include="Services\TfsSync\WpfClipboardAccessor.cs" />
+    <Compile Include="Services\TfsSync\ClipboardProtocolLease.cs" />
+    <Compile Include="Services\TfsSync\ClipboardProtocolLeaseManager.cs" />
+    <Compile Include="Services\TfsSync\TfsPayloadIngestService.cs" />
+    <Compile Include="Services\TfsSync\TfsSyncCoordinator.cs" />
+    <Compile Include="Models\LastProcessedRdpState.cs" />
+    <Compile Include="Models\RdpLaunchPurpose.cs" />
+    <Compile Include="Models\Popup\PopupEnums.cs" />
+    <Compile Include="Models\Popup\PopupButtonDefinition.cs" />
+    <Compile Include="Models\Popup\PopupRequest.cs" />
+    <Compile Include="Models\Popup\PopupResult.cs" />
+    <Compile Include="Converters\BoolToVisibilityConverter.cs" />
+    <Compile Include="Converters\MinWidthToVisibilityConverter.cs" />
+    <Compile Include="Converters\StringEqualsMultiConverter.cs" />
+    <Compile Include="ViewModels\ViewModelBase.cs" />
+    <Compile Include="ViewModels\RelayCommand.cs" />
+    <Compile Include="ViewModels\RelayCommandGeneric.cs" />
+    <Compile Include="ViewModels\MainViewModel.cs" />
+    <Compile Include="ViewModels\RemoteWorkspaceViewModel.cs" />
+    <Compile Include="ViewModels\RemoteComputerItemViewModel.cs" />
+    <Compile Include="Services\RemoteSessionController.cs" />
+    <Compile Include="Services\RemoteSessionUi.cs" />
+    <Compile Include="ViewModels\RdpEventViewModel.cs" />
+    <Compile Include="ViewModels\RemotePcUsageLogItemViewModel.cs" />
+    <Compile Include="ViewModels\TfsChangesetCandidateViewModel.cs" />
+    <Compile Include="ViewModels\TfsWorkLogViewModel.cs" />
+    <Compile Include="ViewModels\WorkLog\WorkLogUiOptions.cs" />
+    <Compile Include="ViewModels\WorkLog\WorkLogUiModels.cs" />
+    <Compile Include="ViewModels\WorkLog\WorkLogFieldMasters.cs" />
+    <Compile Include="ViewModels\WorkLog\WorkLogTreeModels.cs" />
+    <Compile Include="ViewModels\WorkLog\WorkLogDraftMapper.cs" />
+    <Compile Include="ViewModels\WorkLog\WorkLogDbMapper.cs" />
+    <Compile Include="ViewModels\WorkLog\WorkLogListViewModel.cs" />
+    <Compile Include="ViewModels\WorkLog\WorkLogPersistenceService.cs" />
+    <Compile Include="ViewModels\WorkLog\WorkLogImportService.cs" />
+    <Compile Include="ViewModels\WorkLog\WorkLogTfsImportCoordinator.cs" />
+    <Compile Include="ViewModels\WorkLog\WorkLogEditSession.cs" />
+    <Compile Include="ViewModels\WorkLog\WorkLogEditValidator.cs" />
+    <Compile Include="ViewModels\WorkLog\WorkLogEditDialogViewModel.cs" />
+    <Compile Include="ViewModels\WorkLog\TfsImportDialogViewModel.cs" />
+    <Compile Include="Controls\CustomDropdown.xaml.cs">
+      <DependentUpon>CustomDropdown.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Controls\CustomEditableDropdown.xaml.cs">
+      <DependentUpon>CustomEditableDropdown.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Controls\InlineOptionPicker.xaml.cs">
+      <DependentUpon>InlineOptionPicker.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Controls\InlineSuggestionField.xaml.cs">
+      <DependentUpon>InlineSuggestionField.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\MainTabBar.xaml.cs">
+      <DependentUpon>MainTabBar.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\RemoteWorkspaceView.xaml.cs">
+      <DependentUpon>RemoteWorkspaceView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\WorkLog\WorkLogListView.xaml.cs">
+      <DependentUpon>WorkLogListView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\WorkLog\WorkLogListClassicView.xaml.cs">
+      <DependentUpon>WorkLogListClassicView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\WorkLog\WorkLogListGlassView.xaml.cs">
+      <DependentUpon>WorkLogListGlassView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\WorkLog\WorkLogEditDialog.xaml.cs">
+      <DependentUpon>WorkLogEditDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\WorkLog\TfsImportDialog.xaml.cs">
+      <DependentUpon>TfsImportDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\WorkLog\TfsImportHostWindow.xaml.cs">
+      <DependentUpon>TfsImportHostWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="ViewModels\Popup\PopupHostViewModel.cs" />
+    <Compile Include="ViewModels\Popup\ConfirmProgressResultViewModels.cs" />
+    <Compile Include="Views\Popup\PopupHostWindow.xaml.cs">
+      <DependentUpon>PopupHostWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\Popup\ConfirmPopupView.xaml.cs">
+      <DependentUpon>ConfirmPopupView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\Popup\ProgressPopupView.xaml.cs">
+      <DependentUpon>ProgressPopupView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\Popup\ResultPopupView.xaml.cs">
+      <DependentUpon>ResultPopupView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" Condition="Exists('App.config')" />
+    <None Include="App.config.example" />
+    <None Include="packages.config" />
+    <None Include="Fonts\LICENSE.txt" />
+    <!-- Content+폴더 로드: Resource pack URI는 weight가 안 묶여 SemiBold가 깨져 보임 -->
+    <Content Include="Fonts\Pretendard-Regular.otf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Fonts\Pretendard-Medium.otf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Fonts\Pretendard-SemiBold.otf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Fonts\Pretendard-Bold.otf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Page Include="Assets\ThemeConfig.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Assets\Icons.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Assets\RemoteComputerGallery.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Assets\WorkLogStyles.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Assets\WorkLogGlassStyles.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Assets\SkeletonStyles.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Assets\WorkLogEditGlassOverrides.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Controls\CustomDropdown.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Controls\CustomEditableDropdown.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Controls\InlineOptionPicker.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Controls\InlineSuggestionField.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\MainTabBar.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\RemoteWorkspaceView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\WorkLog\WorkLogListView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\WorkLog\WorkLogListClassicView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\WorkLog\WorkLogListGlassView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\WorkLog\WorkLogEditDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\WorkLog\TfsImportDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\WorkLog\TfsImportHostWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\Popup\PopupHostWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\Popup\ConfirmPopupView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\Popup\ProgressPopupView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\Popup\ResultPopupView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\GBCWorkHub.BIZ\GBCWorkHub.BIZ.csproj">
+      <Project>{A1B2C3D4-E5F6-7890-ABCD-333333333333}</Project>
+      <Name>GBCWorkHub.BIZ</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\GBCWorkHub.DTO\GBCWorkHub.DTO.csproj">
+      <Project>{A1B2C3D4-E5F6-7890-ABCD-111111111111}</Project>
+      <Name>GBCWorkHub.DTO</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Target Name="EnsureAppConfig" BeforeTargets="PrepareForBuild">
+    <Copy SourceFiles="App.config.example" DestinationFiles="App.config" Condition="!Exists('App.config')" />
+  </Target>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

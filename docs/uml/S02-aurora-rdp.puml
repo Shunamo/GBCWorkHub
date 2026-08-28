@@ -1,0 +1,39 @@
+﻿@startuml GBCWorkHub_S02_AuroraRdp
+skinparam shadowing false
+title Sequence ??Aurora / Standard RDP Connect + Occupancy
+
+actor User
+participant "RemoteWorkspaceViewModel" as RW
+participant "RemoteSessionController" as RSC
+participant "RemotePcShareBiz" as Share
+participant "RdpSessionTrackingService" as Track
+participant "Windows mstsc" as Mstsc
+participant "SessionAgent\n(remote)" as Agent
+participant "Clipboard + rdpclip" as Clip
+participant "ClipboardMonitorService" as Mon
+participant "RdpStatusBiz" as RdpBiz
+
+User -> RW : click gallery PC (Aurora)
+RW -> RSC : StartRemoteSessionAsync(pc)
+RSC -> Share : TryReserveAsync(ip, token)
+Share --> RSC : reserved
+RSC -> Track : TryStart(ip) / mstsc /v:
+Track -> Mstsc : launch
+Mstsc -> Agent : RDP connect event
+Agent -> Clip : GBCWORKHUB:: CONNECT JSON
+Clip -> Mon : WM_CLIPBOARDUPDATE
+Mon -> RSC : GbcClipboardReceived
+RSC -> RdpBiz : TryHandleClipboardText
+RdpBiz --> RSC : RdpStatusPayload
+RSC -> Share : ConfirmConnectionAsync
+RSC -> RW : gallery IN_USE
+
+... user works ...
+
+Agent -> Clip : GBCWORKHUB:: DISCONNECT\n(+ optional TFS / pending)
+Track -> RSC : RdpEnded / process exit
+RSC -> Share : ReleaseAsync
+RSC -> RSC : optional TFS sync prompt
+
+@enduml
+

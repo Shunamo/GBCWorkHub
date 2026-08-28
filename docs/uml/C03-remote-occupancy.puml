@@ -1,0 +1,92 @@
+﻿@startuml GBCWorkHub_C03_RemoteOccupancy
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+title Remote Occupancy / Gallery ??Class Diagram
+
+abstract class RemoteSessionUi {
+  + {abstract} PopupShowInfoAsync()
+  + {abstract} RefreshRcVpnBadges()
+  + {abstract} UpdateGalleryLocalInUse()
+  + {abstract} MergeRemoteComputersFromDb()
+}
+
+class RemoteWorkspaceViewModel {
+  + ConnectRemoteComputerAsync()
+  + OpenSiteAsync()
+  + RefreshRcVpnBadges()
+}
+
+class SessionUiBridge {
+  -- nested in RemoteWorkspaceViewModel --
+}
+
+class RemoteSessionController {
+  + StartRemoteSessionAsync()
+  + ConnectRcWithPublishedRdpAsync()
+  + ConnectCmcWithPmpAsync()
+  + TryHandleRdpClipboardText()
+  + HandleSessionChangeResultReceived()
+  + PollSharedStatusAsync()
+  - TryReserveCmcOccupancyAsync()
+}
+
+class RdpSessionTrackingService {
+  + TryStart()
+  + TryStartPublishedRdp()
+  + ForceEnd()
+  + IsConnectionConfirmed
+  + event RdpEnded
+}
+
+class RemotePcShareBiz {
+  + TryReserveAsync()
+  + ConfirmConnectionAsync()
+  + ReleaseAsync()
+  + GetByRemoteIpAsync()
+  + GetAllAsync()
+}
+
+class RemotePcBiz {
+  + GetRemotePcListBySite()
+}
+
+class RdpStatusBiz {
+  + TryHandleClipboardText()
+  + EvaluateFreshness()
+}
+
+class FortiVpnStatus <<static>>
+class FortiClientLauncher <<static>>
+class PublishedRdpLauncher <<static>>
+class CmcPmpBrowserLauncher <<static>>
+class CmcPmpSessionMonitor
+
+class RemoteComputerItemViewModel
+class RemotePcDto
+class RemotePcStatus
+class RdpStatusPayload
+
+interface IRemotePcRepository
+class OracleRemotePcRepository
+
+RemoteWorkspaceViewModel --|> RemoteSessionUi : SessionUiBridge
+RemoteWorkspaceViewModel --> RemoteSessionController
+RemoteSessionController --> RemoteSessionUi
+RemoteSessionController --> RdpSessionTrackingService
+RemoteSessionController --> RemotePcShareBiz
+RemoteSessionController --> RemotePcBiz
+RemoteSessionController --> RdpStatusBiz
+RemoteSessionController --> CmcPmpSessionMonitor
+RemoteSessionController ..> FortiVpnStatus
+RemoteSessionController ..> FortiClientLauncher
+RemoteSessionController ..> PublishedRdpLauncher
+RemoteSessionController ..> CmcPmpBrowserLauncher
+RemotePcShareBiz --> IRemotePcRepository
+OracleRemotePcRepository ..|> IRemotePcRepository
+RemoteWorkspaceViewModel o-- RemoteComputerItemViewModel
+RemoteComputerItemViewModel --> RemotePcDto
+RemotePcShareBiz --> RemotePcStatus
+RdpStatusBiz --> RdpStatusPayload
+
+@enduml
+

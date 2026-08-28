@@ -1,0 +1,23 @@
+-- RC 점유용 MSDWHTKD 행 예시 (WorkHub App.config RC.PcNames=HO-BCARE-07 과 동일 키)
+-- REMOTE_ACCS_IP_ADDR 컬럼에 IP 대신 PC명을 넣어도 앱이 점유 키로 사용함.
+
+/*
+INSERT INTO XSUP.MSDWHTKD (
+    REMOTE_ACCS_IP_ADDR,
+    REMOTE_PC_NM,
+    SITE_CD,
+    ACCS_STS_CD,
+    UPDT_DTM
+) VALUES (
+    'HO-BCARE-07',
+    'HO-BCARE-07',
+    'RC',
+    'AVAILABLE',
+    SYSTIMESTAMP
+);
+*/
+
+-- 확인
+-- SELECT REMOTE_ACCS_IP_ADDR, REMOTE_PC_NM, ACCS_STS_CD
+--   FROM XSUP.MSDWHTKD
+--  WHERE REMOTE_ACCS_IP_ADDR = 'HO-BCARE-07';

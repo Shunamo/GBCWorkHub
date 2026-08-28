@@ -1,0 +1,33 @@
+﻿@startuml GBCWorkHub_S07_DevSession
+skinparam shadowing false
+title Sequence ??DevSession Two-Point Snapshot
+
+participant "RemoteSessionController" as RSC
+participant "TfsClipboardAckService" as Ack
+participant "Clipboard" as Clip
+participant "SessionAgent" as Agent
+participant "SourceTreeSnapshot" as Snap
+participant "SnapshotDiff" as Diff
+participant "DevSessionFileBiz" as Biz
+participant "OracleDevSessionFileRepository" as Repo
+
+RSC -> Ack : TryAnnounceSessionToken\nbefore mstsc
+Ack -> Clip : GBCWORKHUB_SESSION_TOKEN::
+Agent -> Clip : read token on connect
+Agent -> Snap : CaptureBaseline to disk
+... user edits HIS sources ...
+Agent -> Agent : HandleDisconnect
+Agent -> Diff : baseline vs end snapshot
+Agent -> Clip : GBCWORKHUB_SESSION_RESULT::
+Clip -> RSC : HandleSessionChangeResultReceived
+RSC -> Biz : HandleReceivedResultAsync
+Biz -> Repo : InsertSessionFiles
+
+note right of Diff
+  Live path = two-point snapshot.
+  DevSessionFileTracker (FileSystemWatcher)
+  is superseded / not runtime.
+end note
+
+@enduml
+

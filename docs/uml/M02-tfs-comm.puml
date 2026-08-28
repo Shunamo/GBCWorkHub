@@ -1,0 +1,31 @@
+﻿@startuml GBCWorkHub_M02_TfsComm
+skinparam shadowing false
+title Communication - TFS Sync Collaboration
+
+object User
+object "TfsSyncCoordinator" as Coord
+object "PopupService" as Pop
+object "TfsClipboardAckService" as Ack
+object "ClipboardProtocolLeaseManager" as Lease
+object "RdpSessionTrackingService" as Track
+object "SessionAgent" as Agent
+object "ClipboardMonitorService" as Mon
+object "TfsWorkLogViewModel" as TfsVm
+object "WorkLogListViewModel" as Wl
+
+User --> Coord : 1 fetch TFS after session
+Coord --> Pop : 2 confirm / progress
+Coord --> Ack : 3 write SYNC_REQUEST
+Ack --> Lease : 4 lease + UserBackup
+Coord --> Track : 5 reconnect mstsc
+Track --> Agent : 6 RDP up
+Agent --> Mon : 7 CONNECT then TFS JSON
+Mon --> Coord : 8 accept payload
+Coord --> TfsVm : 9 candidates
+Coord --> Ack : 10 ACK
+Coord --> Track : 11 close RDP
+TfsVm --> Wl : 12 NotifyTfsCandidatesUpdated
+User --> Wl : 13 open TFS import dialog
+
+@enduml
+

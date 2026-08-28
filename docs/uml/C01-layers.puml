@@ -1,0 +1,99 @@
+﻿@startuml GBCWorkHub_C01_Layers
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+title GBCWorkHub - Layer / Component Overview (UML)
+
+package "GBCWorkHub.UI" as UI {
+  class MainWindow
+  class MainViewModel
+  class RemoteWorkspaceViewModel
+  class WorkLogListViewModel
+  class RemoteSessionController
+  class TfsSyncCoordinator
+  class ClipboardMonitorService
+  class PopupService
+}
+
+package "GBCWorkHub.BIZ" as BIZ {
+  class RemotePcShareBiz
+  class RemotePcBiz
+  class WorkLogBiz
+  class RdpStatusBiz
+  class TfsClipboardPayloadService
+  class WorkLogExcelImporter
+  class TfsWorkLogParser
+  class DevSessionFileBiz
+}
+
+package "GBCWorkHub.DAC" as DAC {
+  interface IRemotePcRepository
+  interface IWorkLogRepository
+  class OracleRemotePcRepository
+  class OracleWorkLogRepository
+  class OracleDevSessionFileRepository
+  class RemotePcDac
+}
+
+package "GBCWorkHub.DTO" as DTO {
+  class RemotePcDto
+  class RemotePcStatus
+  class WorkLogRecordDto
+  class TfsRecentChangesetsPayload
+  class RdpStatusPayload
+  class TfsSyncRequestClipboardDto
+  class DevSessionFileDto
+}
+
+package "SessionAgent" as AGENT {
+  class SessionAgentProgram
+  class ClipboardHelper
+  class TfsRecentCollector
+  class SourceTreeSnapshot
+}
+
+class OracleDb <<database>> {
+  GbcWorkHubDb / XSUP
+}
+
+class RdpClipboard <<integration>> {
+  Windows Clipboard + rdpclip
+}
+
+class User <<actor>>
+
+User --> MainWindow
+MainWindow --> MainViewModel
+MainViewModel --> RemoteWorkspaceViewModel
+MainViewModel --> WorkLogListViewModel
+MainViewModel --> TfsSyncCoordinator
+MainWindow --> ClipboardMonitorService
+MainWindow --> PopupService
+RemoteWorkspaceViewModel --> RemoteSessionController
+
+UI ..> BIZ
+BIZ ..> DAC
+BIZ ..> DTO
+UI ..> DTO
+DAC --> OracleDb
+
+RemoteSessionController --> RdpClipboard
+ClipboardMonitorService --> RdpClipboard
+SessionAgentProgram --> RdpClipboard
+TfsSyncCoordinator --> RdpClipboard
+
+SessionAgentProgram --> TfsRecentCollector
+SessionAgentProgram --> SourceTreeSnapshot
+SessionAgentProgram --> ClipboardHelper
+
+note right of RdpClipboard
+  Prefixes:
+  GBCWORKHUB::
+  GBCWORKHUB_TFS::
+  GBCWORKHUB_TFS_SYNC_REQUEST::
+  GBCWORKHUB_ACK::
+  GBCWORKHUB_SESSION_TOKEN::
+  GBCWORKHUB_SESSION_RESULT::
+end note
+
+@enduml

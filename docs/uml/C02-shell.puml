@@ -1,0 +1,65 @@
+﻿@startuml GBCWorkHub_C02_Shell
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+title App Shell ??Class Diagram
+
+class MainWindow {
+  - MainViewModel _viewModel
+  - PopupService _popupService
+  - ClipboardMonitorService _clipboardMonitor
+  + MainWindow_Loaded()
+  + OnGbcClipboardReceived()
+  + OnTfsClipboardReceived()
+  + OnSessionChangeResultReceived()
+}
+
+class MainViewModel {
+  - RemoteWorkspaceViewModel
+  - WorkLogListViewModel
+  - TfsWorkLogViewModel
+  - TfsSyncCoordinator
+  + InitializeUiServices()
+  + InitializeCentralShareAsync()
+  + HandleClipboardText()
+  + HandleTfsClipboardText()
+  + HandleSessionChangeResultText()
+  + HandleAppClosingAsync()
+}
+
+class ClipboardMonitorService {
+  + event GbcClipboardReceived
+  + event TfsClipboardReceived
+  + event SessionChangeResultReceived
+  + Start() / Stop()
+  + ProcessClipboardText()
+}
+
+class PopupService {
+  + ShowConfirmAsync()
+  + ShowResultAsync()
+  + ShowProgressAsync()
+  + UpdateProgressAsync()
+  + CloseProgressAsync()
+}
+
+class RemoteWorkspaceViewModel
+class WorkLogListViewModel
+class TfsWorkLogViewModel
+class TfsSyncCoordinator
+class RemoteSessionController
+
+MainWindow *-- MainViewModel
+MainWindow *-- ClipboardMonitorService
+MainWindow *-- PopupService
+MainViewModel *-- RemoteWorkspaceViewModel
+MainViewModel *-- WorkLogListViewModel
+MainViewModel *-- TfsWorkLogViewModel
+MainViewModel *-- TfsSyncCoordinator
+RemoteWorkspaceViewModel --> RemoteSessionController
+MainViewModel --> PopupService : inject
+TfsSyncCoordinator --> PopupService
+ClipboardMonitorService ..> MainWindow : events
+MainWindow ..> MainViewModel : dispatch handlers
+
+@enduml
+

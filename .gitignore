@@ -1,0 +1,59 @@
+## Build
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.vspscc
+.vs/
+
+## NuGet
+packages/
+*.nupkg
+nuget.exe
+
+## Local binaries accidentally copied to repo root
+/*.dll
+/*.pdb
+/*.exe
+debug.log
+
+## IDE / agent local
+.cursor/
+.claude/
+.vscode/
+*.local.json
+
+## Duplicate font license at repo root (canonical copy is src/GBCWorkHub.UI/Fonts/LICENSE.txt)
+/LICENSE.txt
+
+## Deploy / recovery artifacts
+deploy/
+recovery/
+backup/
+
+## Session agent WIP copies (not in solution)
+tools/agent-updates/
+
+## Generated UML binaries
+docs/uml/plantuml.jar
+docs/uml/png/
+
+## Local DB credentials (commit *.example instead)
+src/GBCWorkHub.UI/App.config
+src/GBCWorkHub.CsvImportTool/App.config
+tools/ImportWorkLogExcel/App.config
+
+## Scratch / import dumps
+sql/_compare_tmp/
+sql/_parse_out.txt
+*.csv
+*.xlsx
+
+## OS
+Thumbs.db
+Desktop.ini
+.DS_Store

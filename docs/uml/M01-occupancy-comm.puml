@@ -1,0 +1,31 @@
+﻿@startuml GBCWorkHub_M01_OccupancyComm
+skinparam shadowing false
+title Communication - Occupancy Collaboration
+
+object User
+object "RemoteWorkspaceViewModel" as RW
+object "RemoteSessionController" as RSC
+object "RemotePcShareBiz" as Share
+object "RdpSessionTrackingService" as Track
+object "RdpStatusBiz" as RdpBiz
+object "ClipboardMonitorService" as Mon
+object "SessionAgent" as Agent
+object "Oracle" as DB
+
+User --> RW : 1 connect PC
+RW --> RSC : 2 StartRemoteSession / Connect
+RSC --> Share : 3 TryReserveAsync
+Share --> DB : 4 UPDATE MSDWHTKD
+RSC --> Track : 5 TryStart / published RDP
+Track --> Agent : 6 RDP session up
+Agent --> Mon : 7 GBCWORKHUB via rdpclip
+Mon --> RSC : 8 clipboard event
+RSC --> RdpBiz : 9 parse status
+RSC --> Share : 10 ConfirmConnection
+Share --> DB : 11 confirm
+RSC --> RW : 12 gallery IN_USE
+Track --> RSC : 13 RdpEnded
+RSC --> Share : 14 ReleaseAsync
+
+@enduml
+

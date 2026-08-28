@@ -1,0 +1,28 @@
+﻿@startuml GBCWorkHub_S01_Startup
+skinparam shadowing false
+title Sequence ??App Startup
+
+actor User
+participant "App" as App
+participant "MainWindow" as MW
+participant "MainViewModel" as MVM
+participant "PopupService" as Pop
+participant "ClipboardMonitorService" as Mon
+participant "RemoteWorkspaceViewModel" as RW
+participant "RemoteSessionController" as RSC
+
+User -> App : start WorkHub
+App -> MW : create
+MW -> MVM : new MainViewModel()
+MW -> Pop : new PopupService()
+MW -> MVM : InitializeUiServices(popup)
+MVM -> MVM : create TfsSyncCoordinator\nwire WorkLog / Remote
+
+User -> MW : Loaded
+MW -> Mon : Start()\nAddClipboardFormatListener
+MW -> MVM : InitializeCentralShareAsync()
+MVM -> RW : init / load sites
+RW -> RSC : StartPollTimer /\nTryRecoverStaleSessions /\nTryAdoptLiveCmcSessions
+
+@enduml
+
