@@ -283,6 +283,11 @@
                     </Grid>
                     <TextBlock Text="{Binding HeaderTitle}" FontSize="{StaticResource FontSize.Xl}" FontWeight="SemiBold"
                                Foreground="#1E293B" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding CurrentAppVersion, StringFormat=v{0}}"
+                               FontSize="12"
+                               Foreground="#64748B"
+                               VerticalAlignment="Center"
+                               Margin="10,2,0,0" />
                 </StackPanel>
 
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
@@ -363,10 +368,6 @@
                                FontSize="13" FontWeight="SemiBold"
                                Foreground="#1E293B"
                                TextWrapping="Wrap" MaxWidth="280" />
-                    <TextBlock Text="업데이트 테스트"
-                               FontSize="11"
-                               Foreground="#64748B"
-                               Margin="0,4,0,0" />
                 </StackPanel>
             </DockPanel>
         </Border>
