@@ -275,14 +275,20 @@ namespace GBCWorkHub.UI.ViewModels
             get { return AppVersion.Current; }
         }
 
-        /// <summary>Best-effort update check. Never throws to caller; never blocks app startup.</summary>
+        /// <summary>
+        /// Best-effort update check. On newer version shows the bottom-left banner only;
+        /// apply runs when the user clicks Update. Never blocks app startup on failure.
+        /// </summary>
         public async Task CheckForUpdatesAsync()
         {
             try
             {
                 var source = UpdateService.CreateSourceFromConfig();
                 if (source == null)
+                {
+                    DiagnosticLogger.Info("UPDATE", "Update check skipped (source not configured or disabled).");
                     return;
+                }
 
                 if (_updateCts != null)
                     _updateCts.Cancel();
@@ -290,9 +296,15 @@ namespace GBCWorkHub.UI.ViewModels
                 var cts = _updateCts;
 
                 var service = new UpdateService(source);
+                DiagnosticLogger.Info("UPDATE", "Checking updates. current=v" + AppVersion.Current);
                 var latest = await service.CheckForUpdateAsync(cts.Token).ConfigureAwait(true);
-                if (cts.IsCancellationRequested || latest == null)
+                if (cts.IsCancellationRequested)
                     return;
+                if (latest == null)
+                {
+                    DiagnosticLogger.Info("UPDATE", "Already up to date (or manifest unavailable).");
+                    return;
+                }
 
                 _pendingUpdate = latest;
                 LatestVersion = latest.Version;

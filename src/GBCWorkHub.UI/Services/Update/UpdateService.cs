@@ -73,8 +73,13 @@ namespace GBCWorkHub.UI.Services.Update
             if (!string.IsNullOrWhiteSpace(baseOverride))
                 return baseOverride.Trim().TrimEnd('/');
 
+            // Defaults match App.config.example so stale LocalAppData configs still check updates.
             string owner = ReadSetting("Update.ReleaseOwner");
+            if (string.IsNullOrWhiteSpace(owner))
+                owner = "Shunamo";
             string repo = ReadSetting("Update.ReleaseRepo");
+            if (string.IsNullOrWhiteSpace(repo))
+                repo = "GBCWorkHub";
             return GitHubReleaseUrls.NormalizeBaseUrl(owner, repo);
         }
 
