@@ -17,5 +17,7 @@ namespace GBCWorkHub.DTO
         public DateTime? ConfirmedAt { get; set; }
         public DateTime? EndedAt { get; set; }
         public string EndSource { get; set; }
+        public string ResultMessage { get; set; }
+        public string SiteCode { get; set; }
     }
 }

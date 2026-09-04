@@ -56,13 +56,37 @@ namespace GBCWorkHub.UI.Views.WorkLog
                 return;
 
             var vm = DataContext as WorkLogListViewModel;
-            if (vm == null || !vm.IsImportOpen || vm.CloseImportCommand == null)
+            if (vm == null)
                 return;
-            if (vm.CloseImportCommand.CanExecute(null))
-            {
-                vm.CloseImportCommand.Execute(null);
+            if (TryCloseCommand(vm.CloseImportCommand) || TryCloseCommand(vm.CloseInboxCommand))
                 e.Handled = true;
-            }
+        }
+
+        private void ImportOverlay_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var vm = DataContext as WorkLogListViewModel;
+            if (vm != null)
+                TryCloseCommand(vm.CloseImportCommand);
+        }
+
+        private void InboxOverlay_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var vm = DataContext as WorkLogListViewModel;
+            if (vm != null)
+                TryCloseCommand(vm.CloseInboxCommand);
+        }
+
+        private void OverlayCard_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+        }
+
+        private static bool TryCloseCommand(ICommand command)
+        {
+            if (command == null || !command.CanExecute(null))
+                return false;
+            command.Execute(null);
+            return true;
         }
     }
 }

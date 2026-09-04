@@ -4,7 +4,9 @@ using System.Windows.Input;
 using GBCWorkHub.UI.Models.Popup;
 using GBCWorkHub.UI.Services;
 using GBCWorkHub.UI.Services.Popup;
+using GBCWorkHub.BIZ;
 using GBCWorkHub.UI.ViewModels;
+using GBCWorkHub.UI.Services.TfsSync;
 
 namespace GBCWorkHub.UI
 {
@@ -14,6 +16,11 @@ namespace GBCWorkHub.UI
         private readonly PopupService _popupService = new PopupService();
         private ClipboardMonitorService _clipboardMonitor;
         private bool _clipboardStarted;
+
+        public System.Windows.Controls.Panel PopupLayer
+        {
+            get { return PopupOverlayHost; }
+        }
 
         public MainWindow()
         {
@@ -37,7 +44,32 @@ namespace GBCWorkHub.UI
                 DiagnosticLogger.Info("MainWindow", "클립보드 모니터 시작 완료 (RDP/TFS Prefix 분기)");
             }
 
+            await OccupancyNamePrompt.EnsureAsync(_popupService);
+            try
+            {
+                await new DirectoryBiz().SyncPcMapFromConfigAsync().ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.Warn("DIRECTORY", "PC 별명 동기화 실패: " + ex.Message);
+            }
+            _viewModel.RemoteWorkspace.RefreshLocalIdentity();
+            _viewModel.NotifyIdentityChanged();
+
+            TfsCheckinInboxStore.PurgeDummyRows();
+            if (_viewModel.WorkLogList != null && _viewModel.WorkLogList.Inbox != null)
+                _viewModel.WorkLogList.Inbox.Reload();
+
             await _viewModel.InitializeCentralShareAsync();
+
+            try
+            {
+                await _viewModel.CheckForUpdatesAsync().ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.Warn("UPDATE", "Update check failed: " + ex.Message);
+            }
         }
 
         private void Window_Closed(object sender, EventArgs e)

@@ -34,10 +34,12 @@ namespace GBCWorkHub.UI.Services.TfsSync
 
         /// <summary>프로토콜 문구를 잠시 올린 뒤 사용자 클립보드 복원 (상태/ACK).</summary>
         private const int TransientHoldMs = 1500;
+        /// <summary>원격 세션이 붙은 뒤 TOKEN을 유지하는 시간. 로그인/비번 입력보다 뒤라 짧게.</summary>
+        public const int SessionTokenHoldAfterReadyMs = 5000;
 
         private static readonly ClipboardProtocolLeaseManager Manager = new ClipboardProtocolLeaseManager(
             new WpfClipboardAccessor(),
-            IsProtocolText,
+            ShouldNotBackupAsUserText,
             msg => DiagnosticLogger.Info("CLIPBOARD_LEASE", msg));
 
         public static bool TryWriteAck(string deliveryId)
@@ -60,10 +62,8 @@ namespace GBCWorkHub.UI.Services.TfsSync
         }
 
         /// <summary>
-        /// GBCWORKHUB_SESSION_TOKEN::{compact JSON} — written right before mstsc launches for
-        /// every remote session, so the remote SessionAgent can capture a connect-time snapshot
-        /// keyed by this SESSION_TOKEN. See class remarks for why this is not the same message
-        /// as TryWriteSyncRequest.
+        /// GBCWORKHUB_SESSION_TOKEN::{compact JSON} — 원격 세션이 붙은 뒤에만 올린다.
+        /// 로그인/비밀번호 붙여넣기 중에는 올리지 않는다.
         /// </summary>
         public static bool TryAnnounceSessionToken(string sessionToken, string requestId)
         {
@@ -76,14 +76,23 @@ namespace GBCWorkHub.UI.Services.TfsSync
         }
 
         /// <param name="holdMs">
-        /// CMC 웹 RDP는 브라우저 로그인 후 세션이 늦게 붙으므로, 원격 connect 에이전트가
-        /// 읽을 때까지 길게 유지한다. mstsc 직전 공지는 기본 1.5초면 충분하다.
+        /// 원격 세션이 이미 붙은 뒤에만 사용. 로그인 화면에서 길게 들고 있으면
+        /// 비밀번호 붙여넣기가 프로토콜 문구로 바뀐다.
         /// </param>
         /// <param name="targetComputerName">
         /// 갤러리/원격 PC명. 원격 SessionAgent는 Environment.MachineName 과 같을 때만 WorkHub 세션으로 본다.
         /// </param>
         public static bool TryAnnounceSessionToken(
             string sessionToken, string requestId, int holdMs, string targetComputerName)
+        {
+            return TryAnnounceSessionToken(sessionToken, requestId, holdMs, targetComputerName, null);
+        }
+
+        /// <param name="remoteIp">
+        /// 갤러리 원격 IP. 원격 Agent는 PC명이 달라도 이 IP가 로컬 NIC와 같으면 WorkHub 세션으로 본다.
+        /// </param>
+        public static bool TryAnnounceSessionToken(
+            string sessionToken, string requestId, int holdMs, string targetComputerName, string remoteIp)
         {
             if (string.IsNullOrWhiteSpace(sessionToken))
                 return false;
@@ -94,7 +103,8 @@ namespace GBCWorkHub.UI.Services.TfsSync
                 sessionToken = sessionToken.Trim(),
                 targetComputerName = string.IsNullOrWhiteSpace(targetComputerName)
                     ? null
-                    : targetComputerName.Trim()
+                    : targetComputerName.Trim(),
+                remoteIp = string.IsNullOrWhiteSpace(remoteIp) ? null : remoteIp.Trim()
             });
             string text = SessionTokenAnnouncePrefix + body;
 
@@ -109,6 +119,24 @@ namespace GBCWorkHub.UI.Services.TfsSync
             if (lease != null)
                 ScheduleAckCompletion(lease, holdMs > 0 ? holdMs : TransientHoldMs);
             return true;
+        }
+
+        /// <summary>
+        /// mstsc/PMP 비밀번호 붙여넣기 전에 아웃바운드 프로토콜을 치우고
+        /// 사용자가 복사해 둔 텍스트(비밀번호 등)를 되돌린다.
+        /// </summary>
+        public static void PrepareClipboardForCredentials()
+        {
+            try
+            {
+                Manager.CaptureCurrentAsUserBackupIfReal();
+                bool acted = Manager.TryReleaseClipboardForUserCredentials();
+                DiagnosticLogger.Info("CLIPBOARD_CREDENTIALS_PREPARE", "acted=" + acted);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.Warn("CLIPBOARD_CREDENTIALS_PREPARE", ex.Message);
+            }
         }
 
         /// <summary>
@@ -148,8 +176,69 @@ namespace GBCWorkHub.UI.Services.TfsSync
         }
 
         /// <summary>
+        /// 원격 접속 확인 직후 SYNC_REQUEST 강제 재기록.
+        /// GBC status가 클립보드를 덮어도 다시 올린다(미수집 TFS 페이로드·일반 텍스트는 제외).
+        /// </summary>
+        public static bool TryForceWriteSyncRequest(TfsSyncRequestClipboardDto dto, out string clipboardText)
+        {
+            clipboardText = null;
+            if (dto == null)
+                return false;
+
+            if (string.IsNullOrWhiteSpace(dto.Type))
+                dto.Type = TfsSyncRequestClipboardDto.ExpectedType;
+
+            string json = JsonConvert.SerializeObject(dto, Formatting.None);
+            clipboardText = SyncRequestPrefix + json;
+
+            var result = Manager.TryForceRefreshSyncRequest(dto.RequestId, clipboardText, IsBlockingForeignPayload);
+
+            if (result.Outcome == ClipboardWriteOutcome.SkippedForeignInboundPresent)
+            {
+                DiagnosticLogger.Info("TFS_SYNC_REQUEST_SKIPPED", "reason=tfs_payload_present mode=force");
+            }
+            else if (result.Outcome == ClipboardWriteOutcome.Displaced)
+            {
+                DiagnosticLogger.Info("TFS_SYNC_REQUEST_DISPLACED",
+                    "requestId=" + (dto.RequestId ?? "-") + " reason=user_text_present mode=force");
+            }
+            else if (result.Outcome == ClipboardWriteOutcome.Failed)
+            {
+                DiagnosticLogger.Error("TFS_CLIPBOARD_WRITE",
+                    "SYNC_REQUEST force write failed requestId=" + (dto.RequestId ?? "-"));
+            }
+            else
+            {
+                DiagnosticLogger.Info("TFS_REQUEST_CLIPBOARD_FORCE_WRITTEN",
+                    "requestId=" + (dto.RequestId ?? "-")
+                    + " outcome=" + result.Outcome
+                    + " length=" + clipboardText.Length);
+            }
+
+            return result.IsSuccessLike;
+        }
+
+        /// <summary>
+        /// 다시 시도 전에 남은 TFS/SYNC 프로토콜을 치운다. 이후 TryWriteSyncRequest가 새 prefix를 쓸 수 있다.
+        /// </summary>
+        public static bool PrepareFreshSyncRequest()
+        {
+            try
+            {
+                bool discarded = Manager.TryDiscardInboundPayloadForRetry();
+                DiagnosticLogger.Info("TFS_SYNC_RETRY_PREPARE", "discardedInbound=" + discarded);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.Warn("TFS_SYNC_RETRY_PREPARE", "failed: " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
         /// 클립보드에 남은 SYNC_REQUEST를 지우고, 가능하면 사용자 클립보드를 복원한다.
-        /// 활성 SyncRequest lease가 있고 현재 클립보드가 정확히 그 값일 때만 동작한다(exact CAS).
+        /// GBCWORKHUB* 이거나 비어 있으면 복원/정리. 일반 텍스트와 미수집 TFS 응답은 유지.
         /// </summary>
         public static bool TryClearSyncRequestIfPresent()
         {
@@ -167,9 +256,71 @@ namespace GBCWorkHub.UI.Services.TfsSync
         }
 
         /// <summary>
-        /// 현재 활성 lease(무엇이든)를 exact CAS로 종료한다. 외부에서는 호출되지 않지만
-        /// (내부 정리용) 시그니처는 하위 호환을 위해 유지한다.
+        /// RDP가 끊긴 뒤 로컬 클립보드가 비었거나 GBCWORKHUB* 만 남아 있으면
+        /// 접속 전 사용자 텍스트를 다시 넣는다. prefix가 없는 일반 텍스트는 건드리지 않는다.
         /// </summary>
+        private static readonly object RdpclipRestoreSync = new object();
+        private static DateTime _rdpclipRestoreArmUntilUtc = DateTime.MinValue;
+
+        public static bool TryRestoreRememberedClipboardAfterRemote()
+        {
+            try
+            {
+                bool acted = Manager.TryRestoreRememberedBackupIfEmptyOrProtocol();
+                DiagnosticLogger.Info("CLIPBOARD_REMEMBERED_RESTORE", "acted=" + acted);
+                return acted;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.Warn("CLIPBOARD_REMEMBERED_RESTORE", ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// rdpclip이 클립보드를 비우는 그 이벤트를 복원으로 바꾼다.
+        /// rdpclip.exe는 못 고치므로, 비움 통지(WM_CLIPBOARDUPDATE empty)에서 사용자 글을 다시 넣는다.
+        /// </summary>
+        public static void ScheduleRestoreAfterRemoteDisconnect()
+        {
+            try
+            {
+                Manager.CaptureCurrentAsUserBackupIfReal();
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.Warn("CLIPBOARD_CAPTURE_BEFORE_RDP_END", ex.Message);
+            }
+
+            TryClearSyncRequestIfPresent();
+
+            lock (RdpclipRestoreSync)
+                _rdpclipRestoreArmUntilUtc = DateTime.UtcNow.AddSeconds(15);
+
+            TryHandleClipboardEmptiedByRdpclip();
+        }
+
+        /// <summary>
+        /// 클립보드가 비었거나 프로토콜만 남을 때 호출. armed 구간에만 사용자 백업을 넣는다.
+        /// </summary>
+        public static bool TryHandleClipboardEmptiedByRdpclip()
+        {
+            lock (RdpclipRestoreSync)
+            {
+                if (_rdpclipRestoreArmUntilUtc == DateTime.MinValue
+                    || DateTime.UtcNow > _rdpclipRestoreArmUntilUtc)
+                    return false;
+            }
+
+            bool acted = TryRestoreRememberedClipboardAfterRemote();
+            if (acted)
+            {
+                lock (RdpclipRestoreSync)
+                    _rdpclipRestoreArmUntilUtc = DateTime.MinValue;
+            }
+            return acted;
+        }
+
         public static bool TryRestoreUserClipboard()
         {
             var lease = Manager.GetActiveLeaseSnapshot();
@@ -193,6 +344,19 @@ namespace GBCWorkHub.UI.Services.TfsSync
         {
             return !string.IsNullOrEmpty(text)
                 && text.StartsWith("GBCWORKHUB", StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// 사용자 복사본이 아님: 프로토콜, 빈 값, 스케줄러 명령 붙여넣기.
+        /// 이런 값은 백업하지 않고, 이전에 잡아 둔 사용자 텍스트를 유지한다.
+        /// </summary>
+        private static bool ShouldNotBackupAsUserText(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text) || IsProtocolText(text))
+                return true;
+            string t = text.TrimStart();
+            return t.StartsWith("powershell.exe -STA", StringComparison.OrdinalIgnoreCase)
+                || t.StartsWith("powershell -STA", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsBlockingForeignPayload(string current)
@@ -231,6 +395,7 @@ namespace GBCWorkHub.UI.Services.TfsSync
         public DateTime SessionStartedAt { get; set; }
         public DateTime SessionEndedAt { get; set; }
         public string Status { get; set; }
+        public bool ClipboardOnly { get; set; }
     }
 
     public static class TfsPendingSessionStore
@@ -310,8 +475,9 @@ namespace GBCWorkHub.UI.Services.TfsSync
     }
 
     /// <summary>
-    /// 같은 원격 세션에서 TFS 가져오기(또는 거절)를 이미 했으면
-    /// 종료 팝업을 다시 띄우지 않는다. (CMC 웹 RDP 중복 SessionLost 대비)
+    /// 같은 점유 세션(PC + 접속 시작 시각)에서 가져오기/나중에를 이미 눌렀으면
+    /// 종료 팝업을 다시 띄우지 않는다. CMC 웹 RDP 중복 SessionLost 대비.
+    /// 재접속(시작 시각이 새로 찍힘)은 다시 묻는다.
     /// </summary>
     public static class TfsSyncPromptGate
     {
@@ -390,14 +556,17 @@ namespace GBCWorkHub.UI.Services.TfsSync
                 if (hit == null)
                     return false;
 
+                // 시작 시각이 같으면 같은 점유. (종료 직후 중복 SessionLost)
                 bool sameSession = sessionStartedAt != default(DateTime)
+                    && hit.SessionStartedAt != default(DateTime)
                     && Math.Abs((hit.SessionStartedAt - sessionStartedAt).TotalSeconds) < 120;
-                bool handledDuringSession = sessionStartedAt != default(DateTime)
-                    && hit.HandledAt >= sessionStartedAt.AddMinutes(-1);
-                bool recentFallback = sessionStartedAt == default(DateTime)
-                    && hit.HandledAt >= DateTime.Now.AddHours(-6);
 
-                bool skip = sameSession || handledDuringSession || recentFallback;
+                // 이 점유가 시작된 뒤에 이미 답했으면 스킵.
+                // (이전에는 -1분이라, 나중에 직후 재접속하면 새 세션 전체가 막혔음)
+                bool alreadyAnsweredThisSession = sessionStartedAt != default(DateTime)
+                    && hit.HandledAt >= sessionStartedAt;
+
+                bool skip = sameSession || alreadyAnsweredThisSession;
                 if (skip)
                 {
                     DiagnosticLogger.Info("TFS_PROMPT_GATE",

@@ -102,6 +102,9 @@
   <ItemGroup>
     <Compile Include="RemotePcBiz.cs" />
     <Compile Include="RemotePcShareBiz.cs" />
+    <Compile Include="OccupancyNameStore.cs" />
+    <Compile Include="DirectoryBiz.cs" />
+    <Compile Include="OccupancyTakeoverMessage.cs" />
     <Compile Include="LocalNetworkHelper.cs" />
     <Compile Include="RdpStatusBiz.cs" />
     <Compile Include="TfsClipboardPayloadService.cs" />

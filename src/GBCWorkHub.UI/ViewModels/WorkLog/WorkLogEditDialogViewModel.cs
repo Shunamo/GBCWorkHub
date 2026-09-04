@@ -24,6 +24,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         private int _changesetId;
         private string _changesetDisplay = string.Empty;
         private string _checkedInDisplay = string.Empty;
+        private string _originalTfsComment = string.Empty;
         private string _writeStatus = WorkLogWriteStatus.Draft;
         private string _validationMessage;
         private string _validationField;
@@ -69,6 +70,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             CloseCommand = new RelayCommand(() => { if (CloseRequested != null) CloseRequested(); });
             CancelCommand = new RelayCommand(CancelEdit);
             SaveCommand = new RelayCommand(Save, CanSave);
+            SaveDraftCommand = new RelayCommand(SaveDraft, CanSaveDraft);
             EnterEditModeCommand = new RelayCommand(EnterEditMode, () => IsReadOnlyMode && CanEditByCurrentUser);
             DeleteWorkLogCommand = new RelayCommand(
                 () => { if (DeleteRequested != null) DeleteRequested(); },
@@ -93,11 +95,17 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             UnlockWorkCategoryCommand = new RelayCommand(UnlockWorkCategoryReveal);
             ToggleTicketInternalCommand = new RelayCommand(ToggleTicketInternal);
             ToggleTicketUnregisteredCommand = new RelayCommand(ToggleTicketUnregistered);
+            SelectImportGroupCommand = new RelayCommand<ImportGroupSlot>(slot =>
+            {
+                if (ImportGroupSelected != null)
+                    ImportGroupSelected(slot);
+            });
         }
 
         public event Action CloseRequested;
         public event Action ApplyRequested;
         public event Action DeleteRequested;
+        public event Action<ImportGroupSlot> ImportGroupSelected;
         /// <summary>Menu 기입 후 Work 스택이 처음 나타날 때 스크롤 요청.</summary>
         public event Action RequestScrollToWorkForm;
 
@@ -243,7 +251,24 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
 
         public bool HasImportProgress
         {
-            get { return !string.IsNullOrWhiteSpace(ImportProgressText); }
+            get { return false; }
+        }
+
+        private ObservableCollection<ImportGroupSlot> _importGroupSlots;
+
+        public ObservableCollection<ImportGroupSlot> ImportGroupSlots
+        {
+            get { return _importGroupSlots; }
+            set
+            {
+                if (SetProperty(ref _importGroupSlots, value))
+                    RaisePropertyChanged("HasImportGroups");
+            }
+        }
+
+        public bool HasImportGroups
+        {
+            get { return _importGroupSlots != null && _importGroupSlots.Count > 1; }
         }
 
         /// <summary>좌측 트리 검색 (메뉴/프로젝트/파일).</summary>
@@ -770,14 +795,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         public bool CanGoPrevStep { get { return EditStepIndex > 0; } }
         public bool CanGoNextStep
         {
-            get
-            {
-                if (!IsEditMode || EditStepIndex >= 1)
-                    return false;
-                return HasSiteCode
-                    && ActiveMenu != null
-                    && !string.IsNullOrWhiteSpace(ActiveMenu.MenuName);
-            }
+            get { return IsEditMode && EditStepIndex < 1; }
         }
 
         public string NextStepLabel
@@ -1013,6 +1031,21 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             set { SetProperty(ref _checkedInDisplay, value ?? string.Empty); }
         }
 
+        public string OriginalTfsComment
+        {
+            get { return _originalTfsComment; }
+            set
+            {
+                if (SetProperty(ref _originalTfsComment, value ?? string.Empty))
+                    RaisePropertyChanged("HasOriginalTfsComment");
+            }
+        }
+
+        public bool HasOriginalTfsComment
+        {
+            get { return !string.IsNullOrWhiteSpace(OriginalTfsComment); }
+        }
+
         public string WriteStatus
         {
             get { return _writeStatus; }
@@ -1103,6 +1136,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         public ICommand CloseCommand { get; private set; }
         public ICommand CancelCommand { get; private set; }
         public ICommand SaveCommand { get; private set; }
+        public ICommand SaveDraftCommand { get; private set; }
         public ICommand EnterEditModeCommand { get; private set; }
         public ICommand DeleteWorkLogCommand { get; private set; }
         public ICommand SelectNodeCommand { get; private set; }
@@ -1125,17 +1159,11 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         public ICommand UnlockWorkCategoryCommand { get; private set; }
         public ICommand ToggleTicketInternalCommand { get; private set; }
         public ICommand ToggleTicketUnregisteredCommand { get; private set; }
+        public ICommand SelectImportGroupCommand { get; private set; }
 
         public string this[string columnName]
         {
-            get
-            {
-                if (Tree == null || Tree.SelectedMenu == null)
-                    return null;
-                if (columnName == "StartDateText" || columnName == "PersonInCharge")
-                    return WorkLogEditValidator.ValidateMenuRequired(Tree.SelectedMenu);
-                return null;
-            }
+            get { return null; }
         }
 
         public string Error { get { return null; } }
@@ -1173,6 +1201,9 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             vm.ApplyTicketStorage(item.TicketNo ?? string.Empty);
             // 헤더 제목 = Ticket Contents만 (Comment/TfsComment를 섞지 않음)
             vm.TicketComment = item.TicketContents ?? string.Empty;
+            vm.OriginalTfsComment = !string.IsNullOrWhiteSpace(item.TfsComment)
+                ? item.TfsComment
+                : (item.TicketContents ?? string.Empty);
             vm.ChangesetId = item.ChangesetId;
             vm.ChangesetDisplay = item.ChangesetDisplay ?? string.Empty;
             vm.CheckedInDisplay = item.CheckedInAt.HasValue
@@ -2117,6 +2148,29 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             // IsEditMode / Close 는 Persist 성공 후 ListVM 에서 처리
         }
 
+        private bool CanSaveDraft()
+        {
+            return IsEditMode;
+        }
+
+        private void SaveDraft()
+        {
+            ClearFieldValidation();
+            if (string.IsNullOrWhiteSpace(SiteCode)
+                || string.Equals(SiteCode, WorkLogSiteCodes.All, StringComparison.OrdinalIgnoreCase))
+            {
+                ApplyValidationIssue(new WorkLogValidationIssue(
+                    WorkLogValidationKind.MissingSite,
+                    "Site",
+                    WorkLogEditValidator.EmptyValue("Site")));
+                return;
+            }
+
+            WriteStatus = WorkLogWriteStatus.Draft;
+            if (ApplyRequested != null)
+                ApplyRequested();
+        }
+
         /// <summary>Validator Issue → FieldError / Step / Tree 선택 (UI reaction만).</summary>
         private void ApplyValidationIssue(WorkLogValidationIssue issue)
         {
@@ -2136,6 +2190,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 case WorkLogValidationKind.MissingType:
                 case WorkLogValidationKind.MissingSource:
                     EditStepIndex = 1;
+                    EnsureScratchProjectUnderMenu();
                     break;
             }
 
@@ -2410,6 +2465,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             ((RelayCommand<WorkLogTreeNodeBase>)RemoveNodeCommand).RaiseCanExecuteChanged();
             ((RelayCommand)RemoveSelectedNodeCommand).RaiseCanExecuteChanged();
             ((RelayCommand)SaveCommand).RaiseCanExecuteChanged();
+            ((RelayCommand)SaveDraftCommand).RaiseCanExecuteChanged();
             ((RelayCommand)EnterEditModeCommand).RaiseCanExecuteChanged();
             ((RelayCommand)DeleteWorkLogCommand).RaiseCanExecuteChanged();
             RaiseStepCommands();

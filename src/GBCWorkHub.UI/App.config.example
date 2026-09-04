@@ -16,14 +16,117 @@
   <appSettings>
     <add key="WorkLog.UseGlassmorphism" value="true" />
     <add key="AURORA.Host" value="" />
-    <add key="AURORA.PcNames" value="" />
+    <add key="AURORA.PcNames" value="KEB-3TYYVP2,KEB-DRY98V3,KEB-BC-8TSD0F2,KEB-3VNZVP2,KEB-7VY98V3,KEB-84Y73Q3,KEB-CRY98V3,KEB-71V73Q3,KEB-505F8R2,KEB-BC-HTSD0F2,KEB-HYT73Q3,KEB-7ZT73Q3,KEB-B2V73Q3,KEB-BC-6TSD0F2,KEB-BC-CSSD0F1" />
+    <add key="AURORA.KEB-3TYYVP2.Host" value="172.16.49.57" />
+    <add key="AURORA.KEB-DRY98V3.Host" value="172.16.49.56" />
+    <add key="AURORA.KEB-BC-8TSD0F2.Host" value="172.16.49.63" />
+    <add key="AURORA.KEB-3VNZVP2.Host" value="172.16.49.59" />
+    <add key="AURORA.KEB-7VY98V3.Host" value="172.16.49.61" />
+    <add key="AURORA.KEB-84Y73Q3.Host" value="172.16.49.50" />
+    <add key="AURORA.KEB-CRY98V3.Host" value="172.16.49.55" />
+    <add key="AURORA.KEB-71V73Q3.Host" value="172.16.49.53" />
+    <add key="AURORA.KEB-505F8R2.Host" value="172.16.49.58" />
+    <add key="AURORA.KEB-BC-HTSD0F2.Host" value="172.16.49.66" />
+    <add key="AURORA.KEB-HYT73Q3.Host" value="172.16.49.52" />
+    <add key="AURORA.KEB-7ZT73Q3.Host" value="172.16.49.54" />
+    <add key="AURORA.KEB-B2V73Q3.Host" value="172.16.49.51" />
+    <add key="AURORA.KEB-BC-6TSD0F2.Host" value="172.16.49.65" />
+    <add key="AURORA.KEB-BC-CSSD0F1.Host" value="172.16.49.62" />
+    <!-- RC: WorkHub가 .rdp를 만들지 않음. Forti VPN 후 RD Web에서 해당 PC를 눌러 받은
+         cpub-HOBCARE07-QuickSessionCollection-CmsRdsh.rdp 를 다운로드/바탕화면/문서에 두면 접속됨. -->
     <add key="RC.Host" value="" />
-    <add key="RC.PcNames" value="" />
+    <add key="RC.PcNames" value="HO-BCARE-11,HO-01-HIS-11,HO-BCARE-07,HO-BESTCARE-06,HO-BCARE-12,JM-HIS-RCJ-10,JM-HIS-RCJ-01,HO-BCARE-15,HO-01-DTT-56,HO-BCARE-10,HO-BESTCARE-01,HO-01-DTT-03,HO-BESTCARE-07,HO-BCARE-14,HO-BESTCARE-02,HO-BCARE-09,HOS-ITD-HIS-02,HO-BESTCARE-04,HO-01-HIS-95,HO-01-TRN-03,HO-BCARE-13,JM-HIS-RCJ-25,HO-BESTCARE-05,HO-DTT-05,HO-BCARE-01,HO-01-DTT-04" />
+    <add key="RC.HO-BCARE-11.Host" value="10.80.26.52" />
+    <add key="RC.HO-BCARE-11.RdpHint" value="HOBCARE11" />
+    <add key="RC.HO-01-HIS-11.Host" value="10.80.25.66" />
+    <add key="RC.HO-01-HIS-11.RdpHint" value="HO01HIS11" />
+    <add key="RC.HO-BCARE-07.Host" value="10.80.22.73" />
+    <add key="RC.HO-BCARE-07.RdpHint" value="HOBCARE07" />
+    <add key="RC.HO-BESTCARE-06.Host" value="10.80.25.64" />
+    <add key="RC.HO-BESTCARE-06.RdpHint" value="HOBESTCARE06" />
+    <add key="RC.HO-BCARE-12.Host" value="10.80.25.73" />
+    <add key="RC.HO-BCARE-12.RdpHint" value="HOBCARE12" />
+    <add key="RC.JM-HIS-RCJ-10.Host" value="10.81.10.107" />
+    <add key="RC.JM-HIS-RCJ-10.RdpHint" value="JMHISRCJ10" />
+    <add key="RC.JM-HIS-RCJ-01.Host" value="10.81.10.104" />
+    <add key="RC.JM-HIS-RCJ-01.RdpHint" value="JMHISRCJ01" />
+    <add key="RC.HO-BCARE-15.Host" value="10.80.25.80" />
+    <add key="RC.HO-BCARE-15.RdpHint" value="HOBCARE15" />
+    <add key="RC.HO-01-DTT-56.Host" value="10.80.25.77" />
+    <add key="RC.HO-01-DTT-56.RdpHint" value="HO01DTT56" />
+    <add key="RC.HO-BCARE-10.Host" value="10.80.26.54" />
+    <add key="RC.HO-BCARE-10.RdpHint" value="HOBCARE10" />
+    <add key="RC.HO-BESTCARE-01.Host" value="10.80.26.58" />
+    <add key="RC.HO-BESTCARE-01.RdpHint" value="HOBESTCARE01" />
+    <add key="RC.HO-01-DTT-03.Host" value="10.80.25.81" />
+    <add key="RC.HO-01-DTT-03.RdpHint" value="HO01DTT03" />
+    <add key="RC.HO-BESTCARE-07.Host" value="10.80.26.61" />
+    <add key="RC.HO-BESTCARE-07.RdpHint" value="HOBESTCARE07" />
+    <add key="RC.HO-BCARE-14.Host" value="10.80.14.88" />
+    <add key="RC.HO-BCARE-14.RdpHint" value="HOBCARE14" />
+    <add key="RC.HO-BESTCARE-02.Host" value="10.80.22.59" />
+    <add key="RC.HO-BESTCARE-02.RdpHint" value="HOBESTCARE02" />
+    <add key="RC.HO-BCARE-09.Host" value="10.80.26.63" />
+    <add key="RC.HO-BCARE-09.RdpHint" value="HOBCARE09" />
+    <add key="RC.HOS-ITD-HIS-02.Host" value="10.80.25.60" />
+    <add key="RC.HOS-ITD-HIS-02.RdpHint" value="HOSITDHIS02" />
+    <add key="RC.HO-BESTCARE-04.Host" value="10.80.26.56" />
+    <add key="RC.HO-BESTCARE-04.RdpHint" value="HOBESTCARE04" />
+    <add key="RC.HO-01-HIS-95.Host" value="10.80.25.67" />
+    <add key="RC.HO-01-HIS-95.RdpHint" value="HO01HIS95" />
+    <add key="RC.HO-01-TRN-03.Host" value="10.80.22.86" />
+    <add key="RC.HO-01-TRN-03.RdpHint" value="HO01TRN03" />
+    <add key="RC.HO-BCARE-13.Host" value="10.80.25.75" />
+    <add key="RC.HO-BCARE-13.RdpHint" value="HOBCARE13" />
+    <add key="RC.JM-HIS-RCJ-25.Host" value="10.81.10.94" />
+    <add key="RC.JM-HIS-RCJ-25.RdpHint" value="JMHISRCJ25" />
+    <add key="RC.HO-BESTCARE-05.Host" value="10.80.25.70" />
+    <add key="RC.HO-BESTCARE-05.RdpHint" value="HOBESTCARE05" />
+    <add key="RC.HO-DTT-05.Host" value="10.80.25.68" />
+    <add key="RC.HO-DTT-05.RdpHint" value="HODTT05" />
+    <add key="RC.HO-BCARE-01.Host" value="10.80.25.79" />
+    <add key="RC.HO-BCARE-01.RdpHint" value="HOBCARE01" />
+    <add key="RC.HO-01-DTT-04.Host" value="10.80.25.56" />
+    <add key="RC.HO-01-DTT-04.RdpHint" value="HO01DTT04" />
     <add key="CMC.Host" value="" />
-    <add key="CMC.PcNames" value="" />
+    <add key="CMC.PcNames" value="P-BCTECH8,P-BCTECH6,P-BCTECH1,P-BCTECH2,P-BCTECH3,P-BCTECH5,P-BCTECH9,P-BCTECH7,P-BCTECH4" />
+    <add key="CMC.P-BCTECH8.Host" value="10.230.35.252" />
+    <add key="CMC.P-BCTECH8.MatchHints" value="P-BCTECH8,rdp.ma" />
+    <add key="CMC.P-BCTECH6.Host" value="10.230.35.250" />
+    <add key="CMC.P-BCTECH6.MatchHints" value="P-BCTECH6,rdp.ma" />
+    <add key="CMC.P-BCTECH1.Host" value="10.230.35.245" />
+    <add key="CMC.P-BCTECH1.MatchHints" value="P-BCTECH1,rdp.ma" />
+    <add key="CMC.P-BCTECH2.Host" value="10.230.35.246" />
+    <add key="CMC.P-BCTECH2.MatchHints" value="P-BCTECH2,rdp.ma" />
+    <add key="CMC.P-BCTECH3.Host" value="10.230.35.247" />
+    <add key="CMC.P-BCTECH3.MatchHints" value="P-BCTECH3,rdp.ma" />
+    <add key="CMC.P-BCTECH5.Host" value="10.230.35.249" />
+    <add key="CMC.P-BCTECH5.MatchHints" value="P-BCTECH5,rdp.ma" />
+    <add key="CMC.P-BCTECH9.Host" value="10.230.35.253" />
+    <add key="CMC.P-BCTECH9.MatchHints" value="P-BCTECH9,rdp.ma" />
+    <add key="CMC.P-BCTECH7.Host" value="10.230.35.251" />
+    <add key="CMC.P-BCTECH7.MatchHints" value="P-BCTECH7,rdp.ma" />
+    <add key="CMC.P-BCTECH4.Host" value="10.230.35.248" />
+    <add key="CMC.P-BCTECH4.MatchHints" value="P-BCTECH4,rdp.ma" />
     <add key="FortiClient.ExePath" value="" />
     <add key="RemotePc.DbPollSeconds" value="2" />
     <add key="Tfs.SkipAuthorFilter" value="false" />
+    <add key="Tfs.UseLocalDummyPayload" value="false" />
+    <!-- 점유/체크인 시각을 한국 시간으로 바꿀 때 쓰는 사이트 현지 타임존(Windows ID). -->
+    <add key="SiteTimeZone.CMC" value="Arabian Standard Time" />
+    <add key="SiteTimeZone.MNGHA" value="Arab Standard Time" />
+    <add key="SiteTimeZone.RC" value="Arab Standard Time" />
+    <add key="SiteTimeZone.AURORA" value="US Mountain Standard Time" />
+    <!-- Auto-update: production default = public GitHub Releases static HTTPS (no PAT). -->
+    <add key="Update.Enabled" value="true" />
+    <add key="Update.SourceType" value="GitHubRelease" />
+    <!-- Prefer owner/repo OR ReleaseBaseUrl. ManifestUrl overrides latest endpoint if set. -->
+    <add key="Update.ReleaseOwner" value="Shunamo" />
+    <add key="Update.ReleaseRepo" value="GBCWorkHub" />
+    <add key="Update.ReleaseBaseUrl" value="" />
+    <add key="Update.ManifestUrl" value="" />
+    <!-- Offline/test only -->
+    <add key="Update.ManifestPath" value="" />
   </appSettings>
   <runtime>
     <assemblyBinding xmlns="urn:schemas-microsoft-com:asm.v1">

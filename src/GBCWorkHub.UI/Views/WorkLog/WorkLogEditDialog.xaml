@@ -11,7 +11,53 @@
                 <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogGlassStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
-            <!-- WPF CheckBox 미사용: 네모 + Done_light -->
+            <Style x:Key="CheckinMessageSwitch" TargetType="ToggleButton">
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="HorizontalAlignment" Value="Left" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ToggleButton">
+                            <StackPanel Orientation="Horizontal" Background="Transparent">
+                                <TextBlock Text="Check-in message"
+                                           FontSize="{StaticResource FontSize.Sm}"
+                                           FontWeight="SemiBold"
+                                           Foreground="#64748B"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0" />
+                                <Grid Width="36" Height="20" VerticalAlignment="Center">
+                                    <Border x:Name="Track"
+                                            CornerRadius="10"
+                                            Background="#D1D5DB"
+                                            SnapsToDevicePixels="True" />
+                                    <Ellipse x:Name="Thumb"
+                                             Width="16" Height="16"
+                                             Fill="White"
+                                             HorizontalAlignment="Left"
+                                             Margin="2,0,0,0">
+                                        <Ellipse.Effect>
+                                            <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.18" Color="#1E293B" />
+                                        </Ellipse.Effect>
+                                    </Ellipse>
+                                </Grid>
+                            </StackPanel>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="Track" Property="Background" Value="#4F67D8" />
+                                    <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right" />
+                                    <Setter TargetName="Thumb" Property="Margin" Value="0,0,2,0" />
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Opacity" Value="0.92" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
             <Style x:Key="WorkLogGlassCheckButton" TargetType="Button">
                 <Setter Property="Width" Value="18" />
                 <Setter Property="Height" Value="18" />
@@ -43,13 +89,17 @@
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="Bd" Property="Background" Value="#CCFFFFFF" />
-                                    <Setter TargetName="Bd" Property="BorderBrush" Value="#FFFFFFFF" />
+                                    <Setter TargetName="Bd" Property="Background" Value="#B8D0E0" />
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="#A0B8CC" />
                                 </Trigger>
                                 <Trigger Property="Tag" Value="Checked">
                                     <Setter TargetName="Bd" Property="Background" Value="#B8CFE0FF" />
                                     <Setter TargetName="Bd" Property="BorderBrush" Value="#994F67D8" />
                                     <Setter TargetName="Mark" Property="Opacity" Value="1" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Opacity" Value="0.4" />
+                                    <Setter Property="Cursor" Value="Arrow" />
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -124,18 +174,22 @@
                                 </Border.RenderTransform>
                                 <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" />
                             </Border>
-                            <ControlTemplate.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Foreground" Value="#334155" />
-                                </Trigger>
-                                <Trigger Property="IsPressed" Value="True">
-                                    <Setter TargetName="Root" Property="RenderTransform">
-                                        <Setter.Value>
-                                            <ScaleTransform ScaleX="0.92" ScaleY="0.92" />
-                                        </Setter.Value>
-                                    </Setter>
-                                </Trigger>
-                            </ControlTemplate.Triggers>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="#334155" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Root" Property="RenderTransform">
+                                <Setter.Value>
+                                    <ScaleTransform ScaleX="0.92" ScaleY="0.92" />
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </Setter.Value>
                 </Setter>
@@ -160,6 +214,21 @@
                 <Setter Property="VerticalAlignment" Value="Top" />
                 <Setter Property="HorizontalContentAlignment" Value="Center" />
                 <Setter Property="VerticalContentAlignment" Value="Center" />
+            </Style>
+
+            <Style x:Key="TreeNodeTitleText" TargetType="TextBlock">
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Foreground" Value="#1E293B" />
+                <Setter Property="FontSize" Value="{StaticResource FontSize.Base}" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="TextWrapping" Value="NoWrap" />
+                <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsPlaceholderTitle}" Value="True">
+                        <Setter Property="FontWeight" Value="Normal" />
+                        <Setter Property="Foreground" Value="#94A3B8" />
+                    </DataTrigger>
+                </Style.Triggers>
             </Style>
 
             <Style x:Key="TreeSourceSquareSlot" TargetType="Border">
@@ -235,8 +304,46 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
+        <ItemsControl Grid.Row="0" ItemsSource="{Binding ImportGroupSlots}"
+                      Margin="16,8,16,0" HorizontalAlignment="Left"
+                      Visibility="{Binding HasImportGroups, Converter={StaticResource BoolToVis}}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Button Command="{Binding DataContext.SelectImportGroupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding}"
+                            Visibility="{Binding IsVisible, Converter={StaticResource BoolToVis}}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource NotebookInnerTabButton}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                        <Setter Property="Tag" Value="On" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Label}" FontSize="11" FontWeight="SemiBold"
+                                       VerticalAlignment="Center"
+                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                            <TextBlock Text="✓" FontSize="12" FontWeight="Bold" Margin="6,0,0,0"
+                                       VerticalAlignment="Center" Foreground="#16A34A"
+                                       Visibility="{Binding ShowGreenCheck, Converter={StaticResource BoolToVis}}" />
+                            <TextBlock Text="✓" FontSize="12" FontWeight="Bold" Margin="6,0,0,0"
+                                       VerticalAlignment="Center" Foreground="#94A3B8"
+                                       Visibility="{Binding ShowGrayCheck, Converter={StaticResource BoolToVis}}" />
+                        </StackPanel>
+                    </Button>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
         <!-- Ticket/save chrome lives in the right pane (same layout as detail). -->
-        <Grid x:Name="EditBodyGrid" Grid.Row="0" Grid.RowSpan="2" MinWidth="0">
+        <Grid x:Name="EditBodyGrid" Grid.Row="1" MinWidth="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="32*" MinWidth="160" />
                 <ColumnDefinition Width="6" />
@@ -341,10 +448,7 @@
                                                                               Command="{Binding DataContext.SelectNodeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                               CommandParameter="{Binding}" />
                                                             </Border.InputBindings>
-                                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="{StaticResource FontSize.Base}"
-                                                                       Foreground="#1E293B" TextWrapping="NoWrap"
-                                                                       TextTrimming="CharacterEllipsis"
-                                                                       VerticalAlignment="Center" />
+                                                            <TextBlock Text="{Binding Title}" Style="{DynamicResource TreeNodeTitleText}" />
                                                         </Border>
                                                         <Button Grid.Column="2" Style="{DynamicResource TreePlusButton}"
                                                                 ToolTip="Type 추가"
@@ -406,9 +510,7 @@
                                                                                               Command="{Binding DataContext.SelectNodeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                                               CommandParameter="{Binding}" />
                                                                             </Border.InputBindings>
-                                                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="{StaticResource FontSize.Base}"
-                                                                                       Foreground="#1E293B" VerticalAlignment="Center"
-                                                                                       TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                                                                            <TextBlock Text="{Binding Title}" Style="{DynamicResource TreeNodeTitleText}" />
                                                                         </Border>
                                                                         <Button Grid.Column="2" Style="{DynamicResource TreePlusButton}"
                                                                                 ToolTip="Category 추가"
@@ -469,22 +571,7 @@
                                                                                                               Command="{Binding DataContext.SelectNodeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                                                               CommandParameter="{Binding}" />
                                                                                             </Border.InputBindings>
-                                                                                            <TextBlock Text="{Binding Title}" FontSize="{StaticResource FontSize.Base}"
-                                                                                                       VerticalAlignment="Center"
-                                                                                                       TextWrapping="NoWrap" TextTrimming="CharacterEllipsis">
-                                                                                                <TextBlock.Style>
-                                                                                                    <Style TargetType="TextBlock">
-                                                                                                        <Setter Property="FontWeight" Value="SemiBold" />
-                                                                                                        <Setter Property="Foreground" Value="#1E293B" />
-                                                                                                        <Style.Triggers>
-                                                                                                            <DataTrigger Binding="{Binding IsPlaceholderTitle}" Value="True">
-                                                                                                                <Setter Property="FontWeight" Value="Normal" />
-                                                                                                                <Setter Property="Foreground" Value="#94A3B8" />
-                                                                                                            </DataTrigger>
-                                                                                                        </Style.Triggers>
-                                                                                                    </Style>
-                                                                                                </TextBlock.Style>
-                                                                                            </TextBlock>
+                                                                                            <TextBlock Text="{Binding Title}" Style="{DynamicResource TreeNodeTitleText}" />
                                                                                         </Border>
                                                                                         <Button Grid.Column="2" Style="{DynamicResource TreePlusButton}"
                                                                                                 ToolTip="Project 추가"
@@ -544,23 +631,9 @@
                                                                                                                               Command="{Binding DataContext.SelectNodeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                                                                               CommandParameter="{Binding}" />
                                                                                                             </Border.InputBindings>
-                                                                                                            <TextBlock Text="{Binding Title}" FontSize="{StaticResource FontSize.Base}"
-                                                                                                                       VerticalAlignment="Center"
-                                                                                                                       TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
-                                                                                                                       ToolTip="{Binding Title}">
-                                                                                                                <TextBlock.Style>
-                                                                                                                    <Style TargetType="TextBlock">
-                                                                                                                        <Setter Property="FontWeight" Value="SemiBold" />
-                                                                                                                        <Setter Property="Foreground" Value="#1E293B" />
-                                                                                                                        <Style.Triggers>
-                                                                                                                            <DataTrigger Binding="{Binding IsPlaceholderTitle}" Value="True">
-                                                                                                                                <Setter Property="FontWeight" Value="Normal" />
-                                                                                                                                <Setter Property="Foreground" Value="#94A3B8" />
-                                                                                                                            </DataTrigger>
-                                                                                                                        </Style.Triggers>
-                                                                                                                    </Style>
-                                                                                                                </TextBlock.Style>
-                                                                                                            </TextBlock>
+                                                                                                            <TextBlock Text="{Binding Title}"
+                                                                                                                       ToolTip="{Binding Title}"
+                                                                                                                       Style="{DynamicResource TreeNodeTitleText}" />
                                                                                                         </Border>
                                                                                                         <Button Grid.Column="2" Style="{DynamicResource TreeRowIconButton}"
                                                                                                                 Width="18" Height="18" VerticalAlignment="Top" ToolTip="Project 삭제"
@@ -596,7 +669,7 @@
                                                                                                                                VerticalAlignment="Center" HorizontalAlignment="Center" />
                                                                                                                     </Border>
                                                                                                                     <TextBlock Grid.Column="1"
-                                                                                                                               Text="{Binding ChangeDetailText}"
+                                                                                                                               Text="{Binding TreeTitle}"
                                                                                                                                FontSize="{StaticResource FontSize.Base}"
                                                                                                                                VerticalAlignment="Top"
                                                                                                                                TextTrimming="CharacterEllipsis"
@@ -606,6 +679,9 @@
                                                                                                                             <Style TargetType="TextBlock">
                                                                                                                                 <Setter Property="Foreground" Value="#64748B" />
                                                                                                                                 <Style.Triggers>
+                                                                                                                                    <DataTrigger Binding="{Binding IsPlaceholderTitle}" Value="True">
+                                                                                                                                        <Setter Property="Foreground" Value="#94A3B8" />
+                                                                                                                                    </DataTrigger>
                                                                                                                                     <DataTrigger Binding="{Binding IsAppended}" Value="True">
                                                                                                                                         <Setter Property="Foreground" Value="#166534" />
                                                                                                                                         <Setter Property="FontWeight" Value="SemiBold" />
@@ -705,8 +781,13 @@
                                         </WrapPanel>
                                     </DockPanel>
                                     <TextBlock Text="{Binding HeaderCommentLine}" FontSize="{StaticResource FontSize.Base}" Foreground="#475569"
-                                               TextWrapping="Wrap" Margin="0,0,0,14"
+                                               TextWrapping="Wrap" Margin="0,0,0,8"
                                                Visibility="{Binding HasHeaderComment, Converter={StaticResource BoolToVis}}" />
+                                    <ToggleButton Style="{StaticResource CheckinMessageSwitch}"
+                                                  IsChecked="{Binding ShowTfsOriginal, Mode=TwoWay}"
+                                                  Margin="0,0,0,14"
+                                                  Visibility="{Binding HasChangeset, Converter={StaticResource BoolToVis}}"
+                                                  ToolTip="TFS 체크인 메시지" />
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="{Binding DetailPersonMeta}" FontSize="{StaticResource FontSize.Base}" Foreground="#64748B"
                                                    VerticalAlignment="Center" />
@@ -714,15 +795,18 @@
                                         <TextBlock Text="{Binding DetailPeriodMeta}" FontSize="{StaticResource FontSize.Base}" Foreground="#64748B"
                                                    VerticalAlignment="Center" />
                                     </StackPanel>
-                                    <TextBlock Text="{Binding ImportProgressText}" FontSize="{StaticResource FontSize.Base}" Foreground="#3B82F6"
-                                               Margin="0,10,0,0"
-                                               Visibility="{Binding HasImportProgress, Converter={StaticResource BoolToVis}}" />
-                                    <TextBlock Margin="0,8,0,0" FontSize="{StaticResource FontSize.Base}" Foreground="#94A3B8"
-                                               Visibility="{Binding ShowTfsOriginal, Converter={StaticResource BoolToVis}}">
-                                        <Run Text="{Binding ChangesetDisplay, Mode=OneWay}" FontWeight="SemiBold" />
-                                        <Run Text=" · " />
-                                        <Run Text="{Binding CheckedInDisplay, Mode=OneWay}" />
-                                    </TextBlock>
+                                    <StackPanel Margin="0,8,0,0"
+                                                Visibility="{Binding ShowTfsOriginal, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock FontSize="{StaticResource FontSize.Base}" Foreground="#94A3B8">
+                                            <Run Text="{Binding ChangesetDisplay, Mode=OneWay}" FontWeight="SemiBold" />
+                                            <Run Text=" · " />
+                                            <Run Text="{Binding CheckedInDisplay, Mode=OneWay}" />
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding OriginalTfsComment}"
+                                                   FontSize="{StaticResource FontSize.Base}" Foreground="#475569"
+                                                   TextWrapping="Wrap" Margin="0,6,0,0"
+                                                   Visibility="{Binding HasOriginalTfsComment, Converter={StaticResource BoolToVis}}" />
+                                    </StackPanel>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top"
                                             Panel.ZIndex="1">
@@ -732,9 +816,6 @@
                                             Visibility="{Binding ShowDeleteButton, Converter={StaticResource BoolToVis}}">
                                         <Image Source="{StaticResource TrashDuotoneIcon}" Width="16" Height="16" />
                                     </Button>
-                                    <Button Style="{DynamicResource WorkLogGhostButton}" Content="TFS 원본" FontSize="{StaticResource FontSize.Sm}" Padding="8,4"
-                                            Visibility="{Binding HasChangeset, Converter={StaticResource BoolToVis}}"
-                                            Command="{Binding ToggleTfsOriginalCommand}" Margin="0,0,6,0" />
                                     <Button Style="{DynamicResource WorkLogIconButton}" Padding="4" Width="28" Height="28"
                                             Margin="0" ToolTip="수정"
                                             Command="{Binding EnterEditModeCommand}"
@@ -917,7 +998,7 @@
                                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                     <TextBlock Text="TN-" FontSize="{StaticResource FontSize.Xl}" FontWeight="Bold"
                                                                Foreground="#0F172A" VerticalAlignment="Center" Margin="0,0,4,0" />
-                                                    <Grid MinWidth="64" Width="80" Height="24">
+                                                    <Grid MinWidth="120" Width="168" Height="24">
                                                         <TextBox FontSize="{StaticResource FontSize.Lg}" FontWeight="SemiBold"
                                                                  Foreground="#0F172A" BorderThickness="0" Background="Transparent"
                                                                  Padding="0" VerticalContentAlignment="Center"
@@ -968,9 +1049,6 @@
                                                  Tag="Ticket Comment를 입력하세요."
                                                  Text="{Binding TicketComment, UpdateSourceTrigger=PropertyChanged}"
                                                  ToolTip="Ticket Comment" />
-                                        <TextBlock Text="{Binding ImportProgressText}" FontSize="{StaticResource FontSize.Base}" Foreground="#3B82F6"
-                                                   Margin="0,10,0,0"
-                                                   Visibility="{Binding HasImportProgress, Converter={StaticResource BoolToVis}}" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top"
                                                 Panel.ZIndex="1">
@@ -981,7 +1059,13 @@
                                             <Image Source="{StaticResource TrashDuotoneIcon}" Width="16" Height="16" />
                                         </Button>
                                         <Button Style="{DynamicResource WorkLogIconButton}" Padding="4" Width="28" Height="28"
-                                                Margin="0" ToolTip="저장"
+                                                Margin="0,0,6,0" ToolTip="임시저장"
+                                                Command="{Binding SaveDraftCommand}"
+                                                Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVis}}">
+                                            <Image Source="{StaticResource LoadListAltFillIcon}" Width="16" Height="16" />
+                                        </Button>
+                                        <Button Style="{DynamicResource WorkLogIconButton}" Padding="4" Width="28" Height="28"
+                                                Margin="0" ToolTip="작성 완료"
                                                 Command="{Binding SaveCommand}">
                                             <Image Source="{StaticResource SaveFillIcon}" Width="16" Height="16" />
                                         </Button>
@@ -993,12 +1077,17 @@
                             <StackPanel MinWidth="0" HorizontalAlignment="Stretch"
                                         Visibility="{Binding IsStepMenu, Converter={StaticResource BoolToVis}}">
                                 <StackPanel Margin="0,0,0,14">
-                                    <TextBlock Text="Site" Style="{DynamicResource WorkLogFieldTitle}" />
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <TextBlock Style="{DynamicResource WorkLogFieldTitle}" Margin="0">
+                                            <Run Text="Site" /><Run Text=" *" Foreground="#DC2626" />
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding SiteFieldError}" Style="{DynamicResource WorkLogFieldError}"
+                                                   Margin="8,0,0,0" VerticalAlignment="Center"
+                                                   Visibility="{Binding HasSiteFieldError, Converter={StaticResource BoolToVis}}" />
+                                    </StackPanel>
                                     <ctrl:InlineOptionPicker ItemsSource="{Binding SiteOptions}"
                                                              SelectedItem="{Binding SiteCode, Mode=TwoWay}"
                                                              Placeholder="사이트 선택" />
-                                    <TextBlock Text="{Binding SiteFieldError}" Style="{DynamicResource WorkLogFieldError}"
-                                               Visibility="{Binding HasSiteFieldError, Converter={StaticResource BoolToVis}}" />
                                 </StackPanel>
 
                                 <!-- Site 선택 시 바로 아래 PC -->
@@ -1013,9 +1102,6 @@
                                     <TextBlock Text="이 사이트에 등록된 PC가 없습니다."
                                                FontSize="{StaticResource FontSize.Sm}" Foreground="#94A3B8"
                                                Visibility="{Binding ShowEmptyPcHint, Converter={StaticResource BoolToVis}}" />
-                                    <TextBlock Text="왼쪽에서 Menu를 선택하거나 추가한 뒤 PC를 지정할 수 있습니다."
-                                               FontSize="{StaticResource FontSize.Sm}" Foreground="#94A3B8"
-                                               Visibility="{Binding HasActiveMenu, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
                                 </StackPanel>
 
                                 <StackPanel MinWidth="0" Visibility="{Binding HasActiveMenu, Converter={StaticResource BoolToVis}}">
@@ -1025,7 +1111,14 @@
                                              Tag="메뉴명을 입력하세요."
                                              Text="{Binding ActiveMenu.MenuName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     <StackPanel Margin="0,0,0,14">
-                                        <TextBlock Text="Person in charge" Style="{DynamicResource WorkLogFieldTitle}" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                            <TextBlock Style="{DynamicResource WorkLogFieldTitle}" Margin="0">
+                                                <Run Text="Person in charge" /><Run Text=" *" Foreground="#DC2626" />
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding PersonInChargeFieldError}" Style="{DynamicResource WorkLogFieldError}"
+                                                       Margin="8,0,0,0" VerticalAlignment="Center"
+                                                       Visibility="{Binding HasPersonInChargeFieldError, Converter={StaticResource BoolToVis}}" />
+                                        </StackPanel>
                                         <!-- 기본 좁게, 여러 명 입력 시 폭 증가 -->
                                         <Grid HorizontalAlignment="Left" MinWidth="168" MaxWidth="520">
                                             <TextBlock FontSize="{StaticResource FontSize.Base}"
@@ -1052,8 +1145,6 @@
                                                      Tag="담당자를 입력하세요."
                                                      Text="{Binding ActiveMenu.PersonInCharge, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         </Grid>
-                                        <TextBlock Text="{Binding PersonInChargeFieldError}" Style="{DynamicResource WorkLogFieldError}"
-                                                   Visibility="{Binding HasPersonInChargeFieldError, Converter={StaticResource BoolToVis}}" />
                                     </StackPanel>
                                     <StackPanel Margin="0,0,0,14"
                                                 Visibility="{Binding ShowLocalPcIp, Converter={StaticResource BoolToVis}}">
@@ -1062,7 +1153,14 @@
                                                    Margin="0,4,0,0" />
                                     </StackPanel>
                                     <StackPanel>
-                                        <TextBlock Text="Period" Style="{DynamicResource WorkLogFieldTitle}" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                            <TextBlock Style="{DynamicResource WorkLogFieldTitle}" Margin="0">
+                                                <Run Text="Period" /><Run Text=" *" Foreground="#DC2626" />
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding PeriodFieldError}" Style="{DynamicResource WorkLogFieldError}"
+                                                       Margin="8,0,0,0" VerticalAlignment="Center"
+                                                       Visibility="{Binding HasPeriodFieldError, Converter={StaticResource BoolToVis}}" />
+                                        </StackPanel>
                                         <StackPanel Orientation="Horizontal">
                                             <TextBox Style="{DynamicResource WorkLogDateInput}"
                                                      Text="{Binding ActiveMenu.StartDateText, UpdateSourceTrigger=PropertyChanged}" />
@@ -1071,12 +1169,8 @@
                                             <TextBox Style="{DynamicResource WorkLogDateInput}"
                                                      Text="{Binding ActiveMenu.EndDateText, UpdateSourceTrigger=PropertyChanged}" />
                                         </StackPanel>
-                                        <TextBlock Text="{Binding PeriodFieldError}" Style="{DynamicResource WorkLogFieldError}"
-                                                   Visibility="{Binding HasPeriodFieldError, Converter={StaticResource BoolToVis}}" />
                                     </StackPanel>
                                 </StackPanel>
-                                <TextBlock Text="왼쪽 트리에서 Menu를 선택하거나 + Menu를 추가하세요." FontSize="{StaticResource FontSize.Md}" Foreground="#94A3B8"
-                                           Visibility="{Binding HasActiveMenu, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
                             </StackPanel>
 
                             <!-- Work page: Type → Category → Name → Deploy → Date → Comment -->
@@ -1084,12 +1178,17 @@
                                         Visibility="{Binding IsStepWork, Converter={StaticResource BoolToVis}}">
                                 <StackPanel Visibility="{Binding HasActiveProject, Converter={StaticResource BoolToVis}}">
                                     <StackPanel Margin="0,0,0,14">
-                                        <TextBlock Text="Type" Style="{DynamicResource WorkLogFieldTitle}" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                            <TextBlock Style="{DynamicResource WorkLogFieldTitle}" Margin="0">
+                                                <Run Text="Type" /><Run Text=" *" Foreground="#DC2626" />
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding TypeFieldError}" Style="{DynamicResource WorkLogFieldError}"
+                                                       Margin="8,0,0,0" VerticalAlignment="Center"
+                                                       Visibility="{Binding HasTypeFieldError, Converter={StaticResource BoolToVis}}" />
+                                        </StackPanel>
                                         <ctrl:InlineOptionPicker ItemsSource="{Binding TypeOptions}"
                                                                  SelectedItem="{Binding ActiveProject.Type, Mode=TwoWay}"
                                                                  EmptyItemDisplay="미선택" />
-                                        <TextBlock Text="{Binding TypeFieldError}" Style="{DynamicResource WorkLogFieldError}"
-                                                   Visibility="{Binding HasTypeFieldError, Converter={StaticResource BoolToVis}}" />
                                     </StackPanel>
 
                                     <StackPanel Visibility="{Binding ShowWorkCategorySection, Converter={StaticResource BoolToVis}}">
@@ -1133,7 +1232,14 @@
                                     <!-- Source: Work 필드 아래 동일 페이지 -->
                                     <StackPanel Margin="0,18,0,0"
                                                 Visibility="{Binding ShowSourceFormStack, Converter={StaticResource BoolToVis}}">
-                                        <TextBlock Text="Source" Style="{DynamicResource WorkLogFieldTitle}" Margin="0,0,0,8" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                            <TextBlock Style="{DynamicResource WorkLogFieldTitle}" Margin="0">
+                                                <Run Text="Source" /><Run Text=" *" Foreground="#DC2626" />
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding SourceFieldError}" Style="{DynamicResource WorkLogFieldError}"
+                                                       Margin="8,0,0,0" VerticalAlignment="Center"
+                                                       Visibility="{Binding HasSourceFieldError, Converter={StaticResource BoolToVis}}" />
+                                        </StackPanel>
                                         <ItemsControl ItemsSource="{Binding ActiveProject.Sources}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
@@ -1182,15 +1288,20 @@
                                                            Foreground="#2563EB" VerticalAlignment="Center" />
                                             </StackPanel>
                                         </Button>
-                                        <TextBlock Text="{Binding SourceFieldError}" Style="{DynamicResource WorkLogFieldError}"
-                                                   Visibility="{Binding HasSourceFieldError, Converter={StaticResource BoolToVis}}" />
                                     </StackPanel>
                                     </StackPanel>
                                 </StackPanel>
 
                                 <StackPanel Visibility="{Binding HasActiveProject, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}">
                                     <StackPanel Visibility="{Binding Tree.IsTypeSelected, Converter={StaticResource BoolToVis}}">
-                                        <TextBlock Text="Type" Style="{DynamicResource WorkLogFieldTitle}" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                            <TextBlock Style="{DynamicResource WorkLogFieldTitle}" Margin="0">
+                                                <Run Text="Type" /><Run Text=" *" Foreground="#DC2626" />
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding TypeFieldError}" Style="{DynamicResource WorkLogFieldError}"
+                                                       Margin="8,0,0,0" VerticalAlignment="Center"
+                                                       Visibility="{Binding HasTypeFieldError, Converter={StaticResource BoolToVis}}" />
+                                        </StackPanel>
                                         <ctrl:InlineOptionPicker ItemsSource="{Binding TypeOptions}"
                                                                  SelectedItem="{Binding Tree.SelectedTypeNode.Type, Mode=TwoWay}"
                                                                  EmptyItemDisplay="미선택" />
@@ -1202,10 +1313,6 @@
                                                                  SelectedItem="{Binding Tree.SelectedCategoryNode.Category, Mode=TwoWay}"
                                                                  EmptyItemDisplay="미선택" />
                                     </StackPanel>
-
-                                    <TextBlock Text="왼쪽 트리에서 + 로 Type / Category / Project를 추가하세요."
-                                               FontSize="{StaticResource FontSize.Md}" Foreground="#94A3B8"
-                                               Visibility="{Binding HasWorkNodeSelected, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
                                 </StackPanel>
                             </StackPanel>
                         </ScrollViewer>

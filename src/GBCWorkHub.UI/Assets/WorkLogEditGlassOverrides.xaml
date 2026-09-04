@@ -146,8 +146,8 @@
         <Setter Property="SnapsToDevicePixels" Value="True" />
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Background" Value="#CCFFFFFF" />
-                <Setter Property="BorderBrush" Value="#FFFFFFFF" />
+                <Setter Property="Background" Value="#B8D0E0" />
+                <Setter Property="BorderBrush" Value="#A0B8CC" />
             </Trigger>
             <DataTrigger Binding="{Binding IsActive}" Value="True">
                 <Setter Property="Background" Value="#B8D9E8FF" />
@@ -241,6 +241,10 @@
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
                 <Setter Property="Opacity" Value="1" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.18" />
+                <Setter Property="Cursor" Value="Arrow" />
             </Trigger>
         </Style.Triggers>
     </Style>
@@ -399,6 +403,10 @@
                         <Trigger Property="IsPressed" Value="True">
                             <Setter Property="Opacity" Value="0.5" />
                         </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.28" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                        </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
@@ -450,6 +458,10 @@
                                     <ScaleTransform ScaleX="0.92" ScaleY="0.92" />
                                 </Setter.Value>
                             </Setter>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                            <Setter Property="Cursor" Value="Arrow" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

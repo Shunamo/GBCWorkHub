@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using GBCWorkHub.BIZ;
 using GBCWorkHub.DTO.WorkLog;
+using GBCWorkHub.UI.Services;
 using GBCWorkHub.UI.ViewModels.WorkLog;
 
 namespace GBCWorkHub.UI.ViewModels.WorkLog
@@ -52,6 +54,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 TfsComment = item.TfsComment,
                 TfsAuthor = item.TfsAuthor,
                 AuthorName = item.AuthorName,
+                TeamName = ResolveTeamName(item),
                 CheckedInAt = item.CheckedInAt,
                 ChangedFileCount = item.PayloadChangedFileCount > 0
                     ? item.PayloadChangedFileCount
@@ -144,6 +147,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 TfsComment = dto.TfsComment,
                 TfsAuthor = dto.TfsAuthor,
                 AuthorName = dto.AuthorName,
+                TeamName = dto.TeamName,
                 CheckedInAt = dto.CheckedInAt,
                 PayloadChangedFileCount = dto.ChangedFileCount,
                 NeedsTicketReview = dto.NeedsTicketReview
@@ -256,6 +260,18 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             if (ids.Count == 0 && fallbackId > 0)
                 ids.Add(fallbackId);
             return ids;
+        }
+
+        private static string ResolveTeamName(WorkLogListItemViewModel item)
+        {
+            if (item == null)
+                return null;
+            if (!string.IsNullOrWhiteSpace(item.TeamName))
+                return item.TeamName.Trim();
+            if (WorkHubUserProfile.OwnsRecord(item.AuthorName, item.LocalPcIp)
+                || WorkHubUserProfile.MatchesIp(item.LocalPcIp))
+                return OccupancyNameStore.TryGetAffiliation();
+            return null;
         }
     }
 }

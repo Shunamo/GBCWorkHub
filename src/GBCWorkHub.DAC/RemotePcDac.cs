@@ -9,7 +9,7 @@ namespace GBCWorkHub.DAC
     /// <summary>
     /// 원격 사이트 / PC 데이터 (App.config 기반)
     /// 사이트별: {SITE}.Host, {SITE}.PcNames
-    /// PC별(선택): {SITE}.{PcName}.Host
+        /// PC별(선택): {SITE}.{PcName}.Host, {SITE}.{PcName}.Group (소속은 PCMAP.TEAM_NM이 우선)
     /// </summary>
     public class RemotePcDac
     {
@@ -65,6 +65,8 @@ namespace GBCWorkHub.DAC
                     shareKey = pcName;
                 }
 
+                string group = (ConfigurationManager.AppSettings[site + "." + pcName + ".Group"] ?? string.Empty).Trim();
+
                 list.Add(new RemotePcDto
                 {
                     HospitalCode = site,
@@ -73,10 +75,23 @@ namespace GBCWorkHub.DAC
                     PcName = pcName,
                     IpAddress = shareKey,
                     HostAddress = host,
+                    GroupName = group,
                     RdpPort = 3389,
                     Remark = site
                 });
             }
+
+            list.Sort((a, b) =>
+            {
+                int g = PcNameNaturalSort.CompareGroup(
+                    a != null ? a.GroupName : null,
+                    b != null ? b.GroupName : null);
+                if (g != 0)
+                    return g;
+                string an = a != null && !string.IsNullOrWhiteSpace(a.PcName) ? a.PcName.Trim() : string.Empty;
+                string bn = b != null && !string.IsNullOrWhiteSpace(b.PcName) ? b.PcName.Trim() : string.Empty;
+                return PcNameNaturalSort.Compare(an, bn);
+            });
 
             return list;
         }

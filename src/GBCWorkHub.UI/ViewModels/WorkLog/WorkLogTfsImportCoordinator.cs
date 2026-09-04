@@ -5,6 +5,7 @@ using System.Linq;
 using GBCWorkHub.DTO.WorkLog;
 using GBCWorkHub.UI.Services;
 using GBCWorkHub.UI.Services.TfsSync;
+using GBCWorkHub.UI.ViewModels;
 
 namespace GBCWorkHub.UI.ViewModels.WorkLog
 {
@@ -16,8 +17,8 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
     {
         private readonly Dictionary<string, WorkLogListItemViewModel> _importSessionBaselines
             = new Dictionary<string, WorkLogListItemViewModel>(StringComparer.Ordinal);
-        private readonly Queue<WorkLogListItemViewModel> _importEditQueue
-            = new Queue<WorkLogListItemViewModel>();
+        private readonly ObservableCollection<ImportGroupSlot> _importGroups
+            = new ObservableCollection<ImportGroupSlot>();
         private int _importEditTotal;
         private int _importEditIndex;
         private bool _isConfirmingImport;
@@ -43,9 +44,28 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             get { return _importEditIndex; }
         }
 
-        public bool HasPendingEditQueue
+        public ObservableCollection<ImportGroupSlot> ImportGroups
         {
-            get { return _importEditQueue.Count > 0; }
+            get { return _importGroups; }
+        }
+
+        public bool HasImportGroups
+        {
+            get { return _importGroups.Count > 1; }
+        }
+
+        public bool HasUnfinishedImportGroups
+        {
+            get
+            {
+                return HasImportGroups
+                    && _importGroups.Any(s => s != null && s.IsUnfinished);
+            }
+        }
+
+        public ImportGroupSlot CurrentSlot
+        {
+            get { return _importGroups.FirstOrDefault(s => s != null && s.IsCurrent); }
         }
 
         public void RememberBaseline(WorkLogListItemViewModel item)
@@ -79,7 +99,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
 
         public void ClearEditQueue()
         {
-            _importEditQueue.Clear();
+            _importGroups.Clear();
             _importEditTotal = 0;
             _importEditIndex = 0;
         }
@@ -122,11 +142,13 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             if (isAppendExistingMode)
             {
                 var target = ResolveAppendTargetItem(items, appendTargetHint);
-                if (target == null)
+                if (target == null || !target.IsOwnedByCurrentUser)
                 {
                     result.Aborted = true;
                     result.ErrorMessage =
-                        "기존 업무기록 대상을 찾을 수 없습니다. 목록을 새로고침한 뒤 다시 시도하세요.";
+                        target == null
+                            ? "기존 업무기록 대상을 찾을 수 없습니다. 목록을 새로고침한 뒤 다시 시도하세요."
+                            : "본인 이름으로 작성된 기록만 병합할 수 있습니다.";
                     return result;
                 }
 
@@ -174,20 +196,12 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
 
                     ensureItemSiteCode(mapped);
 
-                    if (batch.Count == 1 && mapped.ChangesetId > 0)
+                    var existingDraft = FindDraftWithSameChangesets(items, mapped.GetEffectiveChangesetIds());
+                    if (existingDraft != null)
                     {
-                        var existing = FindExistingItemForImport(items, mapped);
-                        if (existing != null)
-                        {
-                            if (existing.IsCompleted)
-                                continue;
-
-                            RememberBaseline(existing);
-                            WorkLogDraftMapper.AppendIncomingToExisting(existing, mapped);
-                            toEdit.Add(existing);
-                            addedOrUpdated++;
-                            continue;
-                        }
+                        toEdit.Add(existingDraft);
+                        addedOrUpdated++;
+                        continue;
                     }
 
                     items.Add(mapped);
@@ -228,7 +242,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             _isConfirmingImport = false;
         }
 
-        /// <summary>큐를 채우고 첫 항목을 반환(목록에 있는 것만). 없으면 null.</summary>
+        /// <summary>그룹 슬롯을 채우고 첫 미작성 항목을 반환.</summary>
         public WorkLogListItemViewModel StartEditQueue(
             IList<WorkLogListItemViewModel> items,
             ObservableCollection<WorkLogListItemViewModel> listItems)
@@ -237,32 +251,94 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             if (items == null || items.Count == 0)
                 return null;
 
+            int n = 0;
             foreach (var item in items)
             {
-                if (item != null)
-                    _importEditQueue.Enqueue(item);
+                if (item == null)
+                    continue;
+                n++;
+                _importGroups.Add(new ImportGroupSlot(n, item));
             }
 
-            _importEditTotal = _importEditQueue.Count;
+            _importEditTotal = _importGroups.Count;
             _importEditIndex = 0;
             return TryTakeNextForEdit(listItems);
         }
 
-        /// <summary>다음 편집 대상. 큐가 비면 baseline도 정리하고 null.</summary>
+        /// <summary>다음 Pending 그룹. 없으면 세션을 정리하고 null.</summary>
         public WorkLogListItemViewModel TryTakeNextForEdit(
             ObservableCollection<WorkLogListItemViewModel> listItems)
         {
-            while (_importEditQueue.Count > 0)
+            var current = CurrentSlot;
+            int after = current != null ? current.GroupNumber : 0;
+            ImportGroupSlot next = FindPendingAfter(after, listItems)
+                ?? FindPendingAfter(0, listItems);
+            if (next == null)
             {
-                var next = _importEditQueue.Dequeue();
-                _importEditIndex++;
-                if (next == null || listItems == null || !listItems.Contains(next))
-                    continue;
-                return next;
+                ClearEditQueue();
+                ClearBaselines();
+                return null;
             }
 
-            ClearEditQueue();
-            ClearBaselines();
+            ActivateSlot(next);
+            return next.Item;
+        }
+
+        public void ActivateSlot(ImportGroupSlot slot)
+        {
+            if (slot == null)
+                return;
+            foreach (var s in _importGroups)
+            {
+                if (s != null)
+                    s.IsCurrent = s == slot;
+            }
+            _importEditIndex = slot.GroupNumber;
+        }
+
+        public void MarkSlot(WorkLogListItemViewModel item, ImportGroupSlotStatus status)
+        {
+            var slot = FindSlot(item);
+            if (slot == null)
+                return;
+            slot.Status = status;
+            if (status == ImportGroupSlotStatus.Deleted)
+                slot.IsCurrent = false;
+        }
+
+        public ImportGroupSlot FindSlot(WorkLogListItemViewModel item)
+        {
+            if (item == null)
+                return null;
+            return _importGroups.FirstOrDefault(s => s != null && ReferenceEquals(s.Item, item));
+        }
+
+        public IList<ImportGroupSlot> CollectUnfinishedSlots()
+        {
+            return _importGroups.Where(s => s != null && s.IsUnfinished).ToList();
+        }
+
+        public IList<ImportGroupSlot> CollectPendingSlots()
+        {
+            return _importGroups
+                .Where(s => s != null && s.Status == ImportGroupSlotStatus.Pending)
+                .ToList();
+        }
+
+        private ImportGroupSlot FindPendingAfter(
+            int afterGroupNumber,
+            ObservableCollection<WorkLogListItemViewModel> listItems)
+        {
+            foreach (var slot in _importGroups.OrderBy(s => s.GroupNumber))
+            {
+                if (slot == null || slot.GroupNumber <= afterGroupNumber)
+                    continue;
+                if (slot.Status != ImportGroupSlotStatus.Pending)
+                    continue;
+                if (listItems != null && !listItems.Contains(slot.Item))
+                    continue;
+                return slot;
+            }
             return null;
         }
 
@@ -272,31 +348,32 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             return new OpeningScope(this);
         }
 
-        /// <summary>남은 큐 항목을 목록에서 철회(미DB 제거 / baseline 복원).</summary>
+        /// <summary>남은 Pending 항목을 목록에서 철회(미DB 제거 / baseline 복원).</summary>
         public void DiscardRemainingQueueItems(
             ObservableCollection<WorkLogListItemViewModel> items,
             Action afterListChanged)
         {
-            while (_importEditQueue.Count > 0)
+            foreach (var rem in CollectPendingSlots())
             {
-                var rem = _importEditQueue.Dequeue();
-                if (rem == null)
+                if (rem == null || rem.Item == null)
                     continue;
+                var item = rem.Item;
 
-                if (rem.DbLogId <= 0 && items != null && items.Contains(rem))
+                if (item.DbLogId <= 0 && items != null && items.Contains(item))
                 {
-                    items.Remove(rem);
-                    if (!string.IsNullOrEmpty(rem.Id))
-                        _importSessionBaselines.Remove(rem.Id);
+                    items.Remove(item);
+                    if (!string.IsNullOrEmpty(item.Id))
+                        _importSessionBaselines.Remove(item.Id);
+                    rem.Status = ImportGroupSlotStatus.Deleted;
                     continue;
                 }
 
-                var baseline = GetBaseline(rem.Id);
+                var baseline = GetBaseline(item.Id);
                 if (baseline != null)
                 {
-                    WorkLogDraftMapper.RestoreListItemFromBaseline(rem, baseline);
-                    if (!string.IsNullOrEmpty(rem.Id))
-                        _importSessionBaselines.Remove(rem.Id);
+                    WorkLogDraftMapper.RestoreListItemFromBaseline(item, baseline);
+                    if (!string.IsNullOrEmpty(item.Id))
+                        _importSessionBaselines.Remove(item.Id);
                 }
             }
 
@@ -322,6 +399,50 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 && ((!string.IsNullOrEmpty(id)
                         && string.Equals(i.Id, id, StringComparison.Ordinal))
                     || (dbId > 0 && i.DbLogId == dbId)));
+        }
+
+        public static WorkLogListItemViewModel FindDraftWithSameChangesets(
+            ObservableCollection<WorkLogListItemViewModel> items,
+            IList<int> changesetIds)
+        {
+            var want = NormalizeChangesetSet(changesetIds);
+            if (want.Count == 0 || items == null)
+                return null;
+
+            foreach (var item in items)
+            {
+                if (item == null || item.IsCompleted)
+                    continue;
+                var have = NormalizeChangesetSet(item.GetEffectiveChangesetIds());
+                if (have.Count != want.Count)
+                    continue;
+                bool same = true;
+                for (int i = 0; i < want.Count; i++)
+                {
+                    if (have[i] != want[i])
+                    {
+                        same = false;
+                        break;
+                    }
+                }
+                if (same)
+                    return item;
+            }
+            return null;
+        }
+
+        private static List<int> NormalizeChangesetSet(IList<int> ids)
+        {
+            var list = new List<int>();
+            if (ids == null)
+                return list;
+            foreach (int id in ids)
+            {
+                if (id > 0 && !list.Contains(id))
+                    list.Add(id);
+            }
+            list.Sort();
+            return list;
         }
 
         public static WorkLogListItemViewModel FindExistingItemForImport(
@@ -353,7 +474,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 return;
             ctx.ClientLocalIp = localIp;
             if (string.IsNullOrWhiteSpace(ctx.CurrentUserName))
-                ctx.CurrentUserName = localIp;
+                ctx.CurrentUserName = WorkHubUserProfile.OccupancyName;
         }
 
         private sealed class OpeningScope : IDisposable
@@ -372,6 +493,78 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                     return;
                 _disposed = true;
                 _owner._openingFromImportQueue = false;
+            }
+        }
+    }
+
+    public enum ImportGroupSlotStatus
+    {
+        Pending = 0,
+        Draft = 1,
+        Saved = 2,
+        Deleted = 3
+    }
+
+    public sealed class ImportGroupSlot : ViewModelBase
+    {
+        private ImportGroupSlotStatus _status;
+        private bool _isCurrent;
+
+        public ImportGroupSlot(int groupNumber, WorkLogListItemViewModel item)
+        {
+            GroupNumber = groupNumber;
+            Item = item;
+        }
+
+        public int GroupNumber { get; private set; }
+        public WorkLogListItemViewModel Item { get; private set; }
+
+        public string Label
+        {
+            get { return "그룹" + GroupNumber; }
+        }
+
+        public ImportGroupSlotStatus Status
+        {
+            get { return _status; }
+            set
+            {
+                if (SetProperty(ref _status, value))
+                {
+                    RaisePropertyChanged("ShowGreenCheck");
+                    RaisePropertyChanged("ShowGrayCheck");
+                    RaisePropertyChanged("IsVisible");
+                }
+            }
+        }
+
+        public bool IsCurrent
+        {
+            get { return _isCurrent; }
+            set { SetProperty(ref _isCurrent, value); }
+        }
+
+        public bool ShowGreenCheck
+        {
+            get { return Status == ImportGroupSlotStatus.Saved; }
+        }
+
+        public bool ShowGrayCheck
+        {
+            get { return Status == ImportGroupSlotStatus.Draft; }
+        }
+
+        public bool IsVisible
+        {
+            get { return Status != ImportGroupSlotStatus.Deleted; }
+        }
+
+        public bool IsUnfinished
+        {
+            get
+            {
+                return Status == ImportGroupSlotStatus.Pending
+                    || Status == ImportGroupSlotStatus.Draft;
             }
         }
     }

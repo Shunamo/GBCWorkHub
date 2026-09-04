@@ -24,6 +24,7 @@ namespace GBCWorkHub.UI.Models.Popup
     {
         Confirm = 0,
         Progress = 1,
-        Result = 2
+        Result = 2,
+        Prompt = 3
     }
 }

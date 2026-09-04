@@ -24,7 +24,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 return new WorkLogValidationIssue(
                     WorkLogValidationKind.MissingSite,
                     "Site",
-                    "선택해 주세요.");
+                    EmptyValue("Site"));
             }
 
             if (menus == null)
@@ -40,7 +40,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                     return new WorkLogValidationIssue(
                         WorkLogValidationKind.MissingMenuPerson,
                         "PersonInCharge",
-                        "입력해 주세요.",
+                        EmptyValue("Person in charge"),
                         menu);
                 }
 
@@ -49,7 +49,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                     return new WorkLogValidationIssue(
                         WorkLogValidationKind.MissingMenuStartDate,
                         "Period",
-                        "시작일을 입력해 주세요.",
+                        EmptyValue("Period"),
                         menu);
                 }
 
@@ -66,7 +66,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                     return new WorkLogValidationIssue(
                         WorkLogValidationKind.MissingProject,
                         "Type",
-                        "Type/Category/Project를 추가해 주세요.");
+                        EmptyValue("Type"));
                 }
 
                 if (menu.Types == null)
@@ -82,7 +82,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                         return new WorkLogValidationIssue(
                             WorkLogValidationKind.MissingType,
                             "Type",
-                            "선택해 주세요.",
+                            EmptyValue("Type"),
                             t);
                     }
 
@@ -103,7 +103,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                                 return new WorkLogValidationIssue(
                                     WorkLogValidationKind.MissingSource,
                                     "Source",
-                                    "추가해 주세요.",
+                                    EmptyValue("Source"),
                                     p);
                             }
                         }
@@ -114,18 +114,9 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             return null;
         }
 
-        /// <summary>
-        /// 선택 중인 Menu의 담당자/시작일 (IDataErrorInfo용).
-        /// </summary>
-        public static string ValidateMenuRequired(WorkLogMenuSectionNode menu)
+        public static string EmptyValue(string label)
         {
-            if (menu == null)
-                return null;
-            if (string.IsNullOrWhiteSpace(menu.PersonInCharge))
-                return "담당자를 입력해 주세요.";
-            if (!menu.StartDate.HasValue)
-                return "시작일을 입력해 주세요.";
-            return null;
+            return (label ?? string.Empty) + " 값이 비어있습니다.";
         }
     }
 

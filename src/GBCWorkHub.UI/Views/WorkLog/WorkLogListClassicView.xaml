@@ -53,6 +53,13 @@
                                                  Placeholder="담당자"
                                                  EmptyText="선택 가능한 담당자 정보가 없습니다." />
 
+                            <TextBlock Text="소속" Style="{StaticResource ListSidebarLabel}" />
+                            <ctrl:CustomDropdown Margin="0,0,0,16" Height="32"
+                                                 ItemsSource="{Binding TeamFilterOptions}"
+                                                 SelectedItem="{Binding FilterTeam, Mode=TwoWay}"
+                                                 Placeholder="소속"
+                                                 EmptyText="등록된 소속이 없습니다." />
+
                             <TextBlock Text="PC" Style="{StaticResource ListSidebarLabel}" />
                             <ctrl:CustomDropdown Margin="0,0,0,16" Height="32"
                                                  ItemsSource="{Binding PcOptions}"

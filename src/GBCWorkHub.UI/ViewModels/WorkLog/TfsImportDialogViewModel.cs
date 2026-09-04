@@ -6,7 +6,9 @@ using System.Windows.Input;
 using System.Windows.Media;
 using GBCWorkHub.BIZ.WorkLog;
 using GBCWorkHub.DTO;
+using GBCWorkHub.DTO.WorkLog;
 using GBCWorkHub.UI.ViewModels;
+using GBCWorkHub.UI.Services.TfsSync;
 
 namespace GBCWorkHub.UI.ViewModels.WorkLog
 {
@@ -39,9 +41,131 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             CycleMergeGroupCommand = new RelayCommand<TfsImportCandidateRow>(CycleMergeGroup);
             ToggleFileIncludeCommand = new RelayCommand<TfsImportFileRow>(ToggleFileInclude);
             SelectAppendTargetCommand = new RelayCommand<TfsImportAppendTarget>(SelectAppendTarget);
+            SelectSessionPcCommand = new RelayCommand<string>(SelectSessionPc);
+            SessionSiteOptions = new ObservableCollection<string>
+            {
+                WorkLogSiteCodes.Aurora,
+                WorkLogSiteCodes.Rc,
+                WorkLogSiteCodes.Cmc,
+                WorkLogSiteCodes.Mngha
+            };
+            SessionPcOptions = new ObservableCollection<string>();
+            SessionPcGroups = new ObservableCollection<TfsImportPcTeamGroup>();
         }
 
         public ObservableCollection<TfsImportCandidateRow> Candidates { get; private set; }
+
+        public ObservableCollection<string> SessionSiteOptions { get; private set; }
+
+        public ObservableCollection<string> SessionPcOptions { get; private set; }
+
+        public ObservableCollection<TfsImportPcTeamGroup> SessionPcGroups { get; private set; }
+
+        public ICommand SelectSessionPcCommand { get; private set; }
+
+        private string _sessionSite = WorkLogSiteCodes.Aurora;
+        public string SessionSite
+        {
+            get { return _sessionSite; }
+            set
+            {
+                string next = string.IsNullOrWhiteSpace(value) ? WorkLogSiteCodes.Aurora : value.Trim();
+                if (SetProperty(ref _sessionSite, next))
+                    RaisePropertyChanged("CanFetchSessionQuery");
+            }
+        }
+
+        private string _sessionDateText = string.Empty;
+        public string SessionDateText
+        {
+            get { return _sessionDateText; }
+            set
+            {
+                string masked = WorkLogDraftMapper.MaskDateInput(value);
+                if (!SetProperty(ref _sessionDateText, masked)
+                    && !string.Equals(value ?? string.Empty, masked, StringComparison.Ordinal))
+                    RaisePropertyChanged("SessionDateText");
+                RaisePropertyChanged("CanFetchSessionQuery");
+            }
+        }
+
+        private string _sessionStartTimeText = string.Empty;
+        public string SessionStartTimeText
+        {
+            get { return _sessionStartTimeText; }
+            set
+            {
+                string masked = WorkLogDraftMapper.MaskTimeInput(value);
+                if (!SetProperty(ref _sessionStartTimeText, masked)
+                    && !string.Equals(value ?? string.Empty, masked, StringComparison.Ordinal))
+                    RaisePropertyChanged("SessionStartTimeText");
+                RaisePropertyChanged("CanFetchSessionQuery");
+            }
+        }
+
+        private string _sessionEndTimeText = string.Empty;
+        public string SessionEndTimeText
+        {
+            get { return _sessionEndTimeText; }
+            set
+            {
+                string masked = WorkLogDraftMapper.MaskTimeInput(value);
+                if (!SetProperty(ref _sessionEndTimeText, masked)
+                    && !string.Equals(value ?? string.Empty, masked, StringComparison.Ordinal))
+                    RaisePropertyChanged("SessionEndTimeText");
+                RaisePropertyChanged("CanFetchSessionQuery");
+            }
+        }
+
+        private string _sessionPc;
+        public string SessionPc
+        {
+            get { return _sessionPc; }
+            set
+            {
+                if (SetProperty(ref _sessionPc, value))
+                {
+                    RefreshPcChipSelection();
+                    RaisePropertyChanged("CanFetchSessionQuery");
+                }
+            }
+        }
+
+        private string _sessionSearchMessage = string.Empty;
+        public string SessionSearchMessage
+        {
+            get { return _sessionSearchMessage; }
+            set
+            {
+                if (SetProperty(ref _sessionSearchMessage, value ?? string.Empty))
+                    RaisePropertyChanged("HasSessionSearchMessage");
+            }
+        }
+
+        public bool HasSessionSearchMessage
+        {
+            get { return !string.IsNullOrWhiteSpace(SessionSearchMessage); }
+        }
+
+        public bool CanFetchSessionQuery
+        {
+            get
+            {
+                DateTime fromAt;
+                DateTime toAt;
+                string error;
+                return TryGetSearchWindow(out fromAt, out toAt, out error)
+                    && !string.IsNullOrWhiteSpace(SessionPc);
+            }
+        }
+
+        public ICommand FetchSessionQueryCommand { get; set; }
+
+        /// <summary>체크인 상세 팝업에서는 이력 검색을 섞지 않음. 이력은 업무기록 TFS 버튼에서만.</summary>
+        public bool ShowSessionPickerWithCandidates
+        {
+            get { return false; }
+        }
 
         /// <summary>기존 업무기록에 추가할 때 대상 전체 목록.</summary>
         public ObservableCollection<TfsImportAppendTarget> AppendTargets { get; private set; }
@@ -160,7 +284,9 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 if (!HasImportableSelectedFiles())
                     return false;
                 if (IsAppendExistingMode)
-                    return SelectedAppendTarget != null && SelectedAppendTarget.Item != null;
+                    return SelectedAppendTarget != null
+                        && SelectedAppendTarget.Item != null
+                        && SelectedAppendTarget.Item.IsOwnedByCurrentUser;
                 return true;
             }
         }
@@ -344,11 +470,15 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 {
                     if (c == null)
                         continue;
-                    bool already = alreadyImportedChangesetIds != null
-                        && alreadyImportedChangesetIds.Contains(c.ChangesetId);
-                    var row = TfsImportCandidateRow.FromCandidate(c, already);
+                    if (alreadyImportedChangesetIds != null
+                        && alreadyImportedChangesetIds.Contains(c.ChangesetId))
+                        continue;
+                    if (string.IsNullOrWhiteSpace(c.RemoteComputerName)
+                        && !string.IsNullOrWhiteSpace(SessionPc))
+                        c.RemoteComputerName = SessionPc;
+                    var row = TfsImportCandidateRow.FromCandidate(c, alreadyImported: false);
                     row.MergeGroup = 1;
-                    row.IsImportSelected = !already;
+                    row.IsImportSelected = true;
                     row.PropertyChanged += OnCandidatePropertyChanged;
                     Candidates.Add(row);
                 }
@@ -356,6 +486,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
 
             RaisePropertyChanged("HasCandidates");
             RaisePropertyChanged("IsEmpty");
+            RaisePropertyChanged("ShowSessionPickerWithCandidates");
             RaisePropertyChanged("SelectedCount");
             RaisePropertyChanged("ShowCustomGroupsTab");
             EnsureModeMatchesSelection();
@@ -364,6 +495,139 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
 
             if (Candidates.Count > 0)
                 FocusCandidate(Candidates[0]);
+        }
+
+        public void PrepareSessionQuery(string preferredSite)
+        {
+            string site = (preferredSite ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(site)
+                || string.Equals(site, WorkLogSiteCodes.All, StringComparison.OrdinalIgnoreCase))
+                site = WorkLogSiteCodes.Aurora;
+            SessionSite = site;
+            SessionDateText = DateTime.Today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+            SessionStartTimeText = string.Empty;
+            SessionEndTimeText = string.Empty;
+            SessionPc = null;
+            SessionSearchMessage = string.Empty;
+        }
+
+        public void ReplaceSessionPcOptions(IEnumerable<string> pcs)
+        {
+            string keep = SessionPc;
+            SessionPcOptions.Clear();
+            SessionPcGroups.Clear();
+            var chips = new List<TfsImportPcChip>();
+            if (pcs != null)
+            {
+                foreach (string pc in pcs)
+                {
+                    if (string.IsNullOrWhiteSpace(pc))
+                        continue;
+                    string value = pc.Trim();
+                    SessionPcOptions.Add(value);
+                    string team = TeamAccent.Resolve(null, null, null, value, SessionSite);
+                    chips.Add(new TfsImportPcChip
+                    {
+                        Value = value,
+                        TeamName = team
+                    });
+                }
+            }
+
+            chips.Sort(ComparePcChip);
+            TfsImportPcTeamGroup group = null;
+            string current = null;
+            for (int i = 0; i < chips.Count; i++)
+            {
+                TfsImportPcChip chip = chips[i];
+                string name = string.IsNullOrWhiteSpace(chip.TeamName) ? string.Empty : chip.TeamName.Trim();
+                if (group == null || !string.Equals(current, name, StringComparison.Ordinal))
+                {
+                    group = new TfsImportPcTeamGroup(name);
+                    SessionPcGroups.Add(group);
+                    current = name;
+                }
+                group.Computers.Add(chip);
+            }
+
+            if (!string.IsNullOrWhiteSpace(keep)
+                && SessionPcOptions.Contains(keep))
+                SessionPc = keep;
+            else
+                SessionPc = SessionPcOptions.Count == 1 ? SessionPcOptions[0] : null;
+            RefreshPcChipSelection();
+            RaisePropertyChanged("CanFetchSessionQuery");
+        }
+
+        private static int ComparePcChip(TfsImportPcChip left, TfsImportPcChip right)
+        {
+            string a = left != null ? left.TeamName : null;
+            string b = right != null ? right.TeamName : null;
+            int g = PcNameNaturalSort.CompareGroup(a, b);
+            if (g != 0)
+                return g;
+            return PcNameNaturalSort.Compare(
+                left != null ? left.Value : null,
+                right != null ? right.Value : null);
+        }
+
+        private void SelectSessionPc(string value)
+        {
+            SessionPc = value;
+        }
+
+        private void RefreshPcChipSelection()
+        {
+            if (SessionPcGroups == null)
+                return;
+            for (int i = 0; i < SessionPcGroups.Count; i++)
+            {
+                TfsImportPcTeamGroup group = SessionPcGroups[i];
+                if (group == null || group.Computers == null)
+                    continue;
+                for (int j = 0; j < group.Computers.Count; j++)
+                {
+                    TfsImportPcChip chip = group.Computers[j];
+                    if (chip == null)
+                        continue;
+                    chip.IsSelected = string.Equals(chip.Value, SessionPc, StringComparison.OrdinalIgnoreCase);
+                }
+            }
+        }
+
+        public bool TryGetSearchWindow(out DateTime fromAt, out DateTime toAt, out string error)
+        {
+            fromAt = default(DateTime);
+            toAt = default(DateTime);
+            error = null;
+
+            DateTime? date;
+            if (!WorkLogDraftMapper.TryParseDateText(SessionDateText, out date, out error) || !date.HasValue)
+            {
+                if (string.IsNullOrWhiteSpace(error))
+                    error = "날짜를 입력해 주세요.";
+                return false;
+            }
+
+            TimeSpan? start;
+            TimeSpan? end;
+            string timeErr;
+            if (!WorkLogDraftMapper.TryParseTimeText(SessionStartTimeText, out start, out timeErr))
+            {
+                error = timeErr;
+                return false;
+            }
+            if (!WorkLogDraftMapper.TryParseTimeText(SessionEndTimeText, out end, out timeErr))
+            {
+                error = timeErr;
+                return false;
+            }
+
+            fromAt = date.Value.Date.Add(start ?? TimeSpan.Zero);
+            toAt = date.Value.Date.Add(end ?? new TimeSpan(23, 59, 59));
+            if (toAt < fromAt)
+                toAt = toAt.AddDays(1);
+            return true;
         }
 
         /// <summary>기존 업무기록 목록을 추가 대상(검색) 목록에 채운다.</summary>
@@ -380,7 +644,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             if (items != null)
             {
                 foreach (var item in items
-                    .Where(i => i != null)
+                    .Where(i => i != null && (i.IsOwnedByCurrentUser || i.IsDraft))
                     .OrderByDescending(i => i.LastModifiedAt)
                     .ThenByDescending(i => i.CheckedInAt ?? DateTime.MinValue))
                 {
@@ -479,9 +743,31 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 return new List<TfsImportAppendTarget>();
 
             return AppendTargets
-                .Where(t => t != null && t.Item != null
-                    && ticketKeys.Contains(WorkLogDraftMapper.NormalizeTicketStorage(t.Item.TicketNo)))
+                .Where(t => t != null && t.Item != null && TicketKeysOverlap(t.Item.TicketNo, ticketKeys))
                 .ToList();
+        }
+
+        private static bool TicketKeysOverlap(string ticketNo, HashSet<string> ticketKeys)
+        {
+            if (ticketKeys == null || ticketKeys.Count == 0)
+                return false;
+            foreach (var part in WorkLogDraftMapper.SplitMultiValues(ticketNo))
+            {
+                string key = WorkLogDraftMapper.NormalizeTicketStorage(part);
+                if (!string.IsNullOrEmpty(key) && ticketKeys.Contains(key))
+                    return true;
+            }
+            string whole = WorkLogDraftMapper.NormalizeTicketStorage(ticketNo);
+            if (!string.IsNullOrEmpty(whole))
+            {
+                foreach (var part in WorkLogDraftMapper.SplitMultiValues(whole))
+                {
+                    string key = WorkLogDraftMapper.NormalizeTicketStorage(part);
+                    if (!string.IsNullOrEmpty(key) && ticketKeys.Contains(key))
+                        return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>
@@ -714,6 +1000,38 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         }
     }
 
+    public sealed class TfsImportPcChip : ViewModelBase
+    {
+        private bool _isSelected;
+
+        public string Value { get; set; }
+        public string TeamName { get; set; }
+
+        public bool IsSelected
+        {
+            get { return _isSelected; }
+            set { SetProperty(ref _isSelected, value); }
+        }
+    }
+
+    public sealed class TfsImportPcTeamGroup
+    {
+        public TfsImportPcTeamGroup(string name)
+        {
+            Name = name ?? string.Empty;
+            Computers = new ObservableCollection<TfsImportPcChip>();
+        }
+
+        public string Name { get; private set; }
+
+        public bool HasName
+        {
+            get { return !string.IsNullOrWhiteSpace(Name); }
+        }
+
+        public ObservableCollection<TfsImportPcChip> Computers { get; private set; }
+    }
+
     public sealed class TfsImportCandidateRow : ViewModelBase
     {
         private bool _isImportSelected;
@@ -728,7 +1046,8 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         public string CheckedInAtDisplay { get; private set; }
         public string OriginalComment { get; private set; }
         public int ChangedFileCount { get; private set; }
-        public bool IsAlreadyImported { get; private set; }
+        public string InboxStatusLabel { get; private set; }
+        public bool HasInboxStatus { get { return !string.IsNullOrWhiteSpace(InboxStatusLabel); } }
 
         public int IncludedFileCount
         {
@@ -751,11 +1070,6 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                     return "변경 파일 " + total + "개 · 숨긴 파일 " + hidden + "개";
                 return "변경 파일 " + total + "개";
             }
-        }
-
-        public string AlreadyImportedLabel
-        {
-            get { return IsAlreadyImported ? "목록에 있음" : "신규"; }
         }
 
         public void RaiseFileIncludeChanged()
@@ -875,7 +1189,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 CheckedInAtDisplay = c.CheckedInAtDisplay,
                 OriginalComment = c.OriginalComment ?? string.Empty,
                 ChangedFileCount = c.ChangedFileCount,
-                IsAlreadyImported = alreadyImported,
+                InboxStatusLabel = ResolveInboxStatusLabel(c.ChangesetId, alreadyImported),
                 Files = new ObservableCollection<TfsImportFileRow>()
             };
 
@@ -893,6 +1207,14 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 row.ChangedFileCount = row.Files.Count;
 
             return row;
+        }
+
+        private static string ResolveInboxStatusLabel(int changesetId, bool alreadyImported)
+        {
+            if (alreadyImported)
+                return TfsCheckinInboxStatus.ToLabel(TfsCheckinInboxStatus.Reported);
+            string status = TfsCheckinInboxStore.GetStatus(changesetId);
+            return string.IsNullOrWhiteSpace(status) ? null : TfsCheckinInboxStatus.ToLabel(status);
         }
     }
 
@@ -921,6 +1243,9 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             string person = string.IsNullOrWhiteSpace(item.PersonInCharge)
                 ? string.Empty
                 : WorkLogDraftMapper.FormatPersonDisplay(item.PersonInCharge);
+            string author = item.AuthorDisplayName;
+            if (string.Equals(author, "알 수 없음", StringComparison.Ordinal))
+                author = string.Empty;
             string site = string.IsNullOrWhiteSpace(item.SiteCode) ? string.Empty : item.SiteCode.Trim();
             string contentPreview = BuildContentPreview(item);
 
@@ -931,6 +1256,10 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             AppendBlob(blobParts, item.MenuName);
             AppendBlob(blobParts, item.PersonInCharge);
             AppendBlob(blobParts, person);
+            AppendBlob(blobParts, item.AuthorName);
+            AppendBlob(blobParts, item.TeamName);
+            AppendBlob(blobParts, author);
+            AppendBlob(blobParts, item.TfsAuthor);
             AppendBlob(blobParts, item.Pc);
             AppendBlob(blobParts, item.SiteCode);
             AppendBlob(blobParts, item.Comment);
@@ -979,6 +1308,8 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             string detail = contentPreview;
             if (!string.IsNullOrEmpty(person))
                 detail = string.IsNullOrEmpty(detail) ? person : person + " · " + detail;
+            else if (!string.IsNullOrEmpty(author))
+                detail = string.IsNullOrEmpty(detail) ? author : author + " · " + detail;
             if (!string.IsNullOrEmpty(site))
                 detail = string.IsNullOrEmpty(detail) ? site : site + " · " + detail;
 

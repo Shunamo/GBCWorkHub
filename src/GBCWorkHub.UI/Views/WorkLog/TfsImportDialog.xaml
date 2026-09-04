@@ -2,6 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:conv="clr-namespace:GBCWorkHub.UI.Converters"
+             xmlns:ctrl="clr-namespace:GBCWorkHub.UI.Controls"
              Background="Transparent"
              UseLayoutRounding="True"
              SnapsToDevicePixels="True">
@@ -10,14 +11,122 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogStyles.xaml" />
                 <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogGlassStyles.xaml" />
+                <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogEditGlassOverrides.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
 
-                        <Style x:Key="ImportModeChip" TargetType="Button" BasedOn="{StaticResource GlassGhostButton}">
+            <Style x:Key="PickerDateField" TargetType="Border" BasedOn="{StaticResource EditHeaderField}">
+                <Setter Property="Margin" Value="0,0,8,0" />
+                <Setter Property="Padding" Value="6,0" />
+                <Setter Property="MinHeight" Value="34" />
+                <Setter Property="HorizontalAlignment" Value="Left" />
+            </Style>
+
+            <Style x:Key="PickerDateInput" TargetType="TextBox">
+                <Setter Property="MinHeight" Value="34" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="TextAlignment" Value="Center" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Padding" Value="6,0" />
+                <Setter Property="FontSize" Value="{StaticResource FontSize.Md}" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Foreground" Value="{StaticResource WlGlassInk}" />
+                <Setter Property="CaretBrush" Value="{StaticResource WlGlassAccent}" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            </Style>
+
+            <Style x:Key="SessionPcChip" TargetType="Button">
+                <Setter Property="Background" Value="#E5E7EB" />
+                <Setter Property="Foreground" Value="#334155" />
+                <Setter Property="BorderBrush" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Padding" Value="12,6" />
+                <Setter Property="FontSize" Value="12.5" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Margin" Value="0,0,6,6" />
+                <Setter Property="MinHeight" Value="28" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="8" Padding="{TemplateBinding Padding}"
+                                    SnapsToDevicePixels="True">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="#D1D5DB" />
+                                </Trigger>
+                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="#FFFFFF" />
+                                </DataTrigger>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsSelected}" Value="True" />
+                                        <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter TargetName="Bd" Property="Background" Value="#F8FAFC" />
+                                </MultiDataTrigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="ImportModeChip" TargetType="Button">
+                <Setter Property="Background" Value="#E5E7EB" />
+                <Setter Property="Foreground" Value="#64748B" />
+                <Setter Property="BorderBrush" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="Padding" Value="8,3" />
                 <Setter Property="FontSize" Value="11" />
+                <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="Margin" Value="0,0,4,0" />
                 <Setter Property="MinHeight" Value="26" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="8" Padding="{TemplateBinding Padding}"
+                                    SnapsToDevicePixels="True">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="#D1D5DB" />
+                                </Trigger>
+                                <Trigger Property="Tag" Value="On">
+                                    <Setter TargetName="Bd" Property="Background" Value="#4F67D8" />
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="#405CC3" />
+                                    <Setter Property="Foreground" Value="White" />
+                                </Trigger>
+                                <MultiTrigger>
+                                    <MultiTrigger.Conditions>
+                                        <Condition Property="IsMouseOver" Value="True" />
+                                        <Condition Property="Tag" Value="On" />
+                                    </MultiTrigger.Conditions>
+                                    <Setter TargetName="Bd" Property="Background" Value="#405CC3" />
+                                </MultiTrigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Foreground" Value="#94A3B8" />
+                                    <Setter Property="Cursor" Value="Arrow" />
+                                    <Setter TargetName="Bd" Property="Background" Value="#E5E7EB" />
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="#D1D5DB" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
 
             <Style x:Key="GlassImportPanel" TargetType="Border">
@@ -70,6 +179,10 @@
                                     <Setter TargetName="Box" Property="Background" Value="{StaticResource WlGlassDeployFocusBg}" />
                                     <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource WlGlassAccent}" />
                                 </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Opacity" Value="0.4" />
+                                    <Setter Property="Cursor" Value="Arrow" />
+                                </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </Setter.Value>
@@ -81,83 +194,97 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
+            <RowDefinition x:Name="ImportBodyRow" Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Header -->
         <Border Grid.Row="0" Padding="16,10,16,10" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1"
                 CornerRadius="14,14,0,0"
-                Background="#B8FFFFFF">
+                Background="#B8FFFFFF"
+                Visibility="{Binding HasCandidates, Converter={StaticResource BoolToVis}}">
             <StackPanel>
                 <DockPanel LastChildFill="True" Margin="0,0,0,6">
-                    <TextBlock DockPanel.Dock="Left" Text="TFS 체크인 가져오기"
+                    <TextBlock DockPanel.Dock="Left"
                                FontSize="15" FontWeight="SemiBold"
                                Foreground="{StaticResource WlGlassInk}"
-                               VerticalAlignment="Center" Margin="0,0,12,0" />
+                               VerticalAlignment="Center" Margin="0,0,12,0">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="TFS 가져오기" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasCandidates}" Value="True">
+                                        <Setter Property="Text" Value="TFS 체크인 가져오기" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                     <TextBlock Text="{Binding StatusMessage}" FontSize="11"
                                Foreground="{StaticResource WlGlassAccent}"
                                TextTrimming="CharacterEllipsis"
-                               VerticalAlignment="Center" />
+                               VerticalAlignment="Center"
+                               Visibility="{Binding HasCandidates, Converter={StaticResource BoolToVis}}" />
                 </DockPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
-                    <Button Content="각각 따로"
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,0"
+                            Visibility="{Binding HasCandidates, Converter={StaticResource BoolToVis}}">
+                    <Button Content="Each"
                             Command="{Binding SetImportModeCommand}" CommandParameter="Separate">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource ImportModeChip}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsSeparateMode}" Value="True">
-                                        <Setter Property="Background" Value="{StaticResource WlGlassDeployFocusBg}" />
-                                        <Setter Property="BorderBrush" Value="#A8C0F0" />
-                                        <Setter Property="Foreground" Value="{StaticResource WlGlassDeployFocusFg}" />
-                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                        <Setter Property="Tag" Value="On" />
+                                        <Setter Property="Background" Value="#4F67D8" />
+                                        <Setter Property="Foreground" Value="White" />
+                                        <Setter Property="BorderBrush" Value="#405CC3" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Button.Style>
                     </Button>
-                    <Button Content="전부 합치기"
+                    <Button Content="Whole"
                             Command="{Binding SetImportModeCommand}" CommandParameter="MergeAll">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource ImportModeChip}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsMergeAllMode}" Value="True">
-                                        <Setter Property="Background" Value="{StaticResource WlGlassDeployFocusBg}" />
-                                        <Setter Property="BorderBrush" Value="#A8C0F0" />
-                                        <Setter Property="Foreground" Value="{StaticResource WlGlassDeployFocusFg}" />
-                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                        <Setter Property="Tag" Value="On" />
+                                        <Setter Property="Background" Value="#4F67D8" />
+                                        <Setter Property="Foreground" Value="White" />
+                                        <Setter Property="BorderBrush" Value="#405CC3" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Button.Style>
                     </Button>
-                    <Button Content="그룹으로 합치기"
+                    <Button Content="Group"
                             Command="{Binding SetImportModeCommand}" CommandParameter="CustomGroups"
                             Visibility="{Binding ShowCustomGroupsTab, Converter={StaticResource BoolToVis}}">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource ImportModeChip}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsCustomGroupsMode}" Value="True">
-                                        <Setter Property="Background" Value="{StaticResource WlGlassDeployFocusBg}" />
-                                        <Setter Property="BorderBrush" Value="#A8C0F0" />
-                                        <Setter Property="Foreground" Value="{StaticResource WlGlassDeployFocusFg}" />
-                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                        <Setter Property="Tag" Value="On" />
+                                        <Setter Property="Background" Value="#4F67D8" />
+                                        <Setter Property="Foreground" Value="White" />
+                                        <Setter Property="BorderBrush" Value="#405CC3" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Button.Style>
                     </Button>
-                    <Button Content="기존 기록과 병합"
+                    <Button Content="Existing"
                             Command="{Binding SetImportModeCommand}" CommandParameter="AppendExisting"
                             Visibility="{Binding HasAppendTargets, Converter={StaticResource BoolToVis}}">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource ImportModeChip}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsAppendExistingMode}" Value="True">
-                                        <Setter Property="Background" Value="{StaticResource WlGlassDeployDoneBg}" />
-                                        <Setter Property="BorderBrush" Value="#C5E4D5" />
-                                        <Setter Property="Foreground" Value="{StaticResource WlGlassDeployDoneFg}" />
-                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                        <Setter Property="Tag" Value="On" />
+                                        <Setter Property="Background" Value="#4F67D8" />
+                                        <Setter Property="Foreground" Value="White" />
+                                        <Setter Property="BorderBrush" Value="#405CC3" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -167,7 +294,7 @@
                 <StackPanel Margin="0,8,0,0"
                             Visibility="{Binding ShowAppendTargetPicker, Converter={StaticResource BoolToVis}}">
                     <TextBlock Text="{Binding SelectedAppendTargetSummary}" FontSize="11"
-                               FontWeight="SemiBold" Foreground="{StaticResource WlGlassDeployDoneFg}"
+                               FontWeight="SemiBold" Foreground="{StaticResource WlGlassAccent}"
                                TextTrimming="CharacterEllipsis" Margin="0,0,0,6"
                                Visibility="{Binding HasSelectedAppendTarget, Converter={StaticResource BoolToVis}}" />
 
@@ -181,7 +308,7 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <Grid>
-                                <TextBlock Text="티켓·메뉴·프로젝트·소스·코멘트 검색" FontSize="{StaticResource FontSize.Base}" Foreground="#94A3B8"
+                                <TextBlock Text="티켓·이름·메뉴·프로젝트·소스·코멘트 검색" FontSize="{StaticResource FontSize.Base}" Foreground="#94A3B8"
                                            Margin="12,0,0,0" VerticalAlignment="Center"
                                            IsHitTestVisible="False">
                                     <TextBlock.Style>
@@ -241,8 +368,8 @@
                                                         <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource WlGlassRowHoverBorder}" />
                                                     </Trigger>
                                                     <Trigger Property="IsSelected" Value="True">
-                                                        <Setter TargetName="Bd" Property="Background" Value="{StaticResource WlGlassDeployDoneBg}" />
-                                                        <Setter TargetName="Bd" Property="BorderBrush" Value="#C5E4D5" />
+                                                        <Setter TargetName="Bd" Property="Background" Value="{StaticResource WlGlassRowSelectedBg}" />
+                                                        <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource WlGlassRowSelectedBorder}" />
                                                     </Trigger>
                                                 </ControlTemplate.Triggers>
                                             </ControlTemplate>
@@ -269,22 +396,183 @@
             </StackPanel>
         </Border>
 
-        <Grid Grid.Row="1" Margin="14,10,14,10" MinHeight="0" ClipToBounds="True" Background="Transparent">
+        <DockPanel Grid.Row="1" Margin="0" LastChildFill="True"
+                   Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}">
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+                <Button Style="{StaticResource GlassGhostButton}" Content="취소" MinWidth="88"
+                        Command="{Binding CloseCommand}" />
+                <Button Style="{StaticResource GlassAccentButton}" Content="가져오기" MinWidth="88" Margin="0"
+                        Command="{Binding FetchSessionQueryCommand}"
+                        IsEnabled="{Binding CanFetchSessionQuery}" />
+            </StackPanel>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          CanContentScroll="False"
+                          MaxHeight="480"
+                          Padding="0,0,8,0">
+                <ScrollViewer.Style>
+                    <Style TargetType="ScrollViewer">
+                        <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+                        <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+                        <Setter Property="CanContentScroll" Value="False" />
+                    </Style>
+                </ScrollViewer.Style>
+                <StackPanel>
+                    <TextBlock Text="TFS 가져오기" FontSize="{StaticResource FontSize.Xl}" FontWeight="SemiBold"
+                               Foreground="{StaticResource WlGlassInk}" Margin="0,0,0,16" />
+
+                    <TextBlock Text="Site" Style="{StaticResource WorkLogFieldTitle}" />
+                    <ctrl:InlineOptionPicker ItemsSource="{Binding SessionSiteOptions}"
+                                             SelectedItem="{Binding SessionSite, Mode=TwoWay}"
+                                             UsePopupChips="True"
+                                             Placeholder="사이트" />
+
+                    <TextBlock Text="날짜 · 시간" Style="{StaticResource WorkLogFieldTitle}" Margin="0,8,0,8" />
+                    <StackPanel Orientation="Horizontal">
+                        <Border Style="{StaticResource PickerDateField}" Width="128">
+                            <Grid>
+                                <TextBlock Text="0000-00-00" FontSize="{StaticResource FontSize.Md}"
+                                           Foreground="{StaticResource WlGlassMuted}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding SessionDateText}" Value="">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding SessionDateText}" Value="{x:Null}">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBox Style="{StaticResource PickerDateInput}"
+                                         Text="{Binding SessionDateText, UpdateSourceTrigger=PropertyChanged}"
+                                         MaxLength="10" />
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource PickerDateField}" Width="68">
+                            <Grid>
+                                <TextBlock Text="00:00" FontSize="{StaticResource FontSize.Md}"
+                                           Foreground="{StaticResource WlGlassMuted}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding SessionStartTimeText}" Value="">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding SessionStartTimeText}" Value="{x:Null}">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBox Style="{StaticResource PickerDateInput}"
+                                         Text="{Binding SessionStartTimeText, UpdateSourceTrigger=PropertyChanged}"
+                                         MaxLength="5" />
+                            </Grid>
+                        </Border>
+                        <TextBlock Text="~" FontSize="{StaticResource FontSize.Md}" Foreground="{StaticResource WlGlassMuted}"
+                                   Margin="0,0,8,0" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource PickerDateField}" Width="68" Margin="0">
+                            <Grid>
+                                <TextBlock Text="00:00" FontSize="{StaticResource FontSize.Md}"
+                                           Foreground="{StaticResource WlGlassMuted}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding SessionEndTimeText}" Value="">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding SessionEndTimeText}" Value="{x:Null}">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBox Style="{StaticResource PickerDateInput}"
+                                         Text="{Binding SessionEndTimeText, UpdateSourceTrigger=PropertyChanged}"
+                                         MaxLength="5" />
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+
+                    <TextBlock Text="PC" Style="{StaticResource WorkLogFieldTitle}" Margin="0,12,0,8" />
+                    <ItemsControl ItemsSource="{Binding SessionPcGroups}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Vertical" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="0,0,0,10">
+                                    <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{StaticResource WlGlassMuted}"
+                                               Margin="0,0,0,6"
+                                               Visibility="{Binding HasName, Converter={StaticResource BoolToVis}}" />
+                                    <ItemsControl ItemsSource="{Binding Computers}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Style="{StaticResource SessionPcChip}"
+                                                        Command="{Binding DataContext.SelectSessionPcCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding Value}"
+                                                        Content="{Binding Value}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Text="{Binding SessionSearchMessage}" Style="{StaticResource WorkLogFieldError}"
+                               Visibility="{Binding HasSessionSearchMessage, Converter={StaticResource BoolToVis}}" />
+                </StackPanel>
+            </ScrollViewer>
+        </DockPanel>
+
+        <Grid Grid.Row="1" Margin="14,10,14,10" MinHeight="0" ClipToBounds="True" Background="Transparent"
+              Visibility="{Binding HasCandidates, Converter={StaticResource BoolToVis}}">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="1.15*" MinWidth="0" />
-                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="*" MinWidth="0" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" MinWidth="0" />
             </Grid.ColumnDefinitions>
 
-            <!-- Left: candidates -->
-            <Border Grid.Column="0" Style="{StaticResource GlassImportPanel}"
-                    MinWidth="0">
+            <!-- Left: 이력만 / 체크인 목록 -->
+            <Border Grid.Column="0" MinWidth="0">
+                <Border.Style>
+                    <Style TargetType="Border" BasedOn="{StaticResource GlassImportPanel}">
+                        <Setter Property="Grid.ColumnSpan" Value="3" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasCandidates}" Value="True">
+                                <Setter Property="Grid.ColumnSpan" Value="1" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <Grid MinWidth="0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <DockPanel Margin="12,10" LastChildFill="False">
+                    <DockPanel Margin="12,10" LastChildFill="False"
+                               Visibility="{Binding HasCandidates, Converter={StaticResource BoolToVis}}">
                         <TextBlock DockPanel.Dock="Left" Text="수신된 체크인" FontWeight="SemiBold"
                                    Foreground="{StaticResource WlGlassInk}"
                                    VerticalAlignment="Center" />
@@ -298,13 +586,9 @@
                         </StackPanel>
                     </DockPanel>
 
-                    <TextBlock Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center"
-                               Text="가져온 TFS 체크인 내역이 없습니다."
-                               Foreground="{StaticResource WlGlassMuted}" FontSize="13"
-                               Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}" />
-
-                    <ScrollViewer Grid.Row="1" Padding="8,0,8,8"
-                                  Visibility="{Binding HasCandidates, Converter={StaticResource BoolToVis}}"
+                    <Grid Grid.Row="1" MinWidth="0"
+                          Visibility="{Binding HasCandidates, Converter={StaticResource BoolToVis}}">
+                    <ScrollViewer Padding="8,0,8,8"
                                   HorizontalScrollBarVisibility="Disabled"
                                   VerticalScrollBarVisibility="Auto"
                                   MinWidth="0">
@@ -351,23 +635,62 @@
                                                       IsChecked="{Binding IsImportSelected, Mode=TwoWay}"
                                                       VerticalAlignment="Top" Margin="0,2,10,0" />
                                             <Grid Grid.Column="1" MinWidth="0">
-                                                <StackPanel MinWidth="0" Margin="0,0,28,0">
+                                                <StackPanel MinWidth="0" Margin="0,0,28,0"
+                                                            HorizontalAlignment="Stretch">
+                                                    <DockPanel LastChildFill="True">
+                                                    <TextBlock DockPanel.Dock="Right" FontSize="10" FontWeight="SemiBold"
+                                                               Margin="8,0,0,0" VerticalAlignment="Center"
+                                                               Text="{Binding InboxStatusLabel}"
+                                                               Visibility="{Binding HasInboxStatus, Converter={StaticResource BoolToVis}}">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="#64748B" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding InboxStatusLabel}" Value="완료">
+                                                                        <Setter Property="Foreground" Value="#246B4D" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding InboxStatusLabel}" Value="대기">
+                                                                        <Setter Property="Foreground" Value="#405CC3" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding InboxStatusLabel}" Value="스킵">
+                                                                        <Setter Property="Foreground" Value="#94A3B8" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
                                                     <TextBlock Text="{Binding ChangesetId, StringFormat=CS {0}}"
                                                                FontWeight="SemiBold"
-                                                               Foreground="{StaticResource WlGlassAccent}" />
+                                                               TextAlignment="Left" HorizontalAlignment="Left">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="{StaticResource WlGlassMuted}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsImportSelected}" Value="True">
+                                                                        <Setter Property="Foreground" Value="{StaticResource WlGlassAccent}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                    </DockPanel>
                                                     <TextBlock Text="{Binding AuthorDisplay}" FontSize="12"
                                                                Foreground="{StaticResource WlGlassMuted}" Margin="0,4,0,0"
-                                                               TextTrimming="CharacterEllipsis" />
+                                                               TextTrimming="CharacterEllipsis"
+                                                               TextAlignment="Left" HorizontalAlignment="Left" />
                                                     <TextBlock Text="{Binding CheckedInAtDisplay}" FontSize="11"
-                                                               Foreground="#94A3B8" Margin="0,2,0,0" />
+                                                               Foreground="#94A3B8" Margin="0,2,0,0"
+                                                               TextAlignment="Left" HorizontalAlignment="Left" />
                                                     <TextBlock Text="{Binding OriginalComment}" FontSize="12"
                                                                Foreground="{StaticResource WlGlassInk}" Margin="0,6,0,0"
                                                                TextWrapping="Wrap"
+                                                               TextAlignment="Left"
                                                                MinWidth="0"
                                                                HorizontalAlignment="Stretch" />
                                                     <TextBlock FontSize="11"
                                                                Foreground="{StaticResource WlGlassMuted}"
                                                                Margin="0,6,0,0"
+                                                               TextAlignment="Left" HorizontalAlignment="Left"
                                                                Text="{Binding FileCountSummary}" />
                                                 </StackPanel>
                                                 <Button Width="22" Height="22" Padding="0" Cursor="Hand"
@@ -375,7 +698,7 @@
                                                         Command="{Binding DataContext.CycleMergeGroupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}"
                                                         Visibility="{Binding DataContext.IsCustomGroupsMode, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}}"
-                                                        ToolTip="그룹">
+                                                        ToolTip="Group">
                                                     <Button.Template>
                                                         <ControlTemplate TargetType="Button">
                                                             <Border Width="22" Height="22" CornerRadius="6"
@@ -396,11 +719,16 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </ScrollViewer>
+                    </Grid>
                 </Grid>
             </Border>
 
+            <Border Grid.Column="1" Width="14"
+                    Visibility="{Binding HasCandidates, Converter={StaticResource BoolToVis}}" />
+
             <!-- Right: files -->
-            <Border Grid.Column="2" Style="{StaticResource GlassImportPanel}">
+            <Border Grid.Column="2" Style="{StaticResource GlassImportPanel}"
+                    Visibility="{Binding HasCandidates, Converter={StaticResource BoolToVis}}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -468,7 +796,7 @@
                                                                     ToolTip="{Binding ChangeTypeMark}">
                                                                 <Border.Style>
                                                                     <Style TargetType="Border">
-                                                                        <Setter Property="Background" Value="{StaticResource WlGlassDeployFocusBg}" />
+                                                                        <Setter Property="Background" Value="{StaticResource WlGlassChipBg}" />
                                                                         <Style.Triggers>
                                                                             <DataTrigger Binding="{Binding IsAdd}" Value="True">
                                                                                 <Setter Property="Background" Value="{StaticResource WlGlassDeployDoneBg}" />
@@ -518,17 +846,25 @@
         <!-- Footer -->
         <Border Grid.Row="2" Padding="14,10,16,12" BorderBrush="#E2E8F0" BorderThickness="0,1,0,0"
                 CornerRadius="0,0,14,14"
-                Background="#B8FFFFFF">
+                Background="#B8FFFFFF"
+                Visibility="{Binding HasCandidates, Converter={StaticResource BoolToVis}}">
             <DockPanel LastChildFill="False">
                 <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" FontSize="12"
                            Foreground="{StaticResource WlGlassMuted}"
-                           Text="{Binding SelectedCount, StringFormat={}{0}건 선택됨}" />
+                           Text="{Binding SelectedCount, StringFormat={}{0}건 선택됨}"
+                           Visibility="{Binding HasCandidates, Converter={StaticResource BoolToVis}}" />
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                     <Button Style="{StaticResource GlassGhostButton}" Content="취소"
                             Command="{Binding CloseCommand}" />
+                    <Button Style="{StaticResource GlassAccentButton}" Content="가져오기"
+                            Command="{Binding FetchSessionQueryCommand}"
+                            IsEnabled="{Binding CanFetchSessionQuery}"
+                            Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}" />
                     <Button Style="{StaticResource GlassAccentButton}"
                             Content="{Binding ConfirmButtonLabel}"
-                            Command="{Binding ConfirmCommand}" />
+                            Command="{Binding ConfirmCommand}"
+                            IsEnabled="{Binding CanConfirm}"
+                            Visibility="{Binding HasCandidates, Converter={StaticResource BoolToVis}}" />
                 </StackPanel>
             </DockPanel>
         </Border>

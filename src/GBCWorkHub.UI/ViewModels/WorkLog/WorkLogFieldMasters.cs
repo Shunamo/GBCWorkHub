@@ -11,6 +11,12 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         public const string Unselected = "미선택";
         public const string EmptyCategory = "";
 
+        public const string TreePlaceholderMenu = "Menu";
+        public const string TreePlaceholderType = "Type";
+        public const string TreePlaceholderCategory = "Category";
+        public const string TreePlaceholderProject = "Project";
+        public const string TreePlaceholderSource = "Source code";
+
         public static ObservableCollection<string> CreateTypes()
         {
             return new ObservableCollection<string>

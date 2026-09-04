@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -25,6 +26,7 @@ namespace GBCWorkHub.UI.ViewModels
     public class RemoteWorkspaceViewModel : ViewModelBase, IDisposable
     {
         private readonly RemotePcBiz _remotePcBiz = new RemotePcBiz();
+        private readonly DirectoryBiz _directoryBiz = new DirectoryBiz();
         private readonly RemoteSessionController _session = new RemoteSessionController();
         private TfsWorkLogViewModel _tfsWorkLog;
         private WorkLog.WorkLogListViewModel _workLogList;
@@ -32,6 +34,16 @@ namespace GBCWorkHub.UI.ViewModels
         private readonly Action _onSiteContextChanged;
 
         private ObservableCollection<RemoteComputerItemViewModel> _remoteComputers;
+        private ObservableCollection<RemotePcTeamGroupViewModel> _galleryGroups;
+        private ObservableCollection<SiteShortcutItemViewModel> _siteShortcuts;
+        private ObservableCollection<PcAccessSectionViewModel> _selectedPcAccessSections;
+        private string _selectedPcComment = string.Empty;
+        private string _selectedPcCommentBaseline = string.Empty;
+        private bool _isPcAccessEditing;
+        private bool _isPcAccessSaving;
+        private readonly Dictionary<string, List<RemotePcDto>> _sitePcCache =
+            new Dictionary<string, List<RemotePcDto>>(StringComparer.OrdinalIgnoreCase);
+        private IList<RemotePcStatus> _lastOccupancy;
         private ICollectionView _filteredRemoteComputers;
         private RemoteComputerItemViewModel _selectedRemoteComputer;
         private string _searchText = string.Empty;
@@ -54,7 +66,7 @@ namespace GBCWorkHub.UI.ViewModels
         private int _usageLogLoadGeneration;
 
         private const int MaxRecentEvents = 20;
-        private const int RecentUsageLogTake = 3;
+        private const int RecentUsageLogTake = 20;
         private const string TrackedComputerName = "KEB-7VY98V3";
 
         private string _remoteComputerName = "-";
@@ -96,9 +108,20 @@ namespace GBCWorkHub.UI.ViewModels
             _recentEvents = new ObservableCollection<RdpEventViewModel>();
             _recentUsageLogs = new ObservableCollection<RemotePcUsageLogItemViewModel>();
             _remoteComputers = new ObservableCollection<RemoteComputerItemViewModel>();
+            _galleryGroups = new ObservableCollection<RemotePcTeamGroupViewModel>();
             _sites = new ObservableCollection<RemoteSiteDto>(_remotePcBiz.GetSiteList() ?? new List<RemoteSiteDto>());
+            _siteShortcuts = new ObservableCollection<SiteShortcutItemViewModel>();
+            foreach (var site in _sites)
+            {
+                if (site == null || string.IsNullOrWhiteSpace(site.SiteCode))
+                    continue;
+                _siteShortcuts.Add(new SiteShortcutItemViewModel(site.SiteCode.Trim().ToUpperInvariant(), site.IsEnabled));
+            }
             _filteredRemoteComputers = CollectionViewSource.GetDefaultView(_remoteComputers);
             _filteredRemoteComputers.Filter = FilterRemoteComputer;
+            var view = _filteredRemoteComputers as ListCollectionView;
+            if (view != null)
+                view.CustomSort = new RemotePcGalleryComparer();
 
             WorkHubUserAccount = RemotePcShareBiz.LocalUserAccount;
             WorkHubClientPc = RemotePcShareBiz.LocalClientPc;
@@ -111,9 +134,16 @@ namespace GBCWorkHub.UI.ViewModels
             ChangeViewModeCommand = new RelayCommand<string>(SetViewMode);
             SelectRemoteComputerCommand = new RelayCommand<RemoteComputerItemViewModel>(SelectRemoteComputer);
             PrimaryActionCommand = new RelayCommand<RemoteComputerItemViewModel>(item => { var _ = ExecutePrimaryActionAsync(item); });
+            ActivateRemoteComputerCommand = new RelayCommand<RemoteComputerItemViewModel>(item => { var _ = ActivateRemoteComputerAsync(item); });
             OpenSiteCommand = new RelayCommand<string>(code => { var _ = OpenSiteAsync(code); });
             BackToSitesCommand = new RelayCommand(BackToSites);
+            CopySelectedPcDomainCommand = new RelayCommand(CopySelectedPcDomain, () => HasSelectedPcDomain);
+            CopyPcCredentialCommand = new RelayCommand<PcCredentialLineViewModel>(CopyPcCredentialLine);
+            BeginEditPcAccessCommand = new RelayCommand(BeginEditPcAccess, () => HasSelectedRemoteComputer && !IsPcAccessEditing && !IsPcAccessSaving);
+            SavePcAccessCommand = new RelayCommand(() => { var _ = SavePcAccessAsync(); }, () => IsPcAccessEditing && !IsPcAccessSaving);
+            CancelEditPcAccessCommand = new RelayCommand(CancelEditPcAccess, () => IsPcAccessEditing && !IsPcAccessSaving);
 
+            _selectedPcAccessSections = new ObservableCollection<PcAccessSectionViewModel>();
             ApplyWorkHubUserToSession();
         }
 
@@ -291,6 +321,16 @@ namespace GBCWorkHub.UI.ViewModels
             private set { SetProperty(ref _recentUsageLogs, value); }
         }
 
+        public bool HasSelectedRemoteComputer
+        {
+            get { return _selectedRemoteComputer != null; }
+        }
+
+        public bool HasRecentUsageLogs
+        {
+            get { return _recentUsageLogs != null && _recentUsageLogs.Count > 0; }
+        }
+
         public TfsWorkLogViewModel TfsWorkLog
         {
             get { return _tfsWorkLog; }
@@ -311,6 +351,11 @@ namespace GBCWorkHub.UI.ViewModels
             get { return _filteredRemoteComputers; }
         }
 
+        public ObservableCollection<RemotePcTeamGroupViewModel> GalleryGroups
+        {
+            get { return _galleryGroups; }
+        }
+
         public RemoteComputerItemViewModel SelectedRemoteComputer
         {
             get { return _selectedRemoteComputer; }
@@ -328,8 +373,24 @@ namespace GBCWorkHub.UI.ViewModels
                     _selectedRemoteComputer.IsSelected = true;
 
                 RaisePropertyChanged("SelectedRemoteComputer");
+                RaisePropertyChanged("HasSelectedRemoteComputer");
+                RaisePropertyChanged("SelectedPcDomain");
+                RaisePropertyChanged("HasSelectedPcDomain");
+                RaisePropertyChanged("HasSelectedPcAccessSections");
+                RaisePropertyChanged("ShowPcAccessCommentColumn");
+                RaisePropertyChanged("PcAccessSectionColumns");
+                var copy = CopySelectedPcDomainCommand as RelayCommand;
+                if (copy != null)
+                    copy.RaiseCanExecuteChanged();
+                RaisePcAccessEditCommands();
+                RebuildSelectedPcAccessPanel();
                 SyncDetailPanelFromSelected();
-                var _ = LoadRecentUsageLogsAsync(_selectedRemoteComputer);
+                if (_selectedRemoteComputer == null)
+                    ApplyRecentUsageLogs(++_usageLogLoadGeneration, null);
+                else
+                {
+                    var _ = LoadRecentUsageLogsAsync(_selectedRemoteComputer);
+                }
             }
         }
 
@@ -459,8 +520,400 @@ namespace GBCWorkHub.UI.ViewModels
         public ICommand ChangeViewModeCommand { get; private set; }
         public ICommand SelectRemoteComputerCommand { get; private set; }
         public ICommand PrimaryActionCommand { get; private set; }
+        public ICommand ActivateRemoteComputerCommand { get; private set; }
         public ICommand OpenSiteCommand { get; private set; }
         public ICommand BackToSitesCommand { get; private set; }
+        public ICommand CopySelectedPcDomainCommand { get; private set; }
+        public ICommand CopyPcCredentialCommand { get; private set; }
+        public ICommand BeginEditPcAccessCommand { get; private set; }
+        public ICommand SavePcAccessCommand { get; private set; }
+        public ICommand CancelEditPcAccessCommand { get; private set; }
+
+        /// <summary>선택 PC의 원격 Windows 로그인(엑셀 ID).</summary>
+        public string SelectedPcDomain
+        {
+            get
+            {
+                return SelectedRemoteComputer != null ? SelectedRemoteComputer.PcDomain : null;
+            }
+        }
+
+        public bool HasSelectedPcDomain
+        {
+            get { return !string.IsNullOrWhiteSpace(SelectedPcDomain); }
+        }
+
+        public ObservableCollection<PcAccessSectionViewModel> SelectedPcAccessSections
+        {
+            get { return _selectedPcAccessSections; }
+        }
+
+        /// <summary>COMMENT 칸. 내용 있거나 수정 모드일 때만.</summary>
+        public bool ShowPcAccessCommentColumn
+        {
+            get
+            {
+                if (IsPcAccessEditing)
+                    return true;
+                return !string.IsNullOrWhiteSpace(_selectedPcComment);
+            }
+        }
+
+        /// <summary>Domain/VPN 가로 배치: 코멘트 없고 섹션 2개일 때 2열.</summary>
+        public int PcAccessSectionColumns
+        {
+            get
+            {
+                if (ShowPcAccessCommentColumn)
+                    return 1;
+                int n = _selectedPcAccessSections != null ? _selectedPcAccessSections.Count : 0;
+                return n >= 2 ? 2 : 1;
+            }
+        }
+
+        public bool HasSelectedPcAccessSections
+        {
+            get { return _selectedPcAccessSections != null && _selectedPcAccessSections.Count > 0; }
+        }
+
+        public bool IsPcAccessEditing
+        {
+            get { return _isPcAccessEditing; }
+            private set
+            {
+                if (SetProperty(ref _isPcAccessEditing, value))
+                {
+                    RaisePropertyChanged("IsPcAccessReadOnly");
+                    RaisePropertyChanged("ShowPcAccessEditButton");
+                    RaisePropertyChanged("ShowPcAccessSaveButton");
+                    RaisePropertyChanged("ShowPcAccessCommentColumn");
+                    RaisePropertyChanged("PcAccessSectionColumns");
+                    ApplyCredentialEditFlags();
+                    RaisePcAccessEditCommands();
+                }
+            }
+        }
+
+        public bool IsPcAccessSaving
+        {
+            get { return _isPcAccessSaving; }
+            private set
+            {
+                if (SetProperty(ref _isPcAccessSaving, value))
+                    RaisePcAccessEditCommands();
+            }
+        }
+
+        public bool IsPcAccessReadOnly
+        {
+            get { return !IsPcAccessEditing; }
+        }
+
+        public bool ShowPcAccessEditButton
+        {
+            get { return HasSelectedRemoteComputer && !IsPcAccessEditing; }
+        }
+
+        public bool ShowPcAccessSaveButton
+        {
+            get { return IsPcAccessEditing; }
+        }
+
+        public string SelectedPcComment
+        {
+            get { return _selectedPcComment; }
+            set
+            {
+                string next = value ?? string.Empty;
+                if (SetProperty(ref _selectedPcComment, next))
+                {
+                    RaisePropertyChanged("ShowPcAccessCommentColumn");
+                    RaisePropertyChanged("PcAccessSectionColumns");
+                }
+            }
+        }
+
+        private void CopySelectedPcDomain()
+        {
+            if (!HasSelectedPcDomain)
+                return;
+            CopyTextToClipboard(SelectedPcDomain);
+        }
+
+        private void CopyPcCredentialLine(PcCredentialLineViewModel line)
+        {
+            if (line == null || string.IsNullOrWhiteSpace(line.Value))
+                return;
+            if (!CopyTextToClipboard(line.Value))
+                return;
+            line.MarkCopied();
+        }
+
+        private static bool CopyTextToClipboard(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+            try
+            {
+                Clipboard.SetText(text.Trim());
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void RaisePcAccessEditCommands()
+        {
+            var begin = BeginEditPcAccessCommand as RelayCommand;
+            if (begin != null)
+                begin.RaiseCanExecuteChanged();
+            var save = SavePcAccessCommand as RelayCommand;
+            if (save != null)
+                save.RaiseCanExecuteChanged();
+            var cancel = CancelEditPcAccessCommand as RelayCommand;
+            if (cancel != null)
+                cancel.RaiseCanExecuteChanged();
+            RaisePropertyChanged("ShowPcAccessEditButton");
+            RaisePropertyChanged("ShowPcAccessSaveButton");
+        }
+
+        private void ApplyCredentialEditFlags()
+        {
+            if (_selectedPcAccessSections == null)
+                return;
+            for (int i = 0; i < _selectedPcAccessSections.Count; i++)
+            {
+                var section = _selectedPcAccessSections[i];
+                if (section != null)
+                    section.SetEditing(IsPcAccessEditing);
+            }
+        }
+
+        private void BeginEditPcAccess()
+        {
+            if (!HasSelectedRemoteComputer || IsPcAccessEditing)
+                return;
+            IsPcAccessEditing = true;
+        }
+
+        private void CancelEditPcAccess()
+        {
+            if (!IsPcAccessEditing)
+                return;
+            IsPcAccessEditing = false;
+            RebuildSelectedPcAccessPanel();
+        }
+
+        private async Task SavePcAccessAsync()
+        {
+            var item = SelectedRemoteComputer;
+            if (item == null || !IsPcAccessEditing || IsPcAccessSaving)
+                return;
+            if (string.IsNullOrWhiteSpace(item.SiteCode) || string.IsNullOrWhiteSpace(item.PcName))
+                return;
+
+            string note = BuildPcNoteFromSections(_selectedPcAccessSections);
+            string comment = SelectedPcComment ?? string.Empty;
+            string domain = BuildPcDomainFromSections(_selectedPcAccessSections);
+            string site = item.SiteCode;
+            string pc = item.PcName;
+
+            IsPcAccessSaving = true;
+            try
+            {
+                int n = await _directoryBiz.UpdatePcAccessAsync(site, pc, note, comment, domain).ConfigureAwait(true);
+                if (n < 0)
+                    return;
+
+                if (SelectedRemoteComputer != null
+                    && string.Equals(SelectedRemoteComputer.SiteCode, site, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(SelectedRemoteComputer.PcName, pc, StringComparison.OrdinalIgnoreCase))
+                {
+                    SelectedRemoteComputer.PcNote = string.IsNullOrWhiteSpace(note) ? null : note;
+                    SelectedRemoteComputer.PcComment = string.IsNullOrWhiteSpace(comment) ? null : comment.Trim();
+                    SelectedRemoteComputer.PcDomain = string.IsNullOrWhiteSpace(domain) ? null : domain;
+                    _selectedPcCommentBaseline = comment;
+                    IsPcAccessEditing = false;
+                    RebuildSelectedPcAccessPanel();
+                }
+            }
+            finally
+            {
+                IsPcAccessSaving = false;
+            }
+        }
+
+        private static string BuildPcNoteFromSections(IEnumerable<PcAccessSectionViewModel> sections)
+        {
+            var ids = new List<string>();
+            var pws = new List<string>();
+            var vpnIds = new List<string>();
+            var vpnPws = new List<string>();
+            CollectSectionLines(sections, "Domain", "ID", ids);
+            CollectSectionLines(sections, "Domain", "PW", pws);
+            CollectSectionLines(sections, "VPN", "ID", vpnIds);
+            CollectSectionLines(sections, "VPN", "PW", vpnPws);
+
+            var parts = new List<string>();
+            if (ids.Count > 0)
+                parts.Add("[ID]\n" + string.Join("\n", ids.ToArray()));
+            if (pws.Count > 0)
+                parts.Add("[Password]\n" + string.Join("\n", pws.ToArray()));
+            if (vpnIds.Count > 0)
+                parts.Add("[VPN ID]\n" + string.Join("\n", vpnIds.ToArray()));
+            if (vpnPws.Count > 0)
+                parts.Add("[VPN Password]\n" + string.Join("\n", vpnPws.ToArray()));
+            return parts.Count == 0 ? null : string.Join("\n\n", parts.ToArray());
+        }
+
+        private static string BuildPcDomainFromSections(IEnumerable<PcAccessSectionViewModel> sections)
+        {
+            var ids = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            CollectSectionLines(sections, "Domain", "ID", ids);
+            CollectSectionLines(sections, "VPN", "ID", ids);
+            var unique = new List<string>();
+            for (int i = 0; i < ids.Count; i++)
+            {
+                if (seen.Add(ids[i]))
+                    unique.Add(ids[i]);
+            }
+            return unique.Count == 0 ? null : string.Join("\n", unique.ToArray());
+        }
+
+        private static void CollectSectionLines(
+            IEnumerable<PcAccessSectionViewModel> sections,
+            string sectionTitle,
+            string fieldKind,
+            IList<string> target)
+        {
+            if (sections == null || target == null)
+                return;
+            foreach (var section in sections)
+            {
+                if (section == null || section.Fields == null)
+                    continue;
+                if (!string.Equals(section.Title, sectionTitle, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                for (int i = 0; i < section.Fields.Count; i++)
+                {
+                    var field = section.Fields[i];
+                    if (field == null || field.Lines == null)
+                        continue;
+                    if (!string.Equals(field.Kind, fieldKind, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    for (int j = 0; j < field.Lines.Count; j++)
+                    {
+                        var line = field.Lines[j];
+                        if (line == null || string.IsNullOrWhiteSpace(line.Value))
+                            continue;
+                        target.Add(line.Value.Trim());
+                    }
+                }
+            }
+        }
+
+        private void RebuildSelectedPcAccessPanel()
+        {
+            IsPcAccessEditing = false;
+            _selectedPcAccessSections.Clear();
+
+            var item = SelectedRemoteComputer;
+            if (item == null)
+            {
+                SetProperty(ref _selectedPcComment, string.Empty, "SelectedPcComment");
+                _selectedPcCommentBaseline = string.Empty;
+                RaisePropertyChanged("HasSelectedPcAccessSections");
+                RaisePropertyChanged("ShowPcAccessCommentColumn");
+                RaisePropertyChanged("PcAccessSectionColumns");
+                RaisePcAccessEditCommands();
+                return;
+            }
+
+            var ids = new List<string>();
+            var pws = new List<string>();
+            var vpnIds = new List<string>();
+            var vpnPws = new List<string>();
+
+            IList<PcAccessCredential> creds = PcAccessNoteParser.ParseCredentials(item.PcNote);
+            if ((creds == null || creds.Count == 0) && !string.IsNullOrWhiteSpace(item.PcDomain))
+            {
+                string[] parts = item.PcDomain.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    string t = parts[i].Trim();
+                    if (t.Length > 0)
+                        ids.Add(t);
+                }
+            }
+            else if (creds != null)
+            {
+                for (int i = 0; i < creds.Count; i++)
+                {
+                    PcAccessCredential c = creds[i];
+                    if (c == null || string.IsNullOrWhiteSpace(c.Value))
+                        continue;
+                    string v = c.Value.Trim();
+                    if (string.Equals(c.Kind, "PW", StringComparison.OrdinalIgnoreCase))
+                        pws.Add(v);
+                    else if (string.Equals(c.Kind, "VPN_ID", StringComparison.OrdinalIgnoreCase))
+                        vpnIds.Add(v);
+                    else if (string.Equals(c.Kind, "VPN_PW", StringComparison.OrdinalIgnoreCase))
+                        vpnPws.Add(v);
+                    else
+                        ids.Add(v);
+                }
+            }
+
+            if (ids.Count > 0 || pws.Count > 0)
+                _selectedPcAccessSections.Add(CreateAccessSection("Domain", ids, pws));
+            if (vpnIds.Count > 0 || vpnPws.Count > 0)
+                _selectedPcAccessSections.Add(CreateAccessSection("VPN", vpnIds, vpnPws));
+
+            string comment = item.PcComment;
+            if (string.IsNullOrWhiteSpace(comment))
+                comment = PcAccessNoteParser.ParseCommentFromNote(item.PcNote) ?? string.Empty;
+
+            SetProperty(ref _selectedPcComment, comment ?? string.Empty, "SelectedPcComment");
+            _selectedPcCommentBaseline = _selectedPcComment;
+
+            RaisePropertyChanged("HasSelectedPcAccessSections");
+            RaisePropertyChanged("ShowPcAccessCommentColumn");
+            RaisePropertyChanged("PcAccessSectionColumns");
+            RaisePcAccessEditCommands();
+        }
+
+        private PcAccessSectionViewModel CreateAccessSection(string title, IList<string> idValues, IList<string> pwValues)
+        {
+            var section = new PcAccessSectionViewModel(title);
+            if (idValues != null && idValues.Count > 0)
+            {
+                var field = new PcCredentialFieldViewModel("ID", "ID");
+                for (int i = 0; i < idValues.Count; i++)
+                {
+                    if (string.IsNullOrWhiteSpace(idValues[i]))
+                        continue;
+                    field.Lines.Add(new PcCredentialLineViewModel(idValues[i].Trim(), CopyPcCredentialCommand));
+                }
+                if (field.Lines.Count > 0)
+                    section.Fields.Add(field);
+            }
+            if (pwValues != null && pwValues.Count > 0)
+            {
+                var field = new PcCredentialFieldViewModel("PW", "PW");
+                for (int i = 0; i < pwValues.Count; i++)
+                {
+                    if (string.IsNullOrWhiteSpace(pwValues[i]))
+                        continue;
+                    field.Lines.Add(new PcCredentialLineViewModel(pwValues[i].Trim(), CopyPcCredentialCommand));
+                }
+                if (field.Lines.Count > 0)
+                    section.Fields.Add(field);
+            }
+            return section;
+        }
 
         /// <summary>TfsSyncCoordinator 등 Shell wiring용.</summary>
         public RemoteSessionController Session { get { return _session; } }
@@ -470,6 +923,12 @@ namespace GBCWorkHub.UI.ViewModels
         public ObservableCollection<RemoteSiteDto> Sites
         {
             get { return _sites; }
+        }
+
+        /// <summary>갤러리 사이드바: 사이트별 사용 가능 PC 수 + 바로 이동.</summary>
+        public ObservableCollection<SiteShortcutItemViewModel> SiteShortcuts
+        {
+            get { return _siteShortcuts; }
         }
 
         public bool IsAuroraSiteEnabled { get { return IsSiteEnabled("AURORA"); } }
@@ -496,6 +955,7 @@ namespace GBCWorkHub.UI.ViewModels
                     RaisePropertyChanged("IsSitePickerVisible");
                     RaisePropertyChanged("IsGalleryVisible");
                     RaisePropertyChanged("HeaderTitle");
+                    SyncSiteShortcutSelection();
                     if (_onSiteContextChanged != null)
                         _onSiteContextChanged();
                 }
@@ -537,6 +997,7 @@ namespace GBCWorkHub.UI.ViewModels
                 IsGalleryLoading = true;
             try
             {
+                _sitePcCache.Clear();
                 // 스켈레톤은 PC 목록 구성까지만. DB 상태/업무기록 조회는 목록 표시 후 진행.
                 if (IsGalleryVisible)
                 {
@@ -572,6 +1033,8 @@ namespace GBCWorkHub.UI.ViewModels
             }
 
             string siteKey = siteCode.Trim().ToUpperInvariant();
+            if (string.Equals(SelectedSiteCode, siteKey, StringComparison.OrdinalIgnoreCase))
+                return;
 
             var pcs = _remotePcBiz.GetRemotePcListBySite(siteCode);
             if (pcs == null || pcs.Count == 0)
@@ -580,6 +1043,8 @@ namespace GBCWorkHub.UI.ViewModels
                     siteCode + " 사이트에 등록된 PC가 없습니다.\nApp.config " + siteCode + ".Host / " + siteCode + ".PcNames 를 확인하세요.").ConfigureAwait(true);
                 return;
             }
+
+            _sitePcCache[siteKey] = pcs;
 
             IsGalleryLoading = true;
             try
@@ -763,9 +1228,21 @@ namespace GBCWorkHub.UI.ViewModels
 
             bool tracking = _session.IsTrackingLocally;
             string trackedName = _session.TrackerRemoteComputerName;
-            bool nameMatches = string.Equals(computerKey, trackedName, StringComparison.OrdinalIgnoreCase)
+            bool nameMatches = RdpStatusBiz.ComputerNamesLooselyMatch(computerKey, trackedName)
                 || string.Equals(computerKey, _session.TrackerTargetIp, StringComparison.OrdinalIgnoreCase);
             bool isConfirm = RdpSessionTrackingService.IsConnectionConfirmPayload(payload) && nameMatches;
+
+            // TFS 가져오기 재접속: 이벤트의 "사용 중"으로 점유 UI를 다시 올리지 않음
+            if (_session.IsTfsSyncReconnectOrInFlight())
+            {
+                DiagnosticLogger.Info("Decision", "ACCEPT_NEW_GBC_PAYLOAD (events only during TFS sync)"
+                    + " ComputerName=" + computerKey
+                    + " LatestEventId=" + (payload.LatestEventId.HasValue ? payload.LatestEventId.Value.ToString() : "null"));
+                ApplyAcceptedPayload(payload, null, payloadHash, computerKey, usedDispatcher, keepCurrentStatus: true);
+                if (isConfirm && tracking)
+                    _session.TryConfirmConnectionFromClipboard(payload, computerKey);
+                return;
+            }
 
             if (tracking && !isConfirm && string.Equals(status, "사용 가능", StringComparison.Ordinal))
             {
@@ -791,13 +1268,7 @@ namespace GBCWorkHub.UI.ViewModels
             ApplyAcceptedPayload(payload, status, payloadHash, computerKey, usedDispatcher, keepCurrentStatus: false);
 
             if (isConfirm && tracking)
-            {
                 _session.TryConfirmConnectionFromClipboard(payload, computerKey);
-                if (_session.IsTfsSyncReconnectOrInFlight())
-                {
-                    DiagnosticLogger.Info("Decision", "RDP_CONFIRM_TRACKER_ONLY_DURING_TFS_SYNC");
-                }
-            }
         }
 
         private void ApplyAcceptedPayload(
@@ -912,18 +1383,163 @@ namespace GBCWorkHub.UI.ViewModels
 
         private async Task LoadRecentUsageLogsAsync(RemoteComputerItemViewModel item)
         {
-            if (item == null || string.IsNullOrWhiteSpace(item.IpAddress) || !_session.IsShareConfigured)
+            if (item == null || !_session.IsShareConfigured)
                 return;
+
+            var keys = ExclusiveUsageLogKeys(item);
+            if (keys.Count == 0)
+                return;
+
             int generation = ++_usageLogLoadGeneration;
             try
             {
-                var logs = await _session.GetRecentUsageLogsAsync(item.IpAddress, RecentUsageLogTake).ConfigureAwait(true);
-                ApplyRecentUsageLogs(generation, logs);
+                var merged = new List<RemotePcUsageLogDto>();
+                var seen = new HashSet<long>();
+                for (int i = 0; i < keys.Count; i++)
+                {
+                    var logs = await _session.GetRecentUsageLogsAsync(keys[i], RecentUsageLogTake).ConfigureAwait(true);
+                    if (logs == null)
+                        continue;
+                    for (int j = 0; j < logs.Count; j++)
+                    {
+                        var dto = logs[j];
+                        if (dto == null || seen.Contains(dto.LogId))
+                            continue;
+                        if (!UsageLogBelongsToItem(item, dto))
+                            continue;
+                        seen.Add(dto.LogId);
+                        merged.Add(dto);
+                    }
+                }
+
+                merged.Sort((a, b) =>
+                {
+                    DateTime? at = a != null ? a.RequestedAt : null;
+                    DateTime? bt = b != null ? b.RequestedAt : null;
+                    int c = Nullable.Compare(bt, at);
+                    if (c != 0)
+                        return c;
+                    long aid = a != null ? a.LogId : 0;
+                    long bid = b != null ? b.LogId : 0;
+                    return bid.CompareTo(aid);
+                });
+
+                EnsureOpenOccupancyHistory(item, merged);
+
+                if (merged.Count > RecentUsageLogTake)
+                    merged = merged.GetRange(0, RecentUsageLogTake);
+
+                ApplyRecentUsageLogs(generation, merged);
             }
             catch (Exception ex)
             {
                 DiagnosticLogger.Warn("USAGE_LOG", ex.Message);
             }
+        }
+
+        private static void EnsureOpenOccupancyHistory(
+            RemoteComputerItemViewModel item,
+            List<RemotePcUsageLogDto> merged)
+        {
+            if (item == null || merged == null)
+                return;
+            if (!item.IsInUse && !item.IsConnecting && !item.IsCheckRequired)
+                return;
+
+            for (int i = 0; i < merged.Count; i++)
+            {
+                var log = merged[i];
+                if (log == null || log.EndedAt.HasValue)
+                    continue;
+                if (string.Equals(log.SessionStatus, "ENDED", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(log.SessionStatus, RemotePcDbStatuses.SessionEnded, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (string.Equals(log.SessionStatus, RemotePcDbStatuses.InUse, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(log.SessionStatus, RemotePcDbStatuses.Connecting, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(log.SessionStatus, RemotePcDbStatuses.CheckRequired, StringComparison.OrdinalIgnoreCase))
+                    return;
+            }
+
+            merged.Insert(0, new RemotePcUsageLogDto
+            {
+                LogId = 0,
+                SessionToken = item.SessionToken,
+                RemoteAccessIpAddress = item.IpAddress,
+                RemotePcName = item.PcName,
+                AccessUserId = item.AccessUserId,
+                AccessPcName = item.AccessPcName,
+                SessionStatus = string.IsNullOrWhiteSpace(item.StatusCode)
+                    ? RemotePcDbStatuses.InUse
+                    : item.StatusCode,
+                RequestedAt = item.AccessStartAt,
+                EndedAt = null
+            });
+        }
+
+        private List<string> ExclusiveUsageLogKeys(RemoteComputerItemViewModel item)
+        {
+            var keys = new List<string>();
+            AddExclusiveKey(keys, item, item != null ? item.IpAddress : null);
+            AddExclusiveKey(keys, item, item != null ? item.PcName : null);
+            AddExclusiveKey(keys, item, item != null ? item.HostAddress : null);
+            return keys;
+        }
+
+        private void AddExclusiveKey(List<string> keys, RemoteComputerItemViewModel item, string key)
+        {
+            if (item == null || string.IsNullOrWhiteSpace(key) || keys == null)
+                return;
+            string t = key.Trim();
+            for (int i = 0; i < keys.Count; i++)
+            {
+                if (string.Equals(keys[i], t, StringComparison.OrdinalIgnoreCase))
+                    return;
+            }
+            if (!ShareKeyUniqueToItem(item, t))
+                return;
+            keys.Add(t);
+        }
+
+        private bool ShareKeyUniqueToItem(RemoteComputerItemViewModel item, string key)
+        {
+            if (item == null || string.IsNullOrWhiteSpace(key) || RemoteComputers == null)
+                return false;
+
+            int hits = 0;
+            for (int i = 0; i < RemoteComputers.Count; i++)
+            {
+                var x = RemoteComputers[i];
+                if (x == null)
+                    continue;
+                if (GalleryItemHasKey(x, key))
+                    hits++;
+                if (hits > 1)
+                    return false;
+            }
+            return hits == 1 && GalleryItemHasKey(item, key);
+        }
+
+        private static bool GalleryItemHasKey(RemoteComputerItemViewModel item, string key)
+        {
+            if (item == null || string.IsNullOrWhiteSpace(key))
+                return false;
+            return RemotePcStatusMapper.SameKey(item.IpAddress, key)
+                || RemotePcStatusMapper.SameKey(item.PcName, key)
+                || RemotePcStatusMapper.SameKey(item.HostAddress, key);
+        }
+
+        private static bool UsageLogBelongsToItem(RemoteComputerItemViewModel item, RemotePcUsageLogDto dto)
+        {
+            if (item == null || dto == null)
+                return false;
+            if (!string.IsNullOrWhiteSpace(dto.RemotePcName)
+                && !RemotePcStatusMapper.SameKey(dto.RemotePcName, item.PcName)
+                && !RemotePcStatusMapper.SameKey(dto.RemotePcName, item.IpAddress))
+                return false;
+            return RemotePcStatusMapper.SameKey(dto.RemoteAccessIpAddress, item.IpAddress)
+                || RemotePcStatusMapper.SameKey(dto.RemoteAccessIpAddress, item.PcName)
+                || RemotePcStatusMapper.SameKey(dto.RemoteAccessIpAddress, item.HostAddress)
+                || RemotePcStatusMapper.SameKey(dto.RemotePcName, item.PcName);
         }
 
         private void ApplyRecentUsageLogs(int generation, IList<RemotePcUsageLogDto> logs)
@@ -944,6 +1560,7 @@ namespace GBCWorkHub.UI.ViewModels
 
             RecentUsageLogs = next;
             RaisePropertyChanged("RecentUsageLogs");
+            RaisePropertyChanged("HasRecentUsageLogs");
         }
 
         private static string TokenPrefix(string token)
@@ -978,9 +1595,10 @@ namespace GBCWorkHub.UI.ViewModels
                 RecordId = localRecordId,
                 EventId = info.WasConnectionConfirmed ? 24 : 0,
                 EventTime = info.EndedAt.ToString("yyyy-MM-dd HH:mm:ss"),
-                User = string.IsNullOrWhiteSpace(RemoteWindowsUser) || RemoteWindowsUser == "-"
-                    ? Environment.UserName
-                    : RemoteWindowsUser,
+                User = OccupancyNameStore.TryGet()
+                    ?? (string.IsNullOrWhiteSpace(RemoteWindowsUser) || RemoteWindowsUser == "-"
+                        ? Environment.UserName
+                        : RemoteWindowsUser),
                 SessionId = string.Empty,
                 SourceIp = string.Empty,
                 EventDescription = info.WasConnectionConfirmed ? "연결 해제(로컬)" : "접속 취소(로컬)"
@@ -1043,14 +1661,20 @@ namespace GBCWorkHub.UI.ViewModels
                         continue;
 
                     RemoteComputerItemViewModel existing = null;
-                    if (hasIp)
-                        existing = FindGalleryItemByIp(dto.IpAddress.Trim());
-                    if (existing == null && hasName)
+                    if (hasName)
                     {
                         existing = RemoteComputers.FirstOrDefault(x =>
                             x != null
                             && string.Equals(x.PcName, dto.PcName.Trim(), StringComparison.OrdinalIgnoreCase)
                             && string.Equals(x.SiteCode ?? site, dto.HospitalCode ?? site, StringComparison.OrdinalIgnoreCase));
+                    }
+                    if (existing == null && hasIp)
+                    {
+                        string ip = dto.IpAddress.Trim();
+                        var byIp = RemoteComputers.Where(x =>
+                            x != null && string.Equals(x.IpAddress, ip, StringComparison.OrdinalIgnoreCase)).ToList();
+                        if (byIp.Count == 1)
+                            existing = byIp[0];
                     }
 
                     if (existing != null)
@@ -1059,6 +1683,12 @@ namespace GBCWorkHub.UI.ViewModels
                             existing.PcName = dto.PcName.Trim();
                         if (hasIp)
                             existing.IpAddress = dto.IpAddress.Trim();
+                        if (!string.IsNullOrWhiteSpace(dto.HostAddress))
+                            existing.HostAddress = dto.HostAddress.Trim();
+                        existing.GroupName = dto.GroupName;
+                        existing.PcDomain = dto.PcDomain;
+                        existing.PcNote = dto.PcNote;
+                        existing.PcComment = dto.PcComment;
                         existing.SiteCode = dto.HospitalCode ?? site;
                         existing.CurrentLocalUser = localUser;
                         continue;
@@ -1069,6 +1699,9 @@ namespace GBCWorkHub.UI.ViewModels
 
                 RecalculateStatusCounts();
                 RefreshGalleryFilter();
+                RefreshSiteShortcutCounts(_lastOccupancy);
+                if (SelectedRemoteComputer != null)
+                    RebuildSelectedPcAccessPanel();
             });
         }
 
@@ -1079,53 +1712,69 @@ namespace GBCWorkHub.UI.ViewModels
 
             string localUser = RemotePcShareBiz.LocalUserAccount;
             string site = SelectedSiteCode;
+            _lastOccupancy = list;
 
             RunOnUi(() =>
             {
                 foreach (var status in list)
                 {
-                    if (status == null || string.IsNullOrWhiteSpace(status.RemoteAccessIpAddress))
-                        continue;
-
-                    // DB SITE_CD 가 있으면 현재 사이트와 다를 때 무시
-                    if (!string.IsNullOrWhiteSpace(status.SiteCode)
-                        && !string.Equals(status.SiteCode, site, StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    string ip = status.RemoteAccessIpAddress.Trim();
-                    var item = FindGalleryItemByIp(ip);
-                    if (item == null)
-                    {
-                        // 사이트 시드에 없는 IP는 현재 사이트 화면에 강제 추가하지 않음
-                        continue;
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(item.SiteCode)
-                        && !string.Equals(item.SiteCode, site, StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    if (string.IsNullOrWhiteSpace(item.SiteCode) && !string.IsNullOrWhiteSpace(status.SiteCode))
-                        item.SiteCode = status.SiteCode.Trim().ToUpperInvariant();
-
-                    bool isLocalActive = isLocalActiveFn != null && isLocalActiveFn(ip);
-
-                    // 로컬이 접속 추적 중일 때 DB가 아직 AVAILABLE이면 카드 덮어쓰지 않음(레이스).
-                    // 그 외(CONNECTING/IN_USE/AVAILABLE 확정)는 항상 DB 반영.
-                    if (isLocalActive
-                        && string.Equals(status.AccessStatusCode, RemotePcDbStatuses.Available, StringComparison.OrdinalIgnoreCase)
-                        && (item.IsConnecting || item.IsInUse))
-                    {
-                        item.CurrentLocalUser = localUser;
-                    }
-                    else
-                    {
-                        item.ApplyFromDb(status, localUser);
-                    }
+                    if (IsOccupancyAvailable(status))
+                        ApplyOccupancyStatusToGallery(status, site, localUser, isLocalActiveFn);
+                }
+                foreach (var status in list)
+                {
+                    if (!IsOccupancyAvailable(status))
+                        ApplyOccupancyStatusToGallery(status, site, localUser, isLocalActiveFn);
                 }
 
                 RecalculateStatusCounts();
                 RefreshGalleryFilter();
+                RefreshSiteShortcutCounts(list);
             });
+        }
+
+        private static bool IsOccupancyAvailable(RemotePcStatus status)
+        {
+            return status == null
+                || string.Equals(status.AccessStatusCode, RemotePcDbStatuses.Available, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void ApplyOccupancyStatusToGallery(
+            RemotePcStatus status,
+            string site,
+            string localUser,
+            Func<string, bool> isLocalActiveFn)
+        {
+            if (status == null || string.IsNullOrWhiteSpace(status.RemoteAccessIpAddress))
+                return;
+
+            if (!string.IsNullOrWhiteSpace(status.SiteCode)
+                && !string.Equals(status.SiteCode, site, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            string ip = status.RemoteAccessIpAddress.Trim();
+            var item = FindGalleryItemForOccupancy(status);
+            if (item == null)
+                return;
+
+            if (!string.IsNullOrWhiteSpace(item.SiteCode)
+                && !string.Equals(item.SiteCode, site, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            if (string.IsNullOrWhiteSpace(item.SiteCode) && !string.IsNullOrWhiteSpace(status.SiteCode))
+                item.SiteCode = status.SiteCode.Trim().ToUpperInvariant();
+
+            bool isLocalActive = isLocalActiveFn != null && isLocalActiveFn(ip);
+
+            if (isLocalActive
+                && string.Equals(status.AccessStatusCode, RemotePcDbStatuses.Available, StringComparison.OrdinalIgnoreCase)
+                && (item.IsConnecting || item.IsInUse))
+            {
+                item.CurrentLocalUser = localUser;
+                return;
+            }
+
+            item.ApplyFromDb(status, localUser);
         }
 
         private RemoteComputerItemViewModel FindGalleryItemByIp(string ip)
@@ -1133,17 +1782,73 @@ namespace GBCWorkHub.UI.ViewModels
             return FindGalleryItemByShareKey(ip);
         }
 
-        /// <summary>점유 키로 갤러리 항목 찾기 (IP 또는 RC PC명).</summary>
+        /// <summary>점유 키로 갤러리 항목 찾기 (IP 또는 RC PC명). 키가 여러 카드에 겹치면 붙이지 않음.</summary>
         private RemoteComputerItemViewModel FindGalleryItemByShareKey(string shareKey)
         {
             if (string.IsNullOrWhiteSpace(shareKey) || RemoteComputers == null)
                 return null;
 
             string key = shareKey.Trim();
-            return RemoteComputers.FirstOrDefault(x =>
-                x != null
-                && (string.Equals(x.IpAddress, key, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(x.PcName, key, StringComparison.OrdinalIgnoreCase)));
+            return UniqueGalleryMatch(x => RemotePcStatusMapper.SameKey(x.PcName, key))
+                ?? UniqueGalleryMatch(x => RemotePcStatusMapper.SameKey(x.IpAddress, key))
+                ?? UniqueGalleryMatch(x => RemotePcStatusMapper.SameKey(x.HostAddress, key));
+        }
+
+        private RemoteComputerItemViewModel FindGalleryItemForOccupancy(RemotePcStatus status)
+        {
+            if (status == null || RemoteComputers == null)
+                return null;
+
+            string name = string.IsNullOrWhiteSpace(status.RemotePcName) ? null : status.RemotePcName.Trim();
+            string key = string.IsNullOrWhiteSpace(status.RemoteAccessIpAddress)
+                ? null
+                : status.RemoteAccessIpAddress.Trim();
+
+            RemoteComputerItemViewModel byName = null;
+            if (!string.IsNullOrWhiteSpace(name))
+                byName = UniqueGalleryMatch(x => RemotePcStatusMapper.SameKey(x.PcName, name));
+            if (byName != null)
+                return byName;
+
+            if (!string.IsNullOrWhiteSpace(key))
+            {
+                var byKeyAsName = UniqueGalleryMatch(x => RemotePcStatusMapper.SameKey(x.PcName, key));
+                if (byKeyAsName != null)
+                    return byKeyAsName;
+
+                var byShare = UniqueGalleryMatch(x => RemotePcStatusMapper.SameKey(x.IpAddress, key));
+                if (byShare != null)
+                {
+                    if (string.IsNullOrWhiteSpace(name) || RemotePcStatusMapper.SameKey(byShare.PcName, name))
+                        return byShare;
+                    return null;
+                }
+
+                var byHost = UniqueGalleryMatch(x => RemotePcStatusMapper.SameKey(x.HostAddress, key));
+                if (byHost != null
+                    && (string.IsNullOrWhiteSpace(name) || RemotePcStatusMapper.SameKey(byHost.PcName, name)))
+                    return byHost;
+            }
+
+            return null;
+        }
+
+        private RemoteComputerItemViewModel UniqueGalleryMatch(Func<RemoteComputerItemViewModel, bool> predicate)
+        {
+            if (RemoteComputers == null || predicate == null)
+                return null;
+
+            RemoteComputerItemViewModel found = null;
+            for (int i = 0; i < RemoteComputers.Count; i++)
+            {
+                var x = RemoteComputers[i];
+                if (x == null || !predicate(x))
+                    continue;
+                if (found != null)
+                    return null;
+                found = x;
+            }
+            return found;
         }
 
         private void UpdateGalleryItemFromStatus(RemotePcStatus status)
@@ -1153,7 +1858,7 @@ namespace GBCWorkHub.UI.ViewModels
 
             RunOnUi(() =>
             {
-                var item = FindGalleryItemByIp(status.RemoteAccessIpAddress);
+                var item = FindGalleryItemForOccupancy(status);
                 if (item == null)
                     return;
                 item.ApplyFromDb(status, RemotePcShareBiz.LocalUserAccount);
@@ -1234,6 +1939,115 @@ namespace GBCWorkHub.UI.ViewModels
             InUseCount = inUse;
             CheckRequiredCount = check;
             RaisePropertyChanged("TotalCountDisplay");
+            UpdateCurrentSiteShortcutAvailableCount();
+        }
+
+        private void SyncSiteShortcutSelection()
+        {
+            if (_siteShortcuts == null)
+                return;
+            foreach (var row in _siteShortcuts)
+            {
+                if (row == null)
+                    continue;
+                row.IsCurrent = !string.IsNullOrWhiteSpace(SelectedSiteCode)
+                    && string.Equals(row.SiteCode, SelectedSiteCode, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        private void UpdateCurrentSiteShortcutAvailableCount()
+        {
+            if (_siteShortcuts == null || string.IsNullOrWhiteSpace(SelectedSiteCode))
+                return;
+            foreach (var row in _siteShortcuts)
+            {
+                if (row == null)
+                    continue;
+                if (string.Equals(row.SiteCode, SelectedSiteCode, StringComparison.OrdinalIgnoreCase))
+                {
+                    row.AvailableCount = AvailableCount;
+                    row.IsCurrent = true;
+                }
+            }
+        }
+
+        private void RefreshSiteShortcutCounts(IList<RemotePcStatus> occupancy)
+        {
+            if (_siteShortcuts == null)
+                return;
+
+            foreach (var row in _siteShortcuts)
+            {
+                if (row == null || string.IsNullOrWhiteSpace(row.SiteCode))
+                    continue;
+
+                bool isCurrent = !string.IsNullOrWhiteSpace(SelectedSiteCode)
+                    && string.Equals(row.SiteCode, SelectedSiteCode, StringComparison.OrdinalIgnoreCase);
+                row.IsCurrent = isCurrent;
+
+                if (isCurrent)
+                {
+                    row.AvailableCount = AvailableCount;
+                    continue;
+                }
+
+                if (!row.IsEnabled)
+                {
+                    row.AvailableCount = 0;
+                    continue;
+                }
+
+                var pcs = GetCachedSitePcs(row.SiteCode);
+                int available = 0;
+                if (pcs != null)
+                {
+                    foreach (var pc in pcs)
+                    {
+                        if (IsPcAvailableInOccupancy(pc, occupancy))
+                            available++;
+                    }
+                }
+                row.AvailableCount = available;
+            }
+        }
+
+        private List<RemotePcDto> GetCachedSitePcs(string siteCode)
+        {
+            if (string.IsNullOrWhiteSpace(siteCode))
+                return new List<RemotePcDto>();
+
+            string key = siteCode.Trim().ToUpperInvariant();
+            List<RemotePcDto> cached;
+            if (_sitePcCache.TryGetValue(key, out cached) && cached != null)
+                return cached;
+
+            cached = _remotePcBiz.GetRemotePcListBySite(key) ?? new List<RemotePcDto>();
+            _sitePcCache[key] = cached;
+            return cached;
+        }
+
+        private static bool IsPcAvailableInOccupancy(RemotePcDto pc, IList<RemotePcStatus> occupancy)
+        {
+            if (pc == null)
+                return false;
+            if (occupancy == null || occupancy.Count == 0)
+                return true;
+
+            string site = pc.HospitalCode;
+            foreach (var status in occupancy)
+            {
+                if (status == null)
+                    continue;
+                if (!string.IsNullOrWhiteSpace(status.SiteCode)
+                    && !string.IsNullOrWhiteSpace(site)
+                    && !string.Equals(status.SiteCode, site, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (!RemotePcStatusMapper.StatusFitsPc(status, pc.PcName, pc.IpAddress, pc.HostAddress))
+                    continue;
+                if (!IsOccupancyAvailable(status))
+                    return false;
+            }
+            return true;
         }
 
         private bool FilterRemoteComputer(object obj)
@@ -1260,9 +2074,19 @@ namespace GBCWorkHub.UI.ViewModels
                 return true;
 
             return ContainsIgnoreCase(item.PcName, q)
-                || ContainsIgnoreCase(item.IpAddress, q)
+                || ContainsIgnoreCase(item.HostAddress, q)
+                || ContainsIgnoreCase(item.DisplayTitle, q)
+                || ContainsIgnoreCase(item.DisplaySubtitle, q)
+                || ContainsIgnoreCase(item.SiteCode, q)
+                || ContainsIgnoreCase(item.StatusCode, q)
+                || ContainsIgnoreCase(item.StatusDisplayName, q)
+                || ContainsIgnoreCase(item.SimpleStatusText, q)
                 || ContainsIgnoreCase(item.AccessUserId, q)
-                || ContainsIgnoreCase(item.AccessPcName, q);
+                || ContainsIgnoreCase(item.AccessPcName, q)
+                || ContainsIgnoreCase(item.OccupantText, q)
+                || ContainsIgnoreCase(item.UserDisplayText, q)
+                || ContainsIgnoreCase(item.GroupName, q)
+                || (LooksLikeIpv4(item.IpAddress) && ContainsIgnoreCase(item.IpAddress, q));
         }
 
         private static bool ContainsIgnoreCase(string source, string query)
@@ -1272,10 +2096,53 @@ namespace GBCWorkHub.UI.ViewModels
             return source.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
+        private static bool LooksLikeIpv4(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+            string[] parts = value.Trim().Split('.');
+            if (parts.Length != 4)
+                return false;
+            for (int i = 0; i < parts.Length; i++)
+            {
+                int n;
+                if (!int.TryParse(parts[i], out n) || n < 0 || n > 255)
+                    return false;
+            }
+            return true;
+        }
+
         private void RefreshGalleryFilter()
         {
             if (_filteredRemoteComputers != null)
                 _filteredRemoteComputers.Refresh();
+            RebuildGalleryGroups();
+        }
+
+        private void RebuildGalleryGroups()
+        {
+            if (_galleryGroups == null)
+                return;
+
+            _galleryGroups.Clear();
+            if (_filteredRemoteComputers == null)
+                return;
+
+            RemotePcTeamGroupViewModel current = null;
+            foreach (RemoteComputerItemViewModel item in _filteredRemoteComputers)
+            {
+                if (item == null)
+                    continue;
+
+                string name = item.GroupName ?? string.Empty;
+                if (current == null || !string.Equals(current.Name, name, StringComparison.Ordinal))
+                {
+                    current = new RemotePcTeamGroupViewModel(name);
+                    _galleryGroups.Add(current);
+                }
+
+                current.Computers.Add(item);
+            }
         }
 
         private void SelectStatusFilter(string filter)
@@ -1298,6 +2165,25 @@ namespace GBCWorkHub.UI.ViewModels
             SelectedRemoteComputer = item;
         }
 
+        private async Task ActivateRemoteComputerAsync(RemoteComputerItemViewModel item)
+        {
+            if (item == null)
+                return;
+
+            if (_selectedRemoteComputer == item)
+            {
+                await ExecutePrimaryActionAsync(item).ConfigureAwait(true);
+                return;
+            }
+
+            SelectRemoteComputer(item);
+        }
+
+        public void ClearRemoteComputerSelection()
+        {
+            SelectedRemoteComputer = null;
+        }
+
         private void SyncDetailPanelFromSelected()
         {
             var item = SelectedRemoteComputer;
@@ -1307,7 +2193,7 @@ namespace GBCWorkHub.UI.ViewModels
             AssignAlways(ref _remoteComputerName, item.DisplayTitle, "RemoteComputerName");
             AssignAlways(ref _currentStatus, item.StatusDisplayName, "CurrentStatus");
             if (!string.IsNullOrWhiteSpace(item.AccessUserId))
-                AssignAlways(ref _workHubUserAccount, item.AccessUserId, "WorkHubUserAccount");
+                AssignAlways(ref _workHubUserAccount, OccupancyNameStore.ToDisplayName(item.AccessUserId, item.AccessPcName), "WorkHubUserAccount");
             if (!string.IsNullOrWhiteSpace(item.AccessPcName))
                 AssignAlways(ref _workHubClientPc, item.AccessPcName, "WorkHubClientPc");
             ConnectionRequestedAt = FormatTs(item.AccessStartAt);
@@ -1339,11 +2225,9 @@ namespace GBCWorkHub.UI.ViewModels
 
             if (item.IsOwnedByOtherUser)
             {
-                await ShowInfoPopupAsync("원격 접속",
-                    "현재 다른 사용자가 이 원격 PC를 사용 중입니다.\n사용자: "
-                        + RemoteComputerItemViewModel.FormatUserId(item.AccessUserId)
-                        + "\n접속 PC: " + (item.AccessPcName ?? "-")).ConfigureAwait(true);
-                return;
+                if (!await ConfirmTakeoverAsync(item).ConfigureAwait(true))
+                    return;
+                _session.AllowTakeoverOnce(GetShareKey(item));
             }
 
             if (item.IsConnecting && item.IsOwnedByCurrentUser)
@@ -1488,6 +2372,42 @@ namespace GBCWorkHub.UI.ViewModels
             }).ConfigureAwait(true);
         }
 
+        private static string GetShareKey(RemoteComputerItemViewModel item)
+        {
+            if (item == null)
+                return null;
+            if (!string.IsNullOrWhiteSpace(item.IpAddress))
+                return item.IpAddress.Trim();
+            return string.IsNullOrWhiteSpace(item.PcName) ? null : item.PcName.Trim();
+        }
+
+        private async Task<bool> ConfirmTakeoverAsync(RemoteComputerItemViewModel item)
+        {
+            string who = RemoteComputerItemViewModel.FormatUserId(item.AccessUserId, item.AccessPcName);
+            if (string.IsNullOrWhiteSpace(who) || who == "-")
+                who = "다른 사용자";
+            string target = OccupancyTakeoverMessage.FormatTarget(item.SiteCode, item.PcName);
+
+            if (_popup == null)
+                return false;
+
+            var result = await _popup.ShowConfirmAsync(new PopupRequest
+            {
+                Title = "점유 가져가기",
+                Message = "현재 " + who + "님이 " + target + "을 사용 중입니다.\n점유를 가져가시겠습니까?",
+                Detail = "가져가면 상대방 Work Hub에 알림이 표시됩니다.",
+                Icon = PopupIconKind.Warning,
+                Kind = PopupKind.Confirm,
+                Buttons = new List<PopupButtonDefinition>
+                {
+                    new PopupButtonDefinition("취소", PopupResultType.Cancel, isCancel: true),
+                    new PopupButtonDefinition("가져가기", PopupResultType.Primary, isDefault: true)
+                }
+            }).ConfigureAwait(true);
+
+            return result != null && result.IsPrimary;
+        }
+
         private void ApplySharedStatusToUi(RemotePcStatus status, bool overwriteLocalStatus, bool isTracking)
         {
             if (status == null)
@@ -1504,7 +2424,7 @@ namespace GBCWorkHub.UI.ViewModels
             }
 
             if (!string.IsNullOrWhiteSpace(status.AccessUserId))
-                WorkHubUserAccount = status.AccessUserId;
+                WorkHubUserAccount = OccupancyNameStore.ToDisplayName(status.AccessUserId, status.AccessPcName);
             if (!string.IsNullOrWhiteSpace(status.AccessPcName))
                 WorkHubClientPc = status.AccessPcName;
             if (!string.IsNullOrWhiteSpace(status.RemotePcName))
@@ -1549,6 +2469,14 @@ namespace GBCWorkHub.UI.ViewModels
             return WorkHubUserProfile.LocalIp;
         }
 
+        public void RefreshLocalIdentity()
+        {
+            WorkHubUserAccount = RemotePcShareBiz.LocalUserAccount;
+            WorkHubClientPc = RemotePcShareBiz.LocalClientPc;
+            LocalAccessIp = RemotePcShareBiz.LocalAccessIp ?? "-";
+            ApplyWorkHubUserToSession();
+        }
+
         public void ApplyWorkHubUserToSessionPublic()
         {
             ApplyWorkHubUserToSession();
@@ -1566,15 +2494,13 @@ namespace GBCWorkHub.UI.ViewModels
             }
 
             ctx.ClientLocalIp = localIp;
-            if (string.IsNullOrWhiteSpace(ctx.CurrentUserId))
-                ctx.CurrentUserId = Environment.UserDomainName + "\\" + Environment.UserName;
-            if (string.IsNullOrWhiteSpace(ctx.CurrentUserName))
-                ctx.CurrentUserName = Environment.UserName;
+            ctx.CurrentUserId = RemotePcShareBiz.LocalUserAccount;
+            ctx.CurrentUserName = RemotePcShareBiz.LocalUserAccount;
         }
 
         private static string FormatTs(DateTime? value)
         {
-            return value.HasValue ? value.Value.ToString("yyyy-MM-dd HH:mm:ss") : "-";
+            return KoreaTime.Format(value, "yyyy-MM-dd HH:mm:ss");
         }
 
         private static int ReadIntSetting(string key, int defaultValue)
@@ -1708,6 +2634,75 @@ namespace GBCWorkHub.UI.ViewModels
             }
             public override Task PopupShowInfoAsync(string title, string message)
             { return _vm.ShowInfoPopupAsync(title, message); }
+        }
+    }
+
+    public sealed class SiteShortcutItemViewModel : ViewModelBase
+    {
+        private int _availableCount;
+        private bool _isCurrent;
+
+        public SiteShortcutItemViewModel(string siteCode, bool isEnabled)
+        {
+            SiteCode = siteCode ?? string.Empty;
+            IsEnabled = isEnabled;
+        }
+
+        public string SiteCode { get; private set; }
+        public bool IsEnabled { get; private set; }
+
+        public int AvailableCount
+        {
+            get { return _availableCount; }
+            set { SetProperty(ref _availableCount, value); }
+        }
+
+        public bool IsCurrent
+        {
+            get { return _isCurrent; }
+            set { SetProperty(ref _isCurrent, value); }
+        }
+    }
+
+    public sealed class RemotePcTeamGroupViewModel
+    {
+        public RemotePcTeamGroupViewModel(string name)
+        {
+            Name = name ?? string.Empty;
+            Computers = new ObservableCollection<RemoteComputerItemViewModel>();
+        }
+
+        public string Name { get; private set; }
+
+        public bool HasName
+        {
+            get { return !string.IsNullOrWhiteSpace(Name); }
+        }
+
+        public ObservableCollection<RemoteComputerItemViewModel> Computers { get; private set; }
+    }
+
+    internal sealed class RemotePcGalleryComparer : IComparer
+    {
+        public int Compare(object x, object y)
+        {
+            var a = x as RemoteComputerItemViewModel;
+            var b = y as RemoteComputerItemViewModel;
+            int g = PcNameNaturalSort.CompareGroup(
+                a != null ? a.GroupName : null,
+                b != null ? b.GroupName : null);
+            if (g != 0)
+                return g;
+            return PcNameNaturalSort.Compare(NameOf(a), NameOf(b));
+        }
+
+        private static string NameOf(RemoteComputerItemViewModel item)
+        {
+            if (item == null)
+                return string.Empty;
+            if (!string.IsNullOrWhiteSpace(item.PcName))
+                return item.PcName.Trim();
+            return string.Empty;
         }
     }
 }

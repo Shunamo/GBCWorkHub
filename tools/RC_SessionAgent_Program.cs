@@ -1,8 +1,10 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Net;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
@@ -11,11 +13,21 @@ namespace GBCWorkHub.SessionAgent
 {
     internal static class Program
     {
-        // ----- RC Team Explorer 기준 (필요 시 여기만 수정) -----
-        // RC 원격망: rch-tfs-01 / BESTCare_RCHSP_20170628
+        // ----- RC Team Explorer (HO-BCARE-07). 다른 PC는 C:\GBCWorkHub\TfsSettings.txt -----
+        // 브라우저: http://rch-tfs-01:8080/tfs/BESTCare_RCHSP_20170628/HIS.MS.CS.PH
         private const string TfsCollectionUrl = "http://rch-tfs-01:8080/tfs/BESTCare_RCHSP_20170628";
-        // Source Control 루트. 없으면 $/ 로 폴백
-        private const string TfsServerPath = "$/HISSolutions";
+        private const string TfsServerPath = "$/HIS.MS.CS.PH";
+        // TFS 전용 계정. RDP whoami(RCHSP\sukhoonyoon) 넣으면 TF30063.
+        // Team Explorer 연결 캐시가 있으면 여기 비워 둬도 됨. git에 비밀번호 넣지 말 것.
+        private const string TfsAuthUser = @"";
+        private const string TfsAuthPassword = "";
+        private const string TfsSettingsFileName = "TfsSettings.txt";
+        private const string TfsPasswordFileName = "TfsPassword.txt";
+        // REST(_apis) 404인 RC는 Team Explorer OM QueryHistory 사용 (Aurora와 동일)
+        private const string TfsClientDllDefault =
+            @"C:\Windows\Microsoft.NET\assembly\GAC_MSIL\Microsoft.TeamFoundation.Client\v4.0_12.0.0.0__b03f5f7f11d50a3a\Microsoft.TeamFoundation.Client.dll";
+        private const string TfsVersionControlDllDefault =
+            @"C:\Windows\Microsoft.NET\assembly\GAC_MSIL\Microsoft.TeamFoundation.VersionControl.Client\v4.0_12.0.0.0__b03f5f7f11d50a3a\Microsoft.TeamFoundation.VersionControl.Client.dll";
         // 세션 구간 내 체크인 전부 (안전상한)
         private const int TfsMaxChangesets = 100;
         // 세션 구간 0건일 때: 오늘(로컬 자정~현재) 동일 계정 체크인 폴백 상한
@@ -26,8 +38,16 @@ namespace GBCWorkHub.SessionAgent
         private const string TfsPrefix = "GBCWORKHUB_TFS::";
         private const string SyncRequestPrefix = "GBCWORKHUB_TFS_SYNC_REQUEST::";
         private const string AckPrefix = "GBCWORKHUB_ACK::";
+        private const string SessionTokenPrefix = "GBCWORKHUB_SESSION_TOKEN::";
+        private const string SessionResultPrefix = "GBCWORKHUB_SESSION_RESULT::";
         private const string PendingTfsFileName = "PendingTfsRecent.json";
         private const string SessionStartedFileName = "SessionStartedUtc.txt";
+
+        private static string _resolvedCollectionUrl;
+        private static string _resolvedServerPath;
+        private static string _resolvedTfsUser;
+        private static string _resolvedTfsPassword;
+        private static bool _tfsSettingsLoaded;
 
         [STAThread]
         private static void Main(string[] args)
@@ -67,53 +87,48 @@ namespace GBCWorkHub.SessionAgent
         }
 
         /// <summary>
-        /// 1) CONNECT 상태 전송
-        /// 2) SYNC_REQUEST(가져오기 팝업)를 읽으면 Pending/수집 TFS 전송. 없으면 CONNECT만.
+        /// 1) SYNC가 없으면 CONNECT만 쓰고 복원. 있으면 CONNECT로 덮지 않음.
+        /// 2) SYNC_REQUEST(가져오기)면 Pending/수집 TFS 전송.
         /// </summary>
         private static void HandleConnect(string logDirectory)
         {
             string pendingPath = Path.Combine(BaseDirectory, PendingTfsFileName);
             bool hasPending = File.Exists(pendingPath);
 
-            // CONNECT 쓰기 전에 SYNC_REQUEST가 이미 있으면 먼저 확보 (덮어쓰기 방지)
             string requestId = null;
             DateTime? syncStartedUtc = null;
             DateTime? syncEndedUtc = null;
-            bool hasSyncRequest = TryReadSyncRequest(out requestId, out syncStartedUtc, out syncEndedUtc);
-            if (!hasSyncRequest)
-            {
-                for (int i = 0; i < 10 && !hasSyncRequest; i++)
-                {
-                    Thread.Sleep(300);
-                    hasSyncRequest = TryReadSyncRequest(out requestId, out syncStartedUtc, out syncEndedUtc);
-                }
-            }
+            bool hasSyncRequest = TryReadTargetedSyncRequest(
+                out requestId, out syncStartedUtc, out syncEndedUtc);
 
             DateTime now = DateTime.Now;
             string connectJson = BuildRdpStatusJson(
                 eventId: 21,
                 triggerType: "RC_CONNECT",
                 sessionRaw: "rdp-tcp#0 Active",
-
-                
                 isVerifiedDisconnect: null,
                 now: now);
 
             TryWriteText(Path.Combine(BaseDirectory, "LastStatus.json"), connectJson);
-            TryCopyToClipboard(RdpPrefix + connectJson);
 
-            // 접속 후 로컬이 SYNC_REQUEST를 다시 쓸 수 있음 → 추가 대기
             if (!hasSyncRequest)
             {
-                const int syncWaitSec = 60;
+                TryCopyToClipboard(RdpPrefix + connectJson);
+                const int syncWaitSec = 50;
                 AppendAgentLog(logDirectory,
-                    "CONNECT_STATUS_SENT | wait SYNC_REQUEST up to " + syncWaitSec
+                    "CONNECT_STATUS_SENT | restore then wait SYNC_REQUEST up to " + syncWaitSec
                     + "s pending=" + hasPending);
                 for (int i = 0; i < syncWaitSec && !hasSyncRequest; i++)
                 {
                     Thread.Sleep(1000);
-                    hasSyncRequest = TryReadSyncRequest(out requestId, out syncStartedUtc, out syncEndedUtc);
+                    hasSyncRequest = TryReadTargetedSyncRequest(
+                        out requestId, out syncStartedUtc, out syncEndedUtc);
                 }
+            }
+            else
+            {
+                AppendAgentLog(logDirectory,
+                    "CONNECT_SYNC_ALREADY | skip CONNECT clipboard requestId=" + (requestId ?? "-"));
             }
 
             if (!hasSyncRequest)
@@ -128,9 +143,8 @@ namespace GBCWorkHub.SessionAgent
 
             AppendAgentLog(logDirectory,
                 "CONNECT_SYNC_REQUEST_OK | requestId=" + (requestId ?? "-")
-                + " pending=" + File.Exists(pendingPath));
-
-            Thread.Sleep(1200);
+                + " pending=" + File.Exists(pendingPath)
+                + " | keep SYNC_REQUEST until TFS");
 
             string tfsJson = null;
             string source = null;
@@ -162,6 +176,7 @@ namespace GBCWorkHub.SessionAgent
                 if (string.IsNullOrWhiteSpace(tfsJson))
                 {
                     AppendAgentLog(logDirectory, "CONNECT_TFS_FAILED | " + (err ?? "unknown"));
+                    TryCopyToClipboard(RdpPrefix + connectJson);
                     return;
                 }
             }
@@ -277,7 +292,8 @@ namespace GBCWorkHub.SessionAgent
                 ServicePointManager.SecurityProtocol =
                     SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
 
-                string collectionUrl = TfsCollectionUrl.Trim().TrimEnd('/');
+                string collectionUrl = GetTfsCollectionUrl();
+                string serverPath = GetTfsServerPath();
                 string author = Environment.UserDomainName + "\\" + Environment.UserName;
 
                 DateTime fromUtc;
@@ -285,10 +301,118 @@ namespace GBCWorkHub.SessionAgent
                 string windowSource;
                 ResolveCollectWindow(sessionStartedUtc, sessionEndedUtc, out fromUtc, out toUtc, out windowSource);
                 AppendAgentLog(logDirectory,
-                    "TFS_COLLECT_START | url=" + collectionUrl
+                    "TFS_COLLECT_START | mode=TFS_OM url=" + collectionUrl
+                    + " path=" + serverPath
                     + " author=" + author
                     + " window=" + FormatUtcForApi(fromUtc) + "~" + FormatUtcForApi(toUtc)
                     + " source=" + windowSource);
+
+                string omError;
+                string authorizedUserId;
+                var changesetJsonParts = new List<string>();
+                bool omOk = TryCollectViaTfsOm(
+                    collectionUrl,
+                    serverPath,
+                    fromUtc.ToLocalTime(),
+                    toUtc.ToLocalTime(),
+                    TfsMaxChangesets,
+                    logDirectory,
+                    changesetJsonParts,
+                    out authorizedUserId,
+                    out omError);
+
+                string queryMode = "SESSION_WINDOW";
+                if (omOk)
+                {
+                    if (changesetJsonParts.Count == 0)
+                    {
+                        AppendAgentLog(logDirectory,
+                            "TFS_COLLECT_EMPTY_WINDOW | fallback=TODAY_FALLBACK"
+                            + " localDay=" + DateTime.Today.ToString("yyyy-MM-dd"));
+                        string fbErr;
+                        string fbUser;
+                        var fbParts = new List<string>();
+                        bool fbOk = TryCollectViaTfsOm(
+                            collectionUrl,
+                            serverPath,
+                            DateTime.Today,
+                            DateTime.Now.AddMinutes(1),
+                            TfsFallbackTodayMax,
+                            logDirectory,
+                            fbParts,
+                            out fbUser,
+                            out fbErr);
+                        if (fbOk && fbParts.Count > 0)
+                        {
+                            changesetJsonParts.AddRange(fbParts);
+                            queryMode = "TODAY_FALLBACK";
+                            if (!string.IsNullOrWhiteSpace(fbUser))
+                                authorizedUserId = fbUser;
+                            AppendAgentLog(logDirectory,
+                                "TFS_FALLBACK_DONE | count=" + changesetJsonParts.Count + " mode=TODAY_FALLBACK");
+                        }
+                        else
+                        {
+                            AppendAgentLog(logDirectory,
+                                "TFS_FALLBACK_FAILED | " + (fbErr ?? "empty"));
+                        }
+                    }
+
+                    if (string.IsNullOrWhiteSpace(authorizedUserId))
+                        authorizedUserId = author;
+
+                    string nowOm = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    string sessionStartOm = string.Equals(queryMode, "TODAY_FALLBACK", StringComparison.Ordinal)
+                        ? DateTime.Today.ToString("yyyy-MM-dd HH:mm:ss")
+                        : fromUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+                    string sessionEndOm = string.Equals(queryMode, "TODAY_FALLBACK", StringComparison.Ordinal)
+                        ? DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                        : toUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+                    string machineOm = Environment.MachineName;
+
+                    AppendAgentLog(logDirectory,
+                        "TFS_COLLECT_DONE | count=" + changesetJsonParts.Count
+                        + " mode=" + queryMode
+                        + " author=" + authorizedUserId
+                        + " window=" + sessionStartOm + "~" + sessionEndOm);
+
+                    var sbOm = new StringBuilder(4096);
+                    sbOm.Append('{');
+                    AppendJson(sbOm, "type", "GBC_TFS_RECENT_CHANGESETS").Append(',');
+                    AppendJson(sbOm, "schemaVersion", 1).Append(',');
+                    AppendJson(sbOm, "success", true).Append(',');
+                    sbOm.Append("\"errorCode\":null,\"message\":null,");
+                    AppendJson(sbOm, "collectionUrl", collectionUrl).Append(',');
+                    AppendJson(sbOm, "serverPath", serverPath).Append(',');
+                    AppendJson(sbOm, "queryMode", queryMode).Append(',');
+                    AppendJson(sbOm, "sessionStartAt", sessionStartOm).Append(',');
+                    AppendJson(sbOm, "sessionEndAt", sessionEndOm).Append(',');
+                    sbOm.Append("\"sessionToken\":null,");
+                    AppendJson(sbOm, "remoteComputerName", machineOm).Append(',');
+                    AppendJson(sbOm, "computerName", machineOm).Append(',');
+                    AppendJson(sbOm, "sourceClientName", Environment.GetEnvironmentVariable("CLIENTNAME")).Append(',');
+                    AppendJson(sbOm, "collectedAt", nowOm).Append(',');
+                    if (string.IsNullOrWhiteSpace(requestId))
+                        sbOm.Append("\"requestId\":null,");
+                    else
+                        AppendJson(sbOm, "requestId", requestId).Append(',');
+                    AppendJson(sbOm, "deliveryId", Guid.NewGuid().ToString("N")).Append(',');
+                    AppendJson(sbOm, "deliveryMode",
+                        string.IsNullOrWhiteSpace(deliveryMode) ? "DISCONNECT" : deliveryMode).Append(',');
+                    AppendJson(sbOm, "deliverySentAt", nowOm).Append(',');
+                    AppendJson(sbOm, "authorizedUserId", authorizedUserId).Append(',');
+                    AppendJson(sbOm, "returnedItemCount", changesetJsonParts.Count).Append(',');
+                    sbOm.Append("\"changesets\":[");
+                    for (int i = 0; i < changesetJsonParts.Count; i++)
+                    {
+                        if (i > 0) sbOm.Append(',');
+                        sbOm.Append(changesetJsonParts[i]);
+                    }
+                    sbOm.Append("]}");
+                    return sbOm.ToString();
+                }
+
+                AppendAgentLog(logDirectory, "TFS_OM_FAIL | fallback=REST | " + (omError ?? "unknown"));
 
                 string httpDetail;
                 string listUrl;
@@ -297,12 +421,11 @@ namespace GBCWorkHub.SessionAgent
 
                 if (string.IsNullOrEmpty(listJson))
                 {
-                    // 진단: 컬렉션/프로젝트가 보이는지
                     string probeDetail;
                     string projectsJson = HttpGet(
                         collectionUrl + "/_apis/projects?api-version=1.0",
                         out probeDetail);
-                    error = "changesets HTTP failed | author=" + author
+                    error = "TFS OM failed (" + (omError ?? "-") + ") and REST 404 | author=" + author
                         + " | url=" + listUrl
                         + " | " + (httpDetail ?? "no detail")
                         + " | projectsProbe=" + (probeDetail ?? "-")
@@ -313,7 +436,7 @@ namespace GBCWorkHub.SessionAgent
                 }
 
                 var changesetBlocks = ExtractObjectArray(listJson, "value");
-                var changesetJsonParts = new List<string>();
+                changesetJsonParts.Clear();
                 AppendChangesetParts(
                     collectionUrl,
                     changesetBlocks,
@@ -326,7 +449,7 @@ namespace GBCWorkHub.SessionAgent
                     logDirectory,
                     changesetJsonParts);
 
-                string queryMode = "SESSION_WINDOW";
+                queryMode = "SESSION_WINDOW";
                 DateTime todayFromUtc = DateTime.Today.ToUniversalTime();
                 DateTime todayToUtc = DateTime.UtcNow.AddMinutes(1);
                 if (changesetJsonParts.Count == 0)
@@ -389,7 +512,7 @@ namespace GBCWorkHub.SessionAgent
                 AppendJson(sb, "success", true).Append(',');
                 sb.Append("\"errorCode\":null,\"message\":null,");
                 AppendJson(sb, "collectionUrl", collectionUrl).Append(',');
-                AppendJson(sb, "serverPath", TfsServerPath).Append(',');
+                AppendJson(sb, "serverPath", serverPath).Append(',');
                 AppendJson(sb, "queryMode", queryMode).Append(',');
                 AppendJson(sb, "sessionStartAt", sessionStartLocal).Append(',');
                 AppendJson(sb, "sessionEndAt", sessionEndLocal).Append(',');
@@ -422,6 +545,803 @@ namespace GBCWorkHub.SessionAgent
                 error = ex.Message;
                 return null;
             }
+        }
+
+        private static string GetTfsCollectionUrl()
+        {
+            EnsureTfsSettingsLoaded();
+            return _resolvedCollectionUrl;
+        }
+
+        private static string GetTfsServerPath()
+        {
+            EnsureTfsSettingsLoaded();
+            return _resolvedServerPath;
+        }
+
+        private static void EnsureTfsSettingsLoaded()
+        {
+            if (_tfsSettingsLoaded)
+                return;
+
+            string collection = TfsCollectionUrl.Trim().TrimEnd('/');
+            string serverPath = TfsServerPath;
+            string user = null;
+            string password = null;
+            try
+            {
+                string file = Path.Combine(BaseDirectory, TfsSettingsFileName);
+                if (File.Exists(file))
+                {
+                    string[] lines = File.ReadAllLines(file, Encoding.UTF8);
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        string line = (lines[i] ?? string.Empty).Trim();
+                        if (line.Length == 0 || line.StartsWith("#", StringComparison.Ordinal))
+                            continue;
+                        int eq = line.IndexOf('=');
+                        if (eq > 0)
+                        {
+                            string key = line.Substring(0, eq).Trim();
+                            string value = line.Substring(eq + 1).Trim();
+                            if (string.Equals(key, "CollectionUrl", StringComparison.OrdinalIgnoreCase)
+                                || string.Equals(key, "Url", StringComparison.OrdinalIgnoreCase))
+                                collection = value;
+                            else if (string.Equals(key, "ServerPath", StringComparison.OrdinalIgnoreCase)
+                                || string.Equals(key, "Project", StringComparison.OrdinalIgnoreCase))
+                                serverPath = value;
+                            else if (string.Equals(key, "User", StringComparison.OrdinalIgnoreCase)
+                                || string.Equals(key, "UserName", StringComparison.OrdinalIgnoreCase)
+                                || string.Equals(key, "Account", StringComparison.OrdinalIgnoreCase))
+                                user = value;
+                            else if (string.Equals(key, "Password", StringComparison.OrdinalIgnoreCase))
+                                password = value;
+                        }
+                        else if (line.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                            || line.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                        {
+                            collection = line;
+                        }
+                        else if (line.StartsWith("$/", StringComparison.Ordinal))
+                        {
+                            serverPath = line;
+                        }
+                    }
+                }
+
+                if (string.IsNullOrEmpty(password))
+                {
+                    string pwFile = Path.Combine(BaseDirectory, TfsPasswordFileName);
+                    if (File.Exists(pwFile))
+                        password = (File.ReadAllText(pwFile) ?? string.Empty).Trim();
+                }
+            }
+            catch
+            {
+            }
+
+            SplitWebProjectUrl(ref collection, ref serverPath);
+            if (string.IsNullOrWhiteSpace(collection))
+                collection = TfsCollectionUrl.Trim().TrimEnd('/');
+            if (string.IsNullOrWhiteSpace(serverPath))
+                serverPath = TfsServerPath;
+            if (!serverPath.StartsWith("$/", StringComparison.Ordinal)
+                && serverPath.IndexOf('/') < 0
+                && serverPath.IndexOf('\\') < 0)
+                serverPath = "$/" + serverPath.Trim();
+
+            if (string.IsNullOrWhiteSpace(user))
+                user = TfsAuthUser;
+            if (string.IsNullOrEmpty(password))
+                password = TfsAuthPassword;
+
+            _resolvedCollectionUrl = collection.Trim().TrimEnd('/');
+            _resolvedServerPath = serverPath.Trim();
+            _resolvedTfsUser = string.IsNullOrWhiteSpace(user) ? null : user.Trim();
+            _resolvedTfsPassword = string.IsNullOrEmpty(password) ? null : password;
+            _tfsSettingsLoaded = true;
+        }
+
+        private static NetworkCredential TryGetTfsNetworkCredential()
+        {
+            EnsureTfsSettingsLoaded();
+            if (string.IsNullOrWhiteSpace(_resolvedTfsUser) || string.IsNullOrEmpty(_resolvedTfsPassword))
+                return null;
+
+            string domain = string.Empty;
+            string name = _resolvedTfsUser;
+            int slash = name.IndexOf('\\');
+            if (slash > 0)
+            {
+                domain = name.Substring(0, slash);
+                name = name.Substring(slash + 1);
+            }
+            else
+            {
+                int at = name.IndexOf('@');
+                if (at > 0)
+                    return new NetworkCredential(name, _resolvedTfsPassword);
+            }
+            return new NetworkCredential(name, _resolvedTfsPassword, domain);
+        }
+
+        /// <summary>
+        /// 브라우저 주소 .../tfs/{컬렉션}/{프로젝트} 를 컬렉션 URL + $/프로젝트 로 나눈다.
+        /// </summary>
+        private static void SplitWebProjectUrl(ref string collectionUrl, ref string serverPath)
+        {
+            if (string.IsNullOrWhiteSpace(collectionUrl))
+                return;
+            try
+            {
+                var uri = new Uri(collectionUrl.Trim());
+                string abs = uri.AbsolutePath.Trim('/');
+                string[] parts = abs.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+                int tfsAt = -1;
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    if (string.Equals(parts[i], "tfs", StringComparison.OrdinalIgnoreCase))
+                    {
+                        tfsAt = i;
+                        break;
+                    }
+                }
+                if (tfsAt < 0 || tfsAt + 1 >= parts.Length)
+                    return;
+                if (tfsAt + 2 >= parts.Length)
+                    return;
+
+                string collectionName = parts[tfsAt + 1];
+                var projectParts = new List<string>();
+                for (int i = tfsAt + 2; i < parts.Length; i++)
+                    projectParts.Add(parts[i]);
+                string project = string.Join("/", projectParts.ToArray());
+                if (string.IsNullOrWhiteSpace(project))
+                    return;
+
+                collectionUrl = uri.GetLeftPart(UriPartial.Authority) + "/tfs/" + collectionName;
+                if (string.IsNullOrWhiteSpace(serverPath)
+                    || string.Equals(serverPath, "$/HISSolutions", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(serverPath, "$/", StringComparison.Ordinal))
+                    serverPath = "$/" + project;
+            }
+            catch
+            {
+            }
+        }
+
+        private static bool TryCollectViaTfsOm(
+            string collectionUrl,
+            string serverPath,
+            DateTime fromLocal,
+            DateTime toLocal,
+            int maxCount,
+            string logDirectory,
+            List<string> changesetJsonParts,
+            out string authorizedUserId,
+            out string error)
+        {
+            authorizedUserId = null;
+            error = null;
+            object collection = null;
+            try
+            {
+                Assembly clientAsm;
+                Assembly vcAsm;
+                string loadErr;
+                if (!TryLoadTfsOmAssemblies(out clientAsm, out vcAsm, out loadErr))
+                {
+                    error = loadErr;
+                    return false;
+                }
+
+                Type collectionType = clientAsm.GetType(
+                    "Microsoft.TeamFoundation.Client.TfsTeamProjectCollection", false);
+                if (collectionType == null)
+                {
+                    error = "TfsTeamProjectCollection type not found";
+                    return false;
+                }
+
+                string authHow;
+                collection = TryCreateTfsCollectionSilent(
+                    collectionType, clientAsm, new Uri(collectionUrl), out authHow);
+                if (collection == null)
+                {
+                    error = "TfsTeamProjectCollection create failed";
+                    return false;
+                }
+                AppendAgentLog(logDirectory, "TFS_OM_CONNECT | " + (authHow ?? "-"));
+
+                Type vcType = vcAsm.GetType(
+                    "Microsoft.TeamFoundation.VersionControl.Client.VersionControlServer", false);
+                if (vcType == null)
+                {
+                    error = "VersionControlServer type not found";
+                    return false;
+                }
+
+                MethodInfo getService = collectionType.GetMethod("GetService", new[] { typeof(Type) });
+                object vcs = getService.Invoke(collection, new object[] { vcType });
+                if (vcs == null)
+                {
+                    error = "VersionControlServer service null";
+                    return false;
+                }
+
+                object identity = GetProp(vcs, "AuthorizedIdentity");
+                authorizedUserId = FirstNonEmpty(
+                    GetPropString(identity, "UniqueName"),
+                    GetPropString(identity, "DisplayName"),
+                    GetPropString(vcs, "AuthorizedUser"),
+                    Environment.UserDomainName + "\\" + Environment.UserName);
+
+                AppendAgentLog(logDirectory,
+                    "TFS_OM_AUTH | user=" + authorizedUserId
+                    + " from=" + fromLocal.ToString("yyyy-MM-dd HH:mm:ss")
+                    + " to=" + toLocal.ToString("yyyy-MM-dd HH:mm:ss"));
+
+                Type versionSpecType = vcAsm.GetType(
+                    "Microsoft.TeamFoundation.VersionControl.Client.VersionSpec", false);
+                Type dateSpecType = vcAsm.GetType(
+                    "Microsoft.TeamFoundation.VersionControl.Client.DateVersionSpec", false);
+                Type recursionType = vcAsm.GetType(
+                    "Microsoft.TeamFoundation.VersionControl.Client.RecursionType", false);
+                if (versionSpecType == null || dateSpecType == null || recursionType == null)
+                {
+                    error = "VersionSpec/DateVersionSpec/RecursionType not found";
+                    return false;
+                }
+
+                object latest = versionSpecType.GetProperty("Latest", BindingFlags.Public | BindingFlags.Static)
+                    .GetValue(null, null);
+                object fromSpec = Activator.CreateInstance(dateSpecType, fromLocal);
+                object toSpec = Activator.CreateInstance(dateSpecType, toLocal);
+                object recursionFull = Enum.Parse(recursionType, "Full");
+
+                MethodInfo queryHistory = FindQueryHistory10(vcs.GetType());
+                if (queryHistory == null)
+                {
+                    error = "QueryHistory(10-arg) overload not found";
+                    return false;
+                }
+
+                string[] paths =
+                {
+                    string.IsNullOrWhiteSpace(serverPath) ? TfsServerPath : serverPath.Trim(),
+                    "$/"
+                };
+                IEnumerable historyEnum = null;
+                string usedPath = null;
+                for (int p = 0; p < paths.Length; p++)
+                {
+                    try
+                    {
+                        object history = queryHistory.Invoke(vcs, new object[]
+                        {
+                            paths[p],
+                            latest,
+                            0,
+                            recursionFull,
+                            authorizedUserId,
+                            fromSpec,
+                            toSpec,
+                            maxCount,
+                            true,
+                            false
+                        });
+                        historyEnum = history as IEnumerable;
+                        usedPath = paths[p];
+                        if (historyEnum != null)
+                            break;
+                    }
+                    catch (TargetInvocationException tex)
+                    {
+                        AppendAgentLog(logDirectory,
+                            "TFS_OM_QUERY_PATH_FAIL | path=" + paths[p]
+                            + " err=" + (tex.InnerException != null ? tex.InnerException.Message : tex.Message));
+                    }
+                }
+
+                if (historyEnum == null)
+                {
+                    error = "QueryHistory returned null";
+                    return false;
+                }
+
+                AppendAgentLog(logDirectory, "TFS_OM_QUERY_OK | path=" + (usedPath ?? "-"));
+
+                int taken = 0;
+                foreach (object changeset in historyEnum)
+                {
+                    if (changeset == null || taken >= maxCount)
+                        break;
+
+                    string part = BuildChangesetJsonFromOm(changeset);
+                    if (string.IsNullOrEmpty(part))
+                        continue;
+                    changesetJsonParts.Add(part);
+                    taken++;
+                }
+
+                return true;
+            }
+            catch (TargetInvocationException tex)
+            {
+                error = tex.InnerException != null ? tex.InnerException.Message : tex.Message;
+                return false;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+            finally
+            {
+                try
+                {
+                    IDisposable d = collection as IDisposable;
+                    if (d != null)
+                        d.Dispose();
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        /// <summary>
+        /// 1) Team Explorer 가 이미 이 PC에 저장한 연결 (Visual Studio 로그인 캐시).
+        /// 2) TfsSettings.txt / TfsAuthUser 명시 계정.
+        /// 3) Windows 로그인. RCHSP\sukhoonyoon 처럼 TFS ACL 없으면 TF30063.
+        /// </summary>
+        private static object TryCreateTfsCollectionSilent(
+            Type collectionType,
+            Assembly clientAsm,
+            Uri uri,
+            out string how)
+        {
+            how = null;
+            if (collectionType == null || uri == null)
+                return null;
+
+            object fromTe = TryCreateCollectionFromTeamExplorerFactory(clientAsm, uri);
+            if (fromTe != null)
+            {
+                how = "team_explorer_cache";
+                return fromTe;
+            }
+
+            NetworkCredential explicitCred = TryGetTfsNetworkCredential();
+            if (explicitCred != null)
+            {
+                object fromFile = TryCreateCollectionWithNetworkCredential(
+                    collectionType, clientAsm, uri, explicitCred);
+                if (fromFile != null)
+                {
+                    how = "settings_user=" + (_resolvedTfsUser ?? "-");
+                    return fromFile;
+                }
+                how = "settings_user_failed=" + (_resolvedTfsUser ?? "-");
+            }
+            else
+            {
+                how = "windows_default(" + Environment.UserDomainName + "\\" + Environment.UserName
+                    + ") — Team Explorer 미연결이면 TfsAuthUser 에 TFS 전용 계정 필요";
+            }
+
+            Type winCredType = clientAsm != null
+                ? clientAsm.GetType("Microsoft.TeamFoundation.Client.WindowsCredential", false)
+                : null;
+            Type tfsCredType = clientAsm != null
+                ? clientAsm.GetType("Microsoft.TeamFoundation.Client.TfsClientCredentials", false)
+                : null;
+            if (winCredType != null && tfsCredType != null)
+            {
+                try
+                {
+                    ConstructorInfo winCtor = winCredType.GetConstructor(new[] { typeof(bool) });
+                    object winCred = winCtor != null
+                        ? winCtor.Invoke(new object[] { true })
+                        : Activator.CreateInstance(winCredType);
+
+                    ConstructorInfo credCtor = tfsCredType.GetConstructor(new[] { winCredType });
+                    object tfsCreds = credCtor != null
+                        ? credCtor.Invoke(new object[] { winCred })
+                        : Activator.CreateInstance(tfsCredType, new object[] { winCred });
+
+                    PropertyInfo allow = tfsCredType.GetProperty("AllowInteractive");
+                    if (allow != null && allow.CanWrite)
+                        allow.SetValue(tfsCreds, false, null);
+
+                    ConstructorInfo colCtor = collectionType.GetConstructor(new[] { typeof(Uri), tfsCredType });
+                    if (colCtor != null)
+                        return colCtor.Invoke(new object[] { uri, tfsCreds });
+                }
+                catch
+                {
+                }
+            }
+
+            try
+            {
+                ConstructorInfo credsCtor = collectionType.GetConstructor(new[] { typeof(Uri), typeof(ICredentials) });
+                if (credsCtor != null)
+                    return credsCtor.Invoke(new object[] { uri, CredentialCache.DefaultNetworkCredentials });
+            }
+            catch
+            {
+            }
+
+            how = (how ?? "") + " | uri_only_may_prompt";
+            return Activator.CreateInstance(collectionType, new object[] { uri });
+        }
+
+        /// <summary>
+        /// Visual Studio Team Explorer 가 이미 이 PC에 등록·인증해 둔 collection 만 재사용.
+        /// Uri 단독 GetTeamProjectCollection 은 로그인 창이 뜰 수 있어 쓰지 않음.
+        /// </summary>
+        private static object TryCreateCollectionFromTeamExplorerFactory(Assembly clientAsm, Uri uri)
+        {
+            if (clientAsm == null || uri == null)
+                return null;
+            try
+            {
+                Type factoryType = clientAsm.GetType(
+                    "Microsoft.TeamFoundation.Client.TfsTeamProjectCollectionFactory", false);
+                Type registeredType = clientAsm.GetType(
+                    "Microsoft.TeamFoundation.Client.RegisteredTfsConnections", false);
+                if (factoryType == null)
+                    return null;
+
+                object registered = null;
+                if (registeredType != null)
+                {
+                    MethodInfo getOne = registeredType.GetMethod(
+                        "GetProjectCollection",
+                        BindingFlags.Public | BindingFlags.Static,
+                        null,
+                        new[] { typeof(Uri) },
+                        null);
+                    if (getOne != null)
+                        registered = getOne.Invoke(null, new object[] { uri });
+
+                    if (registered == null)
+                    {
+                        MethodInfo getAll = registeredType.GetMethod(
+                            "GetProjectCollections",
+                            BindingFlags.Public | BindingFlags.Static,
+                            null,
+                            Type.EmptyTypes,
+                            null);
+                        Array all = getAll != null ? getAll.Invoke(null, null) as Array : null;
+                        if (all != null)
+                        {
+                            string want = uri.ToString().TrimEnd('/');
+                            foreach (object item in all)
+                            {
+                                if (item == null)
+                                    continue;
+                                Uri itemUri = GetProp(item, "Uri") as Uri;
+                                string itemUrl = itemUri != null
+                                    ? itemUri.ToString()
+                                    : GetPropString(item, "Uri");
+                                if (string.IsNullOrWhiteSpace(itemUrl))
+                                    continue;
+                                if (string.Equals(
+                                    itemUrl.TrimEnd('/'),
+                                    want,
+                                    StringComparison.OrdinalIgnoreCase))
+                                {
+                                    registered = item;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (registered == null)
+                    return null;
+
+                MethodInfo fromRegistered = factoryType.GetMethod(
+                    "GetTeamProjectCollection",
+                    BindingFlags.Public | BindingFlags.Static,
+                    null,
+                    new[] { registered.GetType() },
+                    null);
+                if (fromRegistered == null)
+                {
+                    foreach (MethodInfo m in factoryType.GetMethods(
+                        BindingFlags.Public | BindingFlags.Static))
+                    {
+                        if (m.Name != "GetTeamProjectCollection")
+                            continue;
+                        ParameterInfo[] ps = m.GetParameters();
+                        if (ps.Length == 1
+                            && ps[0].ParameterType.Name == "RegisteredProjectCollection")
+                        {
+                            fromRegistered = m;
+                            break;
+                        }
+                    }
+                }
+
+                if (fromRegistered == null)
+                    return null;
+
+                object collection = fromRegistered.Invoke(null, new object[] { registered });
+                if (collection == null)
+                    return null;
+                MethodInfo auth = collection.GetType().GetMethod("EnsureAuthenticated", Type.EmptyTypes);
+                if (auth != null)
+                    auth.Invoke(collection, null);
+                return collection;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static object TryCreateCollectionWithNetworkCredential(
+            Type collectionType,
+            Assembly clientAsm,
+            Uri uri,
+            NetworkCredential networkCredential)
+        {
+            Type winCredType = clientAsm != null
+                ? clientAsm.GetType("Microsoft.TeamFoundation.Client.WindowsCredential", false)
+                : null;
+            Type tfsCredType = clientAsm != null
+                ? clientAsm.GetType("Microsoft.TeamFoundation.Client.TfsClientCredentials", false)
+                : null;
+
+            if (winCredType != null && tfsCredType != null)
+            {
+                try
+                {
+                    object winCred = null;
+                    ConstructorInfo winNet = winCredType.GetConstructor(new[] { typeof(ICredentials) });
+                    if (winNet != null)
+                        winCred = winNet.Invoke(new object[] { networkCredential });
+                    if (winCred == null)
+                    {
+                        ConstructorInfo winNc = winCredType.GetConstructor(new[] { typeof(NetworkCredential) });
+                        if (winNc != null)
+                            winCred = winNc.Invoke(new object[] { networkCredential });
+                    }
+                    if (winCred != null)
+                    {
+                        ConstructorInfo credCtor = tfsCredType.GetConstructor(new[] { winCredType });
+                        object tfsCreds = credCtor != null
+                            ? credCtor.Invoke(new object[] { winCred })
+                            : Activator.CreateInstance(tfsCredType, new object[] { winCred });
+                        PropertyInfo allow = tfsCredType.GetProperty("AllowInteractive");
+                        if (allow != null && allow.CanWrite)
+                            allow.SetValue(tfsCreds, false, null);
+                        ConstructorInfo colCtor = collectionType.GetConstructor(new[] { typeof(Uri), tfsCredType });
+                        if (colCtor != null)
+                            return colCtor.Invoke(new object[] { uri, tfsCreds });
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            try
+            {
+                ConstructorInfo credsCtor = collectionType.GetConstructor(new[] { typeof(Uri), typeof(ICredentials) });
+                if (credsCtor != null)
+                    return credsCtor.Invoke(new object[] { uri, networkCredential });
+            }
+            catch
+            {
+            }
+
+            return null;
+        }
+
+        private static bool TryLoadTfsOmAssemblies(
+            out Assembly clientAsm,
+            out Assembly vcAsm,
+            out string error)
+        {
+            clientAsm = null;
+            vcAsm = null;
+            error = null;
+
+            string clientPath = ResolveTfsDllPath(
+                "Microsoft.TeamFoundation.Client", TfsClientDllDefault);
+            string vcPath = ResolveTfsDllPath(
+                "Microsoft.TeamFoundation.VersionControl.Client", TfsVersionControlDllDefault);
+
+            if (string.IsNullOrEmpty(clientPath) || !File.Exists(clientPath))
+            {
+                error = "TFS Client DLL not found (Team Explorer 필요): " + (clientPath ?? TfsClientDllDefault);
+                return false;
+            }
+            if (string.IsNullOrEmpty(vcPath) || !File.Exists(vcPath))
+            {
+                error = "TFS VersionControl DLL not found: " + (vcPath ?? TfsVersionControlDllDefault);
+                return false;
+            }
+
+            try
+            {
+                clientAsm = Assembly.LoadFrom(clientPath);
+                vcAsm = Assembly.LoadFrom(vcPath);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = "Assembly.LoadFrom failed: " + ex.Message;
+                return false;
+            }
+        }
+
+        private static string ResolveTfsDllPath(string assemblySimpleName, string preferredPath)
+        {
+            if (!string.IsNullOrEmpty(preferredPath) && File.Exists(preferredPath))
+                return preferredPath;
+
+            try
+            {
+                string root = @"C:\Windows\Microsoft.NET\assembly\GAC_MSIL\" + assemblySimpleName;
+                if (!Directory.Exists(root))
+                    return preferredPath;
+                string[] dirs = Directory.GetDirectories(root);
+                Array.Sort(dirs, (a, b) => string.Compare(b, a, StringComparison.OrdinalIgnoreCase));
+                for (int i = 0; i < dirs.Length; i++)
+                {
+                    string dll = Path.Combine(dirs[i], assemblySimpleName + ".dll");
+                    if (File.Exists(dll))
+                        return dll;
+                }
+            }
+            catch
+            {
+            }
+            return preferredPath;
+        }
+
+        private static MethodInfo FindQueryHistory10(Type vcType)
+        {
+            MethodInfo[] methods = vcType.GetMethods(BindingFlags.Public | BindingFlags.Instance);
+            for (int i = 0; i < methods.Length; i++)
+            {
+                if (!string.Equals(methods[i].Name, "QueryHistory", StringComparison.Ordinal))
+                    continue;
+                ParameterInfo[] ps = methods[i].GetParameters();
+                if (ps.Length == 10
+                    && ps[0].ParameterType == typeof(string)
+                    && ps[7].ParameterType == typeof(int)
+                    && ps[8].ParameterType == typeof(bool)
+                    && ps[9].ParameterType == typeof(bool))
+                    return methods[i];
+            }
+            return null;
+        }
+
+        private static string BuildChangesetJsonFromOm(object changeset)
+        {
+            if (changeset == null)
+                return null;
+
+            int changesetId = Convert.ToInt32(GetProp(changeset, "ChangesetId") ?? 0, CultureInfo.InvariantCulture);
+            if (changesetId <= 0)
+                return null;
+
+            string authorId = FirstNonEmpty(
+                GetPropString(changeset, "Owner"),
+                GetPropString(changeset, "Committer"));
+            string authorName = FirstNonEmpty(
+                GetPropString(changeset, "OwnerDisplayName"),
+                GetPropString(changeset, "CommitterDisplayName"),
+                authorId);
+            string comment = GetPropString(changeset, "Comment") ?? string.Empty;
+
+            DateTime creation = DateTime.Now;
+            object creationObj = GetProp(changeset, "CreationDate");
+            if (creationObj is DateTime)
+                creation = (DateTime)creationObj;
+
+            var files = new List<string>();
+            object changesObj = GetProp(changeset, "Changes");
+            IEnumerable changesEnum = changesObj as IEnumerable;
+            if (changesEnum != null)
+            {
+                foreach (object change in changesEnum)
+                {
+                    if (change == null)
+                        continue;
+                    object item = GetProp(change, "Item");
+                    if (item == null)
+                        continue;
+
+                    string path = FirstNonEmpty(
+                        GetPropString(item, "ServerItem"),
+                        GetPropString(item, "LocalItem"));
+                    if (string.IsNullOrEmpty(path))
+                        continue;
+
+                    string fileName = Path.GetFileName(path.Replace('/', '\\'));
+                    string changeType = NormalizeChangeType(Convert.ToString(GetProp(change, "ChangeType"), CultureInfo.InvariantCulture));
+                    string itemTypeRaw = Convert.ToString(GetProp(item, "ItemType"), CultureInfo.InvariantCulture) ?? string.Empty;
+                    bool isFolder = itemTypeRaw.IndexOf("Folder", StringComparison.OrdinalIgnoreCase) >= 0;
+                    string version = FirstNonEmpty(
+                        Convert.ToString(GetProp(item, "ChangesetId"), CultureInfo.InvariantCulture),
+                        Convert.ToString(GetProp(item, "Version"), CultureInfo.InvariantCulture),
+                        changesetId.ToString(CultureInfo.InvariantCulture));
+
+                    var fb = new StringBuilder(256);
+                    fb.Append('{');
+                    AppendJson(fb, "changeType", changeType).Append(',');
+                    AppendJson(fb, "itemType", isFolder ? "folder" : "file").Append(',');
+                    AppendJson(fb, "fileName", fileName).Append(',');
+                    AppendJson(fb, "path", path).Append(',');
+                    AppendJson(fb, "version", version);
+                    fb.Append('}');
+                    files.Add(fb.ToString());
+                }
+            }
+
+            var cs = new StringBuilder(1024);
+            cs.Append('{');
+            AppendJson(cs, "changesetId", changesetId).Append(',');
+            AppendJson(cs, "authorName", authorName).Append(',');
+            AppendJson(cs, "authorId", authorId).Append(',');
+            AppendJson(cs, "checkedInAt", creation.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")).Append(',');
+            AppendJson(cs, "comment", comment).Append(',');
+            AppendJson(cs, "changedFileCount", files.Count).Append(',');
+            cs.Append("\"changedFiles\":[");
+            for (int i = 0; i < files.Count; i++)
+            {
+                if (i > 0) cs.Append(',');
+                cs.Append(files[i]);
+            }
+            cs.Append("]}");
+            return cs.ToString();
+        }
+
+        private static object GetProp(object target, string name)
+        {
+            if (target == null || string.IsNullOrEmpty(name))
+                return null;
+            PropertyInfo p = target.GetType().GetProperty(
+                name, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            if (p == null)
+                return null;
+            try
+            {
+                return p.GetValue(target, null);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string GetPropString(object target, string name)
+        {
+            object v = GetProp(target, name);
+            if (v == null)
+                return null;
+            string s = Convert.ToString(v, CultureInfo.InvariantCulture);
+            return string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+        }
+
+        private static string FirstNonEmpty(params string[] values)
+        {
+            if (values == null)
+                return null;
+            for (int i = 0; i < values.Length; i++)
+            {
+                if (!string.IsNullOrWhiteSpace(values[i]))
+                    return values[i].Trim();
+            }
+            return null;
         }
 
         private static void MarkSessionStarted(string logDirectory)
@@ -532,19 +1452,32 @@ namespace GBCWorkHub.SessionAgent
             return utc.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
         }
 
-        private static bool TryReadSyncRequest(
+        private static bool TryReadTargetedSyncRequest(
             out string requestId,
             out DateTime? sessionStartedUtc,
             out DateTime? sessionEndedUtc)
         {
+            string target;
+            if (!TryReadSyncRequest(out requestId, out sessionStartedUtc, out sessionEndedUtc, out target))
+                return false;
+            if (IsTargetedAtThisPc(target))
+                return true;
+            return false;
+        }
+
+        private static bool TryReadSyncRequest(
+            out string requestId,
+            out DateTime? sessionStartedUtc,
+            out DateTime? sessionEndedUtc,
+            out string targetComputerName)
+        {
             requestId = null;
             sessionStartedUtc = null;
             sessionEndedUtc = null;
+            targetComputerName = null;
             try
             {
-                if (!Clipboard.ContainsText())
-                    return false;
-                string text = Clipboard.GetText();
+                string text = PeekClipboardText();
                 if (string.IsNullOrWhiteSpace(text))
                     return false;
                 text = text.TrimStart();
@@ -552,6 +1485,7 @@ namespace GBCWorkHub.SessionAgent
                     return false;
                 string json = text.Substring(SyncRequestPrefix.Length).Trim();
                 requestId = ExtractString(json, "requestId");
+                targetComputerName = ExtractString(json, "targetComputerName");
                 DateTime started;
                 DateTime ended;
                 if (TryParseUtc(ExtractString(json, "sessionStartedAtUtc"), out started))
@@ -564,6 +1498,35 @@ namespace GBCWorkHub.SessionAgent
             {
                 return false;
             }
+        }
+
+        private static bool IsTargetedAtThisPc(string targetComputerName)
+        {
+            if (string.IsNullOrWhiteSpace(targetComputerName))
+                return true;
+            return ComputerNamesMatch(targetComputerName, Environment.MachineName);
+        }
+
+        private static bool ComputerNamesMatch(string a, string b)
+        {
+            if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b))
+                return false;
+            return string.Equals(
+                NormalizeComputerName(a),
+                NormalizeComputerName(b),
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizeComputerName(string name)
+        {
+            string s = name.Trim();
+            int slash = s.LastIndexOf('\\');
+            if (slash >= 0 && slash < s.Length - 1)
+                s = s.Substring(slash + 1);
+            int dot = s.IndexOf('.');
+            if (dot > 0)
+                s = s.Substring(0, dot);
+            return s;
         }
 
         /// <summary>pending JSON에 requestId / deliveryMode=PENDING_RECONNECT 주입</summary>
@@ -798,14 +1761,14 @@ namespace GBCWorkHub.SessionAgent
         private static string FormatIsoDate(string raw)
         {
             if (string.IsNullOrWhiteSpace(raw))
-                return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                return DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
 
             DateTime dt;
             if (DateTime.TryParse(raw, CultureInfo.InvariantCulture,
                 DateTimeStyles.RoundtripKind, out dt))
-                return dt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+                return dt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
 
-            return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            return DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
         }
 
         /// <summary>
@@ -841,7 +1804,7 @@ namespace GBCWorkHub.SessionAgent
             DateTime? to = toUtc;
             int top = TfsFallbackTodayMax;
             string[] apiVersions = { "1.0", "2.0", "3.0", "4.1" };
-            string[] itemPaths = { TfsServerPath, "$/", null };
+            string[] itemPaths = { GetTfsServerPath(), "$/", null };
 
             foreach (string apiVersion in apiVersions)
             {
@@ -877,9 +1840,9 @@ namespace GBCWorkHub.SessionAgent
             string[] apiVersions = { "1.0", "2.0", "3.0", "4.1" };
             string[] itemPaths =
             {
-                TfsServerPath,
+                GetTfsServerPath(),
                 "$/",
-                null // itemPath 없음
+                null
             };
 
             foreach (string apiVersion in apiVersions)
@@ -1072,7 +2035,16 @@ namespace GBCWorkHub.SessionAgent
                 var request = (HttpWebRequest)WebRequest.Create(url);
                 request.Method = "GET";
                 request.Accept = "application/json";
-                request.UseDefaultCredentials = true;
+                NetworkCredential tfsCred = TryGetTfsNetworkCredential();
+                if (tfsCred != null)
+                {
+                    request.UseDefaultCredentials = false;
+                    request.Credentials = tfsCred;
+                }
+                else
+                {
+                    request.UseDefaultCredentials = true;
+                }
                 request.PreAuthenticate = true;
                 request.Timeout = 30000;
                 request.ReadWriteTimeout = 30000;
@@ -1356,8 +2328,8 @@ namespace GBCWorkHub.SessionAgent
             return null;
         }
 
-        // RDP 클립보드 = 제어채널+사용자 복붙 공유 → Set 전 백업, hold 후 동기 복원
-        // (에이전트는 짧은 수명 프로세스라 ThreadPool 복원은 종료와 함께 유실됨 → 반드시 동기)
+        // Prefix 규칙: GBCWORKHUB* 만 복원/정리. 일반 텍스트는 건드리지 않음.
+        // 미수집 TFS / SESSION_RESULT / SYNC_REQUEST / TOKEN 은 덮지 않음.
         private static string _userClipboardBackup;
 
         private static bool IsProtocolClipboardText(string text)
@@ -1366,60 +2338,98 @@ namespace GBCWorkHub.SessionAgent
                 && text.StartsWith("GBCWORKHUB", StringComparison.Ordinal);
         }
 
+        private static bool IsJunkClipboard(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+            string t = text.TrimStart();
+            return t.StartsWith("powershell.exe -STA", StringComparison.OrdinalIgnoreCase)
+                || t.StartsWith("powershell -STA", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string PeekClipboardText()
+        {
+            if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
+                return TryGetClipboardText();
+
+            string text = null;
+            var t = new Thread(() => { text = TryGetClipboardText(); });
+            t.SetApartmentState(ApartmentState.STA);
+            t.Start();
+            t.Join(4000);
+            return text;
+        }
+
+        private static string TryGetClipboardText()
+        {
+            try
+            {
+                return Clipboard.ContainsText() ? Clipboard.GetText() : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private static bool TryCopyToClipboard(string text)
         {
             if (string.IsNullOrEmpty(text))
                 return false;
 
-            // 사용자 일반 텍스트만 백업 (GBCWORKHUB* 는 백업하지 않음)
-            try
-            {
-                if (Clipboard.ContainsText())
-                {
-                    string cur = Clipboard.GetText();
-                    if (!string.IsNullOrEmpty(cur) && !IsProtocolClipboardText(cur))
-                        _userClipboardBackup = cur;
-                }
-            }
-            catch
-            {
-            }
-
-            bool written = false;
-            for (int attempt = 0; attempt < 5; attempt++)
+            bool ok = false;
+            var worker = new Thread(() =>
             {
                 try
                 {
-                    Clipboard.SetText(text);
-                    written = true;
-                    break;
+                    string cur = TryGetClipboardText();
+                    if (!string.IsNullOrEmpty(cur)
+                        && !IsProtocolClipboardText(cur)
+                        && !IsJunkClipboard(cur))
+                        _userClipboardBackup = cur;
                 }
                 catch
                 {
-                    Thread.Sleep(200);
                 }
-            }
-            if (!written)
-                return false;
 
-            // 상태: 짧게 유지 후 복원
-            // TFS: 로컬 ACK(또는 타임아웃)까지 유지 후 복원.
-            //      사용자가 그 사이 일반 텍스트를 복사하면 복원하지 않음.
-            if (text.StartsWith(TfsPrefix, StringComparison.Ordinal))
-                WaitAckThenRestoreUserClipboard();
-            else
-            {
-                Thread.Sleep(1500);
-                TryRestoreUserClipboard();
-            }
-            return true;
+                for (int attempt = 0; attempt < 8; attempt++)
+                {
+                    try
+                    {
+                        Clipboard.SetText(text);
+                        string roundtrip = TryGetClipboardText();
+                        if (!string.IsNullOrEmpty(roundtrip)
+                            && roundtrip.StartsWith(text.Substring(0, Math.Min(24, text.Length)), StringComparison.Ordinal))
+                        {
+                            ok = true;
+                            break;
+                        }
+                    }
+                    catch
+                    {
+                    }
+                    Thread.Sleep(250);
+                }
+
+                if (!ok)
+                    return;
+
+                if (text.StartsWith(TfsPrefix, StringComparison.Ordinal)
+                    || text.StartsWith(SessionResultPrefix, StringComparison.Ordinal))
+                    WaitAckThenRestoreUserClipboard(text);
+                else
+                {
+                    Thread.Sleep(2500);
+                    TryRestoreUserClipboard(text);
+                }
+            });
+            worker.SetApartmentState(ApartmentState.STA);
+            worker.Start();
+            worker.Join(25000);
+            return ok;
         }
 
-        /// <summary>
-        /// TFS 전달 완료(ACK) 또는 최대 대기 후 사용자 클립보드 복원.
-        /// 중간에 사용자가 새 텍스트를 복사했으면 그 내용을 존중하고 복원하지 않음.
-        /// </summary>
-        private static void WaitAckThenRestoreUserClipboard()
+        private static void WaitAckThenRestoreUserClipboard(string writtenText)
         {
             const int minHoldMs = 2000;
             const int maxWaitMs = 12000;
@@ -1430,21 +2440,11 @@ namespace GBCWorkHub.SessionAgent
 
             while (waited < maxWaitMs)
             {
-                string current = null;
-                try
-                {
-                    if (Clipboard.ContainsText())
-                        current = Clipboard.GetText();
-                }
-                catch
-                {
-                }
+                string current = TryGetClipboardText();
 
-                // 사용자가 중간에 복사함 → 보호(복원으로 덮지 않음)
                 if (!string.IsNullOrEmpty(current) && !IsProtocolClipboardText(current))
                     return;
 
-                // 로컬이 수신 확인(ACK) → 복원해도 안전
                 if (!string.IsNullOrEmpty(current)
                     && current.StartsWith(AckPrefix, StringComparison.Ordinal))
                     break;
@@ -1453,89 +2453,77 @@ namespace GBCWorkHub.SessionAgent
                 waited += stepMs;
             }
 
-            TryRestoreUserClipboard();
+            TryRestoreUserClipboard(writtenText);
         }
 
-        private static void TryRestoreUserClipboard()
+        private static void TryRestoreUserClipboard(string writtenText)
         {
-            string backup = _userClipboardBackup;
-            // 백업 없으면 GBCWORKHUB* 고착 → 원격 붙여넣기 시 프로토콜만 나옴
-            if (string.IsNullOrEmpty(backup))
+            string current = TryGetClipboardText();
+
+            if (!string.IsNullOrEmpty(current)
+                && !IsProtocolClipboardText(current)
+                && !string.Equals(current, _userClipboardBackup, StringComparison.Ordinal))
+                return;
+
+            if (IsForeignProtocol(current, writtenText))
+                return;
+
+            if (string.IsNullOrEmpty(_userClipboardBackup))
             {
                 TryClearProtocolClipboard();
                 return;
             }
 
-            try
+            for (int attempt = 0; attempt < 5; attempt++)
             {
-                string current = null;
                 try
                 {
-                    if (Clipboard.ContainsText())
-                        current = Clipboard.GetText();
+                    Clipboard.SetText(_userClipboardBackup);
+                    return;
                 }
                 catch
                 {
+                    Thread.Sleep(200);
                 }
-
-                // 사용자가 이미 새 내용을 넣었으면 덮지 않음
-                if (!string.IsNullOrEmpty(current)
-                    && !IsProtocolClipboardText(current)
-                    && !string.Equals(current, backup, StringComparison.Ordinal))
-                    return;
-
-                for (int attempt = 0; attempt < 5; attempt++)
-                {
-                    try
-                    {
-                        Clipboard.SetText(backup);
-                        return;
-                    }
-                    catch
-                    {
-                        Thread.Sleep(200);
-                    }
-                }
-
-                TryClearProtocolClipboard();
             }
-            catch
-            {
-            }
+
+            TryClearProtocolClipboard();
+        }
+
+        private static bool IsForeignProtocol(string current, string writtenText)
+        {
+            if (string.IsNullOrEmpty(current) || !IsProtocolClipboardText(current))
+                return false;
+            if (string.Equals(current, writtenText, StringComparison.Ordinal))
+                return false;
+            if (current.StartsWith(AckPrefix, StringComparison.Ordinal))
+                return false;
+
+            return current.StartsWith(TfsPrefix, StringComparison.Ordinal)
+                || current.StartsWith(SessionResultPrefix, StringComparison.Ordinal)
+                || current.StartsWith(SyncRequestPrefix, StringComparison.Ordinal)
+                || current.StartsWith(SessionTokenPrefix, StringComparison.Ordinal);
         }
 
         private static void TryClearProtocolClipboard()
         {
-            try
+            string current = TryGetClipboardText();
+            if (string.IsNullOrEmpty(current) || !IsProtocolClipboardText(current))
+                return;
+            if (IsForeignProtocol(current, null))
+                return;
+
+            for (int attempt = 0; attempt < 5; attempt++)
             {
-                string current = null;
                 try
                 {
-                    if (Clipboard.ContainsText())
-                        current = Clipboard.GetText();
+                    Clipboard.Clear();
+                    return;
                 }
                 catch
                 {
+                    Thread.Sleep(200);
                 }
-
-                if (string.IsNullOrEmpty(current) || !IsProtocolClipboardText(current))
-                    return;
-
-                for (int attempt = 0; attempt < 5; attempt++)
-                {
-                    try
-                    {
-                        Clipboard.Clear();
-                        return;
-                    }
-                    catch
-                    {
-                        Thread.Sleep(200);
-                    }
-                }
-            }
-            catch
-            {
             }
         }
 

@@ -29,6 +29,8 @@ namespace GBCWorkHub.DTO.WorkLog
         public string TfsComment { get; set; }
         public string TfsAuthor { get; set; }
         public string AuthorName { get; set; }
+        /// <summary>작성자 소속. 예: 진료지원. 팀 검색용.</summary>
+        public string TeamName { get; set; }
         public DateTime? CheckedInAt { get; set; }
         public int ChangedFileCount { get; set; }
         public bool NeedsTicketReview { get; set; }

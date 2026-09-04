@@ -87,6 +87,39 @@ namespace GBCWorkHub.DAC
             return Task.Run(() => (IList<RemotePcUsageLogDto>)GetRecentUsageLogsCore(remoteIp, take));
         }
 
+        public Task<RemotePcUsageLogDto> GetUsageLogByTokenAsync(string sessionToken)
+        {
+            return Task.Run(() => GetUsageLogByTokenCore(sessionToken));
+        }
+
+        public Task<IList<RemotePcUsageLogDto>> GetRecentEndedUsageLogsAsync(int take)
+        {
+            return Task.Run(() => (IList<RemotePcUsageLogDto>)GetRecentEndedUsageLogsCore(take));
+        }
+
+        public Task<IList<RemotePcUsageLogDto>> GetRecentUsageLogsForOccupantAsync(
+            string occupancyName,
+            string windowsAccount,
+            string samAccount,
+            string accessPcName,
+            int take,
+            DateTime? fromAt = null,
+            DateTime? toAt = null)
+        {
+            return Task.Run(() => (IList<RemotePcUsageLogDto>)GetRecentUsageLogsForOccupantCore(
+                occupancyName, windowsAccount, samAccount, accessPcName, take, fromAt, toAt));
+        }
+
+        public Task<int> RenameOccupantAsync(string oldName, string newName, string accessPcName)
+        {
+            return Task.Run(() => RenameOccupantCore(oldName, newName, accessPcName));
+        }
+
+        public Task<int> PurgeUsageLogsOlderThanMonthsAsync(int months)
+        {
+            return Task.Run(() => PurgeUsageLogsOlderThanMonthsCore(months));
+        }
+
         private bool TestConnectionCore()
         {
             if (!EnsureConfigured())
@@ -216,6 +249,7 @@ namespace GBCWorkHub.DAC
                     using (var cmd = conn.CreateCommand())
                     {
                         cmd.Transaction = tx;
+                        cmd.BindByName = true;
                         cmd.CommandText =
                             @"UPDATE " + TableName + @"
                                  SET ACCS_IP_ADDR = :accessIp,
@@ -223,9 +257,9 @@ namespace GBCWorkHub.DAC
                                      ACCS_USER_ID = :accessUserId,
                                      ACCS_PC_NM = :accessPcName,
                                      SESSION_TOKEN = :sessionToken,
-                                     ACCS_STRT_DTM = SYSTIMESTAMP,
-                                     REMOTE_ACCS_DTM = SYSTIMESTAMP,
-                                     UPDT_DTM = SYSTIMESTAMP
+                                     ACCS_STRT_DTM = :koreaNow,
+                                     REMOTE_ACCS_DTM = :koreaNow,
+                                     UPDT_DTM = :koreaNow
                                WHERE REMOTE_ACCS_IP_ADDR = :remoteIp
                                  AND ACCS_STS_CD = :available";
                         cmd.Parameters.Add("accessIp", OracleDbType.Varchar2).Value = (object)p.AccessIpAddress ?? DBNull.Value;
@@ -233,6 +267,7 @@ namespace GBCWorkHub.DAC
                         cmd.Parameters.Add("accessUserId", OracleDbType.Varchar2).Value = p.AccessUserId ?? string.Empty;
                         cmd.Parameters.Add("accessPcName", OracleDbType.Varchar2).Value = p.AccessPcName ?? string.Empty;
                         cmd.Parameters.Add("sessionToken", OracleDbType.Varchar2).Value = p.SessionToken;
+                        AddKoreaNow(cmd, "koreaNow");
                         cmd.Parameters.Add("remoteIp", OracleDbType.Varchar2).Value = p.RemoteAccessIpAddress.Trim();
                         cmd.Parameters.Add("available", OracleDbType.Varchar2).Value = RemotePcDbStatuses.Available;
                         rows = cmd.ExecuteNonQuery();
@@ -248,6 +283,9 @@ namespace GBCWorkHub.DAC
                     }
 
                     tx.Rollback();
+
+                    if (p.ForceTakeover)
+                        return TryTakeoverCore(p);
 
                     // rows=0: 행 없음 / 이미 IN_USE — 원인을 로그에 구분
                     var existing = GetByRemoteIpCore(p.RemoteAccessIpAddress);
@@ -267,6 +305,155 @@ namespace GBCWorkHub.DAC
             }
         }
 
+        private bool TryTakeoverCore(RemotePcReserveParams p)
+        {
+            if (p == null || string.IsNullOrWhiteSpace(p.RemoteAccessIpAddress) || string.IsNullOrWhiteSpace(p.SessionToken))
+                return false;
+
+            WorkHubFileLogger.Info("TAKEOVER_REQUESTED", LogCtx(p.RemoteAccessIpAddress, null, p.SessionToken, p.AccessUserId, p.AccessPcName, RemotePcDbStatuses.InUse, RemotePcDbStatuses.InUse, 0, null));
+
+            try
+            {
+                using (var conn = OpenConnection())
+                using (var tx = conn.BeginTransaction())
+                {
+                    string oldToken = null;
+                    string oldStatus = null;
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.Transaction = tx;
+                        cmd.BindByName = true;
+                        cmd.CommandText =
+                            @"SELECT SESSION_TOKEN, ACCS_STS_CD
+                                FROM " + TableName + @"
+                               WHERE REMOTE_ACCS_IP_ADDR = :remoteIp
+                                 FOR UPDATE";
+                        cmd.Parameters.Add("remoteIp", OracleDbType.Varchar2).Value = p.RemoteAccessIpAddress.Trim();
+                        using (var reader = cmd.ExecuteReader())
+                        {
+                            if (!reader.Read())
+                            {
+                                tx.Rollback();
+                                WorkHubFileLogger.Warn("TAKEOVER_REJECTED", LogCtx(p.RemoteAccessIpAddress, null, p.SessionToken, p.AccessUserId, p.AccessPcName, null, RemotePcDbStatuses.InUse, 0, "DB 행 없음"));
+                                return false;
+                            }
+                            oldToken = ReadString(reader, 0);
+                            oldStatus = ReadString(reader, 1);
+                        }
+                    }
+
+                    if (string.Equals(oldToken, p.SessionToken, StringComparison.Ordinal))
+                    {
+                        tx.Rollback();
+                        return true;
+                    }
+
+                    if (string.Equals(oldStatus, RemotePcDbStatuses.Available, StringComparison.OrdinalIgnoreCase))
+                    {
+                        tx.Rollback();
+                        return TryReserveCore(CloneReserveWithoutTakeover(p));
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(oldToken))
+                    {
+                        using (var cmd = conn.CreateCommand())
+                        {
+                            cmd.Transaction = tx;
+                            cmd.BindByName = true;
+                            cmd.CommandText =
+                                @"UPDATE " + LogTableName + @"
+                                     SET SESSION_STATUS = :ended,
+                                         ENDED_AT = :koreaNow,
+                                         END_SOURCE = :endSource,
+                                         RESULT_MESSAGE = :notice,
+                                         UPDT_DTM = :koreaNow
+                                   WHERE SESSION_TOKEN = :oldToken
+                                     AND ENDED_AT IS NULL";
+                            cmd.Parameters.Add("ended", OracleDbType.Varchar2).Value = "ENDED";
+                            AddKoreaNow(cmd, "koreaNow");
+                            cmd.Parameters.Add("endSource", OracleDbType.Varchar2).Value = "TAKEOVER";
+                            cmd.Parameters.Add("notice", OracleDbType.Varchar2).Value = (object)Truncate(p.TakeoverNotice, 1000) ?? DBNull.Value;
+                            cmd.Parameters.Add("oldToken", OracleDbType.Varchar2).Value = oldToken;
+                            cmd.ExecuteNonQuery();
+                        }
+                    }
+
+                    int rows;
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.Transaction = tx;
+                        cmd.BindByName = true;
+                        cmd.CommandText =
+                            @"UPDATE " + TableName + @"
+                                 SET ACCS_IP_ADDR = :accessIp,
+                                     ACCS_STS_CD = :inUse,
+                                     ACCS_USER_ID = :accessUserId,
+                                     ACCS_PC_NM = :accessPcName,
+                                     SESSION_TOKEN = :sessionToken,
+                                     ACCS_STRT_DTM = :koreaNow,
+                                     REMOTE_ACCS_DTM = :koreaNow,
+                                     LAST_HRTBT_DTM = NULL,
+                                     UPDT_DTM = :koreaNow
+                               WHERE REMOTE_ACCS_IP_ADDR = :remoteIp
+                                 AND ACCS_STS_CD IN (:inUse2, :connecting, :checkRequired)";
+                        cmd.Parameters.Add("accessIp", OracleDbType.Varchar2).Value = (object)p.AccessIpAddress ?? DBNull.Value;
+                        cmd.Parameters.Add("inUse", OracleDbType.Varchar2).Value = RemotePcDbStatuses.InUse;
+                        cmd.Parameters.Add("accessUserId", OracleDbType.Varchar2).Value = p.AccessUserId ?? string.Empty;
+                        cmd.Parameters.Add("accessPcName", OracleDbType.Varchar2).Value = p.AccessPcName ?? string.Empty;
+                        cmd.Parameters.Add("sessionToken", OracleDbType.Varchar2).Value = p.SessionToken;
+                        AddKoreaNow(cmd, "koreaNow");
+                        cmd.Parameters.Add("remoteIp", OracleDbType.Varchar2).Value = p.RemoteAccessIpAddress.Trim();
+                        cmd.Parameters.Add("inUse2", OracleDbType.Varchar2).Value = RemotePcDbStatuses.InUse;
+                        cmd.Parameters.Add("connecting", OracleDbType.Varchar2).Value = RemotePcDbStatuses.Connecting;
+                        cmd.Parameters.Add("checkRequired", OracleDbType.Varchar2).Value = RemotePcDbStatuses.CheckRequired;
+                        rows = cmd.ExecuteNonQuery();
+                    }
+
+                    if (rows != 1)
+                    {
+                        tx.Rollback();
+                        WorkHubFileLogger.Warn("TAKEOVER_REJECTED", LogCtx(p.RemoteAccessIpAddress, null, p.SessionToken, p.AccessUserId, p.AccessPcName, oldStatus, RemotePcDbStatuses.InUse, rows, "상태 변경됨"));
+                        return false;
+                    }
+
+                    tx.Commit();
+                    _lastConnectionOk = true;
+                    WorkHubFileLogger.Info("TAKEOVER_SUCCESS", LogCtx(p.RemoteAccessIpAddress, null, p.SessionToken, p.AccessUserId, p.AccessPcName, oldStatus, RemotePcDbStatuses.InUse, rows, "old=" + TruncToken(oldToken)));
+                    TryInsertUsageLog(p);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                FailConnection(ex);
+                WorkHubFileLogger.Error("TAKEOVER_REJECTED", LogCtx(p.RemoteAccessIpAddress, null, p.SessionToken, p.AccessUserId, p.AccessPcName, null, RemotePcDbStatuses.InUse, 0, _lastConnectionError));
+                return false;
+            }
+        }
+
+        private static RemotePcReserveParams CloneReserveWithoutTakeover(RemotePcReserveParams p)
+        {
+            return new RemotePcReserveParams
+            {
+                RemoteAccessIpAddress = p.RemoteAccessIpAddress,
+                RemotePcName = p.RemotePcName,
+                AccessIpAddress = p.AccessIpAddress,
+                AccessUserId = p.AccessUserId,
+                AccessPcName = p.AccessPcName,
+                SessionToken = p.SessionToken
+            };
+        }
+
+        private static string Truncate(string value, int max)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return null;
+            string trimmed = value.Trim();
+            if (trimmed.Length <= max)
+                return trimmed;
+            return trimmed.Substring(0, max);
+        }
+
         private bool ConfirmConnectionCore(string remoteIp, string sessionToken)
         {
             if (!EnsureConfigured() || string.IsNullOrWhiteSpace(remoteIp) || string.IsNullOrWhiteSpace(sessionToken))
@@ -278,15 +465,17 @@ namespace GBCWorkHub.DAC
                 using (var cmd = conn.CreateCommand())
                 {
                     // Reserve가 이미 IN_USE로 올릴 수 있음 — CONNECTING/IN_USE 모두 REMOTE_ACCS_DTM 갱신
+                    cmd.BindByName = true;
                     cmd.CommandText =
                         @"UPDATE " + TableName + @"
                              SET ACCS_STS_CD = :inUse,
-                                 REMOTE_ACCS_DTM = SYSTIMESTAMP,
-                                 UPDT_DTM = SYSTIMESTAMP
+                                 REMOTE_ACCS_DTM = :koreaNow,
+                                 UPDT_DTM = :koreaNow
                            WHERE REMOTE_ACCS_IP_ADDR = :remoteIp
                              AND SESSION_TOKEN = :sessionToken
                              AND ACCS_STS_CD IN (:connecting, :inUse2)";
                     cmd.Parameters.Add("inUse", OracleDbType.Varchar2).Value = RemotePcDbStatuses.InUse;
+                    AddKoreaNow(cmd, "koreaNow");
                     cmd.Parameters.Add("remoteIp", OracleDbType.Varchar2).Value = remoteIp.Trim();
                     cmd.Parameters.Add("sessionToken", OracleDbType.Varchar2).Value = sessionToken;
                     cmd.Parameters.Add("connecting", OracleDbType.Varchar2).Value = RemotePcDbStatuses.Connecting;
@@ -378,6 +567,7 @@ namespace GBCWorkHub.DAC
                 using (var conn = OpenConnection())
                 using (var cmd = conn.CreateCommand())
                 {
+                    cmd.BindByName = true;
                     cmd.CommandText =
                         @"INSERT INTO " + LogTableName + @"
                             (LOG_ID, SESSION_TOKEN, REMOTE_ACCS_IP_ADDR, REMOTE_PC_NM,
@@ -386,7 +576,7 @@ namespace GBCWorkHub.DAC
                           VALUES
                             (" + LogSequenceName + @".NEXTVAL, :sessionToken, :remoteIp, :remotePcNm,
                              :accessUserId, :accessPcName, :accessIp, :status,
-                             SYSTIMESTAMP, SYSTIMESTAMP, SYSTIMESTAMP)";
+                             :koreaNow, :koreaNow, :koreaNow)";
                     cmd.Parameters.Add("sessionToken", OracleDbType.Varchar2).Value = p.SessionToken;
                     cmd.Parameters.Add("remoteIp", OracleDbType.Varchar2).Value = (p.RemoteAccessIpAddress ?? string.Empty).Trim();
                     cmd.Parameters.Add("remotePcNm", OracleDbType.Varchar2).Value = (object)remotePcNm ?? DBNull.Value;
@@ -394,6 +584,7 @@ namespace GBCWorkHub.DAC
                     cmd.Parameters.Add("accessPcName", OracleDbType.Varchar2).Value = (object)p.AccessPcName ?? DBNull.Value;
                     cmd.Parameters.Add("accessIp", OracleDbType.Varchar2).Value = (object)p.AccessIpAddress ?? DBNull.Value;
                     cmd.Parameters.Add("status", OracleDbType.Varchar2).Value = RemotePcDbStatuses.InUse;
+                    AddKoreaNow(cmd, "koreaNow");
                     cmd.ExecuteNonQuery();
                 }
 
@@ -402,8 +593,67 @@ namespace GBCWorkHub.DAC
             }
             catch (Exception ex)
             {
+                if (TryReopenUsageLog(p))
+                    return;
                 WorkHubFileLogger.Warn("USAGE_LOG_INSERT", "failed: " + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// SESSION_TOKEN UNIQUE. 같은 토큰으로 다시 선점하면 INSERT가 실패하고
+        /// 점유는 IN_USE인데 이력은 ENDED로 남는다. 끝난 행을 다시 사용 중으로 연다.
+        /// </summary>
+        private bool TryReopenUsageLog(RemotePcReserveParams p)
+        {
+            if (p == null || string.IsNullOrWhiteSpace(p.SessionToken))
+                return false;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.BindByName = true;
+                    cmd.CommandText =
+                        @"UPDATE " + LogTableName + @"
+                             SET SESSION_STATUS = :status,
+                                 ENDED_AT = NULL,
+                                 END_SOURCE = NULL,
+                                 ACCS_USER_ID = :accessUserId,
+                                 ACCS_PC_NM = :accessPcName,
+                                 ACCS_IP_ADDR = :accessIp,
+                                 REMOTE_ACCS_IP_ADDR = :remoteIp,
+                                 REMOTE_PC_NM = NVL(:remotePcNm, REMOTE_PC_NM),
+                                 REQUESTED_AT = :koreaNow,
+                                 CONFIRMED_AT = NULL,
+                                 UPDT_DTM = :koreaNow
+                           WHERE SESSION_TOKEN = :sessionToken
+                             AND (ENDED_AT IS NOT NULL OR SESSION_STATUS = :ended)";
+                    cmd.Parameters.Add("status", OracleDbType.Varchar2).Value = RemotePcDbStatuses.InUse;
+                    cmd.Parameters.Add("accessUserId", OracleDbType.Varchar2).Value = p.AccessUserId ?? string.Empty;
+                    cmd.Parameters.Add("accessPcName", OracleDbType.Varchar2).Value = (object)p.AccessPcName ?? DBNull.Value;
+                    cmd.Parameters.Add("accessIp", OracleDbType.Varchar2).Value = (object)p.AccessIpAddress ?? DBNull.Value;
+                    cmd.Parameters.Add("remoteIp", OracleDbType.Varchar2).Value = (p.RemoteAccessIpAddress ?? string.Empty).Trim();
+                    cmd.Parameters.Add("remotePcNm", OracleDbType.Varchar2).Value =
+                        string.IsNullOrWhiteSpace(p.RemotePcName) ? (object)DBNull.Value : p.RemotePcName.Trim();
+                    AddKoreaNow(cmd, "koreaNow");
+                    cmd.Parameters.Add("sessionToken", OracleDbType.Varchar2).Value = p.SessionToken;
+                    cmd.Parameters.Add("ended", OracleDbType.Varchar2).Value = "ENDED";
+                    int rows = cmd.ExecuteNonQuery();
+                    if (rows >= 1)
+                    {
+                        WorkHubFileLogger.Info("USAGE_LOG_REOPEN",
+                            "token=" + TruncToken(p.SessionToken) + " remoteIp=" + p.RemoteAccessIpAddress);
+                        return true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WorkHubFileLogger.Warn("USAGE_LOG_REOPEN", "failed: " + ex.Message);
+            }
+
+            return false;
         }
 
         private void TryConfirmUsageLog(string sessionToken)
@@ -416,14 +666,16 @@ namespace GBCWorkHub.DAC
                 using (var conn = OpenConnection())
                 using (var cmd = conn.CreateCommand())
                 {
+                    cmd.BindByName = true;
                     cmd.CommandText =
                         @"UPDATE " + LogTableName + @"
                              SET SESSION_STATUS = :status,
-                                 CONFIRMED_AT = SYSTIMESTAMP,
-                                 UPDT_DTM = SYSTIMESTAMP
+                                 CONFIRMED_AT = :koreaNow,
+                                 UPDT_DTM = :koreaNow
                            WHERE SESSION_TOKEN = :sessionToken
                              AND ENDED_AT IS NULL";
                     cmd.Parameters.Add("status", OracleDbType.Varchar2).Value = RemotePcDbStatuses.InUse;
+                    AddKoreaNow(cmd, "koreaNow");
                     cmd.Parameters.Add("sessionToken", OracleDbType.Varchar2).Value = sessionToken;
                     int rows = cmd.ExecuteNonQuery();
                     WorkHubFileLogger.Info("USAGE_LOG_CONFIRM",
@@ -446,16 +698,18 @@ namespace GBCWorkHub.DAC
                 using (var conn = OpenConnection())
                 using (var cmd = conn.CreateCommand())
                 {
+                    cmd.BindByName = true;
                     cmd.CommandText =
                         @"UPDATE " + LogTableName + @"
                              SET SESSION_STATUS = :status,
-                                 ENDED_AT = SYSTIMESTAMP,
+                                 ENDED_AT = :koreaNow,
                                  END_SOURCE = :endSource,
-                                 UPDT_DTM = SYSTIMESTAMP
+                                 UPDT_DTM = :koreaNow
                            WHERE SESSION_TOKEN = :sessionToken
                              AND ENDED_AT IS NULL";
                     cmd.Parameters.Add("status", OracleDbType.Varchar2).Value = "ENDED";
                     cmd.Parameters.Add("endSource", OracleDbType.Varchar2).Value = endSource ?? "RELEASE";
+                    AddKoreaNow(cmd, "koreaNow");
                     cmd.Parameters.Add("sessionToken", OracleDbType.Varchar2).Value = sessionToken;
                     int rows = cmd.ExecuteNonQuery();
                     WorkHubFileLogger.Info("USAGE_LOG_END",
@@ -528,6 +782,56 @@ namespace GBCWorkHub.DAC
             }
         }
 
+        private RemotePcUsageLogDto GetUsageLogByTokenCore(string sessionToken)
+        {
+            if (!EnsureConfigured() || string.IsNullOrWhiteSpace(sessionToken))
+                return null;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.BindByName = true;
+                    cmd.CommandText =
+                        @"SELECT LOG_ID, SESSION_TOKEN, REMOTE_ACCS_IP_ADDR, REMOTE_PC_NM,
+                                 ACCS_USER_ID, ACCS_PC_NM, ACCS_IP_ADDR, SESSION_STATUS,
+                                 REQUESTED_AT, CONFIRMED_AT, ENDED_AT, END_SOURCE, RESULT_MESSAGE
+                            FROM " + LogTableName + @"
+                           WHERE SESSION_TOKEN = :sessionToken";
+                    cmd.Parameters.Add("sessionToken", OracleDbType.Varchar2).Value = sessionToken.Trim();
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (!reader.Read())
+                            return null;
+                        _lastConnectionOk = true;
+                        return new RemotePcUsageLogDto
+                        {
+                            LogId = Convert.ToInt64(reader.GetValue(0)),
+                            SessionToken = ReadString(reader, 1),
+                            RemoteAccessIpAddress = ReadString(reader, 2),
+                            RemotePcName = ReadString(reader, 3),
+                            AccessUserId = ReadString(reader, 4),
+                            AccessPcName = ReadString(reader, 5),
+                            AccessIpAddress = ReadString(reader, 6),
+                            SessionStatus = ReadString(reader, 7),
+                            RequestedAt = ReadTimestamp(reader, 8),
+                            ConfirmedAt = ReadTimestamp(reader, 9),
+                            EndedAt = ReadTimestamp(reader, 10),
+                            EndSource = ReadString(reader, 11),
+                            ResultMessage = ReadString(reader, 12)
+                        };
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                FailConnection(ex);
+                WorkHubFileLogger.Warn("USAGE_LOG_BY_TOKEN", "failed: " + _lastConnectionError);
+                return null;
+            }
+        }
+
         private List<RemotePcUsageLogDto> GetRecentUsageLogsCore(string remoteIp, int take)
         {
             var list = new List<RemotePcUsageLogDto>();
@@ -590,6 +894,269 @@ namespace GBCWorkHub.DAC
             return list;
         }
 
+        private List<RemotePcUsageLogDto> GetRecentEndedUsageLogsCore(int take)
+        {
+            var list = new List<RemotePcUsageLogDto>();
+            if (!EnsureConfigured())
+                return list;
+
+            if (take <= 0)
+                take = 20;
+            if (take > 50)
+                take = 50;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText =
+                        @"SELECT * FROM (
+                              SELECT LOG_ID, SESSION_TOKEN, REMOTE_ACCS_IP_ADDR, REMOTE_PC_NM,
+                                     ACCS_USER_ID, ACCS_PC_NM, ACCS_IP_ADDR, SESSION_STATUS,
+                                     REQUESTED_AT, CONFIRMED_AT, ENDED_AT, END_SOURCE
+                                FROM " + LogTableName + @"
+                               WHERE ENDED_AT IS NOT NULL
+                                 AND REQUESTED_AT IS NOT NULL
+                               ORDER BY ENDED_AT DESC, LOG_ID DESC
+                          ) WHERE ROWNUM <= :take";
+                    cmd.Parameters.Add("take", OracleDbType.Int32).Value = take;
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            list.Add(new RemotePcUsageLogDto
+                            {
+                                LogId = Convert.ToInt64(reader.GetValue(0)),
+                                SessionToken = ReadString(reader, 1),
+                                RemoteAccessIpAddress = ReadString(reader, 2),
+                                RemotePcName = ReadString(reader, 3),
+                                AccessUserId = ReadString(reader, 4),
+                                AccessPcName = ReadString(reader, 5),
+                                AccessIpAddress = ReadString(reader, 6),
+                                SessionStatus = ReadString(reader, 7),
+                                RequestedAt = ReadTimestamp(reader, 8),
+                                ConfirmedAt = ReadTimestamp(reader, 9),
+                                EndedAt = ReadTimestamp(reader, 10),
+                                EndSource = ReadString(reader, 11)
+                            });
+                        }
+                    }
+                }
+
+                _lastConnectionOk = true;
+            }
+            catch (Exception ex)
+            {
+                FailConnection(ex);
+                WorkHubFileLogger.Warn("USAGE_LOG_SELECT_ENDED", "failed: " + ex.Message);
+            }
+
+            return list;
+        }
+
+        private List<RemotePcUsageLogDto> GetRecentUsageLogsForOccupantCore(
+            string occupancyName,
+            string windowsAccount,
+            string samAccount,
+            string accessPcName,
+            int take,
+            DateTime? fromAt,
+            DateTime? toAt)
+        {
+            var list = new List<RemotePcUsageLogDto>();
+            if (!EnsureConfigured())
+                return list;
+
+            if (take <= 0)
+                take = 20;
+            if (take > 200)
+                take = 200;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.BindByName = true;
+                    cmd.CommandText =
+                        @"SELECT * FROM (
+                              SELECT h.LOG_ID, h.SESSION_TOKEN, h.REMOTE_ACCS_IP_ADDR, h.REMOTE_PC_NM,
+                                     h.ACCS_USER_ID, h.ACCS_PC_NM, h.ACCS_IP_ADDR, h.SESSION_STATUS,
+                                     h.REQUESTED_AT, h.CONFIRMED_AT, h.ENDED_AT, h.END_SOURCE,
+                                     p.SITE_CD
+                                FROM " + LogTableName + @" h
+                                LEFT JOIN " + TableName + @" p
+                                  ON p.REMOTE_ACCS_IP_ADDR = h.REMOTE_ACCS_IP_ADDR
+                               WHERE (
+                                     (:occ IS NOT NULL AND UPPER(TRIM(h.ACCS_USER_ID)) = UPPER(:occ))
+                                  OR (:win IS NOT NULL AND UPPER(TRIM(h.ACCS_USER_ID)) = UPPER(:win))
+                                  OR (:sam IS NOT NULL AND (
+                                         UPPER(TRIM(h.ACCS_USER_ID)) = UPPER(:sam)
+                                      OR UPPER(TRIM(h.ACCS_USER_ID)) LIKE '%\\' || UPPER(:sam)
+                                     ))
+                                  OR (:pc IS NOT NULL AND UPPER(TRIM(h.ACCS_PC_NM)) = UPPER(:pc))
+                               )
+                                 AND (:fromAt IS NULL OR h.REQUESTED_AT >= :fromAt)
+                                 AND (:toAt IS NULL OR h.REQUESTED_AT <= :toAt)
+                               ORDER BY h.REQUESTED_AT DESC NULLS LAST, h.LOG_ID DESC
+                          ) WHERE ROWNUM <= :take";
+                    cmd.Parameters.Add("occ", OracleDbType.Varchar2).Value = BindOptionalText(occupancyName);
+                    cmd.Parameters.Add("win", OracleDbType.Varchar2).Value = BindOptionalText(windowsAccount);
+                    cmd.Parameters.Add("sam", OracleDbType.Varchar2).Value = BindOptionalText(samAccount);
+                    cmd.Parameters.Add("pc", OracleDbType.Varchar2).Value = BindOptionalText(accessPcName);
+                    cmd.Parameters.Add("fromAt", OracleDbType.TimeStamp).Value = BindOptionalTime(fromAt);
+                    cmd.Parameters.Add("toAt", OracleDbType.TimeStamp).Value = BindOptionalTime(toAt);
+                    cmd.Parameters.Add("take", OracleDbType.Int32).Value = take;
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            list.Add(new RemotePcUsageLogDto
+                            {
+                                LogId = Convert.ToInt64(reader.GetValue(0)),
+                                SessionToken = ReadString(reader, 1),
+                                RemoteAccessIpAddress = ReadString(reader, 2),
+                                RemotePcName = ReadString(reader, 3),
+                                AccessUserId = ReadString(reader, 4),
+                                AccessPcName = ReadString(reader, 5),
+                                AccessIpAddress = ReadString(reader, 6),
+                                SessionStatus = ReadString(reader, 7),
+                                RequestedAt = ReadTimestamp(reader, 8),
+                                ConfirmedAt = ReadTimestamp(reader, 9),
+                                EndedAt = ReadTimestamp(reader, 10),
+                                EndSource = ReadString(reader, 11),
+                                SiteCode = reader.FieldCount > 12 ? ReadString(reader, 12) : null
+                            });
+                        }
+                    }
+                }
+
+                _lastConnectionOk = true;
+            }
+            catch (Exception ex)
+            {
+                FailConnection(ex);
+                WorkHubFileLogger.Warn("USAGE_LOG_SELECT_MINE", "failed: " + ex.Message);
+            }
+
+            return list;
+        }
+
+        private int RenameOccupantCore(string oldName, string newName, string accessPcName)
+        {
+            if (string.IsNullOrWhiteSpace(oldName) || string.IsNullOrWhiteSpace(newName))
+                return 0;
+            if (string.Equals(oldName.Trim(), newName.Trim(), StringComparison.Ordinal))
+                return 0;
+            if (!EnsureConfigured())
+                return 0;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                using (var tx = conn.BeginTransaction())
+                {
+                    int rows = 0;
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.Transaction = tx;
+                        cmd.BindByName = true;
+                        cmd.CommandText =
+                            @"UPDATE " + TableName + @"
+                                 SET ACCS_USER_ID = :newNm,
+                                     UPDT_DTM = SYSTIMESTAMP
+                               WHERE UPPER(TRIM(ACCS_USER_ID)) = UPPER(:oldNm)
+                                 AND (:pc IS NULL OR UPPER(TRIM(ACCS_PC_NM)) = UPPER(:pc))";
+                        cmd.Parameters.Add("newNm", OracleDbType.Varchar2).Value = newName.Trim();
+                        cmd.Parameters.Add("oldNm", OracleDbType.Varchar2).Value = oldName.Trim();
+                        cmd.Parameters.Add("pc", OracleDbType.Varchar2).Value =
+                            string.IsNullOrWhiteSpace(accessPcName) ? (object)DBNull.Value : accessPcName.Trim();
+                        rows += cmd.ExecuteNonQuery();
+                    }
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.Transaction = tx;
+                        cmd.BindByName = true;
+                        cmd.CommandText =
+                            @"UPDATE " + LogTableName + @"
+                                 SET ACCS_USER_ID = :newNm
+                               WHERE UPPER(TRIM(ACCS_USER_ID)) = UPPER(:oldNm)
+                                 AND (:pc IS NULL OR UPPER(TRIM(ACCS_PC_NM)) = UPPER(:pc))";
+                        cmd.Parameters.Add("newNm", OracleDbType.Varchar2).Value = newName.Trim();
+                        cmd.Parameters.Add("oldNm", OracleDbType.Varchar2).Value = oldName.Trim();
+                        cmd.Parameters.Add("pc", OracleDbType.Varchar2).Value =
+                            string.IsNullOrWhiteSpace(accessPcName) ? (object)DBNull.Value : accessPcName.Trim();
+                        rows += cmd.ExecuteNonQuery();
+                    }
+                    tx.Commit();
+                    _lastConnectionOk = true;
+                    return rows;
+                }
+            }
+            catch (Exception ex)
+            {
+                FailConnection(ex);
+                WorkHubFileLogger.Warn("OCCUPANCY_RENAME", "RenameOccupant failed: " + _lastConnectionError);
+                return -1;
+            }
+        }
+
+        private int PurgeUsageLogsOlderThanMonthsCore(int months)
+        {
+            if (months <= 0)
+                months = 1;
+            if (!EnsureConfigured())
+                return 0;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.BindByName = true;
+                    cmd.CommandText =
+                        @"DELETE FROM " + LogTableName + @"
+                           WHERE REQUESTED_AT < ADD_MONTHS(SYSTIMESTAMP, 0 - :months)
+                             AND (SESSION_STATUS IS NULL
+                               OR UPPER(TRIM(SESSION_STATUS)) NOT IN ('IN_USE','CONNECTING'))";
+                    cmd.Parameters.Add("months", OracleDbType.Int32).Value = months;
+                    int rows = cmd.ExecuteNonQuery();
+                    _lastConnectionOk = true;
+                    if (rows > 0)
+                        WorkHubFileLogger.Info("USAGE_LOG_PURGE", "deleted " + rows + " rows older than " + months + " month(s)");
+                    return rows;
+                }
+            }
+            catch (Exception ex)
+            {
+                FailConnection(ex);
+                WorkHubFileLogger.Warn("USAGE_LOG_PURGE", "failed: " + ex.Message);
+                return 0;
+            }
+        }
+
+        private static object BindOptionalText(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return DBNull.Value;
+            return value.Trim();
+        }
+
+        private static object BindOptionalTime(DateTime? value)
+        {
+            if (!value.HasValue)
+                return DBNull.Value;
+            return value.Value;
+        }
+
+        private static void AddKoreaNow(OracleCommand cmd, string name)
+        {
+            cmd.Parameters.Add(name, OracleDbType.TimeStamp).Value = KoreaTime.Now;
+        }
+
         private static RemotePcStatus MapRow(IDataRecord reader)
         {
             return new RemotePcStatus
@@ -623,6 +1190,7 @@ namespace GBCWorkHub.DAC
         {
             var conn = new OracleConnection(_connectionString);
             conn.Open();
+            OracleKoreaSession.Apply(conn);
             _lastConnectionOk = true;
             _lastConnectionError = null;
             return conn;
@@ -670,12 +1238,12 @@ namespace GBCWorkHub.DAC
             if (reader.IsDBNull(ordinal))
                 return null;
             object v = reader.GetValue(ordinal);
-            if (v is DateTime)
-                return (DateTime)v;
             DateTime dt;
-            if (DateTime.TryParse(Convert.ToString(v), out dt))
-                return dt;
-            return null;
+            if (v is DateTime)
+                dt = (DateTime)v;
+            else if (!DateTime.TryParse(Convert.ToString(v), out dt))
+                return null;
+            return KoreaTime.ToKorea(dt);
         }
 
         private static string SafeError(Exception ex)

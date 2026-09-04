@@ -16,17 +16,17 @@
             </ResourceDictionary.MergedDictionaries>
 
             <Style TargetType="{x:Type Window}">
-                <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+                <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
                 <Setter Property="FontSize" Value="{StaticResource FontSize.Base}" />
                 <Setter Property="UseLayoutRounding" Value="True" />
-                <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+                <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
                 <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
             </Style>
             <Style TargetType="{x:Type UserControl}">
-                <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+                <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
                 <Setter Property="FontSize" Value="{StaticResource FontSize.Base}" />
                 <Setter Property="UseLayoutRounding" Value="True" />
-                <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+                <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
                 <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
             </Style>
 
@@ -41,6 +41,7 @@
                 <Setter Property="VerticalScrollBarVisibility" Value="Hidden" />
                 <!-- Hidden이면 가로 infinite measure로 입력칸이 화면을 넘어감 → Disabled로 너비 제한 -->
                 <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             </Style>
         </ResourceDictionary>
     </Application.Resources>

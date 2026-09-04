@@ -4,10 +4,22 @@ namespace GBCWorkHub.UI.Models.Popup
     {
         public PopupResultType ResultType { get; set; }
         public string ButtonText { get; set; }
+        public string InputText { get; set; }
+        public string AffiliationText { get; set; }
 
-        public static PopupResult From(PopupResultType type, string buttonText = null)
+        public static PopupResult From(
+            PopupResultType type,
+            string buttonText = null,
+            string inputText = null,
+            string affiliationText = null)
         {
-            return new PopupResult { ResultType = type, ButtonText = buttonText };
+            return new PopupResult
+            {
+                ResultType = type,
+                ButtonText = buttonText,
+                InputText = inputText,
+                AffiliationText = affiliationText
+            };
         }
 
         public bool IsPrimary

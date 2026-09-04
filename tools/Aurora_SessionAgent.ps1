@@ -1,30 +1,25 @@
-#requires -Version 5.0
 <#
 .SYNOPSIS
-  Aurora single SessionAgent (same role as RC/CMC exe).
-  Replaces Collect-RdpStatus / Collect-TfsRecent3 / Handle-RdpConnect /
-  Send-PendingTfsOnReconnect / Collect-RdpDisconnect.ps1
+  Single Aurora SessionAgent: RDP connect status + TFS fetch.
 
 .DESCRIPTION
-  Trigger (disconnect not needed; fetch = reconnect connect):
-    powershell.exe -STA -NoProfile -ExecutionPolicy Bypass -File C:\GBCWorkHub\Aurora_SessionAgent.ps1 connect
+  One file per Aurora PC. Event 21 scheduler only:
 
-  TFS has no REST _apis here -> Team Explorer OM (GAC) QueryHistory.
-  Keep this file ASCII-only (no Korean) so copy/encoding cannot break parsing.
+    powershell.exe -STA -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\GBCWorkHub\Aurora_SessionAgent.ps1" connect
+
+  No .bak, no stubs, no disconnect task.
 #>
 param(
     [Parameter(Position = 0)]
     [string]$Action = 'connect'
 )
 
-# No StrictMode: missing JSON props under scheduler often caused 0x1
 $ErrorActionPreference = 'Stop'
 $Action = ([string]$Action).Trim().ToLowerInvariant()
 if ($Action -notin @('connect', 'disconnect', 'test')) {
     $Action = 'connect'
 }
 
-# Earliest failure breadcrumb (even before functions)
 try {
     $bootLogDir = 'C:\GBCWorkHub\Logs'
     if (-not (Test-Path -LiteralPath $bootLogDir)) {
@@ -47,15 +42,11 @@ trap {
     break
 }
 
-# ============================================================
-# Configuration (edit per site)
-# ============================================================
 $BaseDirectory = 'C:\GBCWorkHub'
 $CollectionUrl = 'http://172.20.0.90:8080/tfs/bestcare2.0b_v1.0'
 $ServerPath = '$/HISSolutions'
 $TfsMaxChangesets = 100
 $TfsFallbackTodayMax = 50
-
 $TfsClientDllDefault = 'C:\Windows\Microsoft.NET\assembly\GAC_MSIL\Microsoft.TeamFoundation.Client\v4.0_12.0.0.0__b03f5f7f11d50a3a\Microsoft.TeamFoundation.Client.dll'
 $TfsVcDllDefault = 'C:\Windows\Microsoft.NET\assembly\GAC_MSIL\Microsoft.TeamFoundation.VersionControl.Client\v4.0_12.0.0.0__b03f5f7f11d50a3a\Microsoft.TeamFoundation.VersionControl.Client.dll'
 
@@ -65,16 +56,12 @@ $SyncRequestPrefix = 'GBCWORKHUB_TFS_SYNC_REQUEST::'
 $AckPrefix = 'GBCWORKHUB_ACK::'
 $PendingFileName = 'PendingTfsRecent.json'
 $SessionStartedFileName = 'SessionStartedUtc.txt'
-$LogFileName = 'SessionAgent.log'
 
-# ============================================================
-# Paths / init
-# ============================================================
 $LogDirectory = Join-Path $BaseDirectory 'Logs'
 $PendingPath = Join-Path $BaseDirectory $PendingFileName
 $SessionStartedPath = Join-Path $BaseDirectory $SessionStartedFileName
 $LastStatusPath = Join-Path $BaseDirectory 'LastStatus.json'
-$LogPath = Join-Path $LogDirectory $LogFileName
+$LogPath = Join-Path $LogDirectory 'SessionAgent.log'
 $ErrorLogPath = Join-Path $BaseDirectory 'SessionAgentError.log'
 
 New-Item -ItemType Directory -Path $BaseDirectory -Force | Out-Null
@@ -82,9 +69,6 @@ New-Item -ItemType Directory -Path $LogDirectory -Force | Out-Null
 
 $script:UserClipboardBackup = $null
 
-# ============================================================
-# Helpers
-# ============================================================
 function Write-AgentLog {
     param([string]$Message)
     try {
@@ -118,6 +102,15 @@ function Write-JsonFile {
 function Test-ProtocolText {
     param([string]$Text)
     return (-not [string]::IsNullOrEmpty($Text)) -and $Text.StartsWith('GBCWORKHUB', [StringComparison]::Ordinal)
+}
+
+# Scheduler command that was copied while setting up the task. Do not treat as user paste.
+function Test-JunkClipboard {
+    param([string]$Text)
+    if ([string]::IsNullOrWhiteSpace($Text)) { return $false }
+    $t = $Text.TrimStart()
+    return $t.StartsWith('powershell.exe -STA', [StringComparison]::OrdinalIgnoreCase) -or
+        $t.StartsWith('powershell -STA', [StringComparison]::OrdinalIgnoreCase)
 }
 
 function Get-ClipboardTextSafe {
@@ -155,32 +148,28 @@ function Clear-ProtocolClipboard {
             return
         }
         catch {
-            try {
-                cmd.exe /c 'echo.| clip' | Out-Null
-                return
-            }
-            catch { }
+            try { cmd.exe /c 'echo.| clip' | Out-Null; return } catch { }
             Start-Sleep -Milliseconds 200
         }
     }
 }
 
 function Restore-UserClipboard {
+    # Prefix 기준: GBCWORKHUB* 만 복원/정리. 일반 텍스트는 건드리지 않음.
     $backup = $script:UserClipboardBackup
-    # No backup: leave GBCWORKHUB* stuck and paste shows protocol only
-    if ([string]::IsNullOrEmpty($backup)) {
-        Clear-ProtocolClipboard
-        return
-    }
-
     $current = Get-ClipboardTextSafe
-    if (-not [string]::IsNullOrEmpty($current) -and
-        -not (Test-ProtocolText $current) -and
-        $current -cne $backup) {
+    $hasPrefix = Test-ProtocolText $current
+
+    if (-not $hasPrefix -and -not [string]::IsNullOrEmpty($current)) {
         return
     }
 
-    if (-not (Set-ClipboardTextSafe $backup)) {
+    if (-not [string]::IsNullOrEmpty($backup)) {
+        [void](Set-ClipboardTextSafe $backup)
+        return
+    }
+
+    if ($hasPrefix) {
         Clear-ProtocolClipboard
     }
 }
@@ -192,7 +181,7 @@ function Send-ClipboardPayload {
     )
 
     $cur = Get-ClipboardTextSafe
-    if (-not [string]::IsNullOrEmpty($cur) -and -not (Test-ProtocolText $cur)) {
+    if (-not [string]::IsNullOrEmpty($cur) -and -not (Test-ProtocolText $cur) -and -not (Test-JunkClipboard $cur)) {
         $script:UserClipboardBackup = $cur
     }
 
@@ -201,7 +190,6 @@ function Send-ClipboardPayload {
     }
 
     if ($IsTfs) {
-        # Wait for ACK / user copy / timeout, then restore (keep short so scheduler ends)
         $minHoldMs = 1500
         $maxWaitMs = 6000
         $stepMs = 250
@@ -221,13 +209,15 @@ function Send-ClipboardPayload {
         Restore-UserClipboard
     }
     else {
-        Start-Sleep -Milliseconds 800
+        # Old Collect-RdpStatus left GBCWORKHUB:: on the clipboard.
+        # 800ms is too short for local WM_CLIPBOARDUPDATE + GetText retries.
+        Start-Sleep -Milliseconds 2500
         Restore-UserClipboard
     }
     return $true
 }
 
-function ConvertTo-CompactJson {
+function Convert-ToCompactJson {
     param([object]$Value, [int]$Depth = 40)
     return ($Value | ConvertTo-Json -Depth $Depth -Compress)
 }
@@ -284,9 +274,6 @@ function Normalize-ChangeType {
     return 'edit'
 }
 
-# ============================================================
-# RDP status / SYNC request
-# ============================================================
 function New-RdpStatusObject {
     param(
         [int]$EventId,
@@ -310,6 +297,65 @@ function New-RdpStatusObject {
     }
 }
 
+function Get-NormalizedComputerName {
+    param([string]$Name)
+    if ([string]::IsNullOrWhiteSpace($Name)) { return '' }
+    $s = $Name.Trim()
+    $slash = $s.LastIndexOf('\')
+    if ($slash -ge 0 -and $slash -lt ($s.Length - 1)) { $s = $s.Substring($slash + 1) }
+    $dot = $s.IndexOf('.')
+    if ($dot -gt 0) { $s = $s.Substring(0, $dot) }
+    return $s
+}
+
+function Test-ComputerNamesLooselyMatch {
+    param([string]$Left, [string]$Right)
+    $a = Get-NormalizedComputerName $Left
+    $b = Get-NormalizedComputerName $Right
+    if ([string]::IsNullOrWhiteSpace($a) -or [string]::IsNullOrWhiteSpace($b)) { return $false }
+    if ([string]::Equals($a, $b, [StringComparison]::OrdinalIgnoreCase)) { return $true }
+    $ca = $a.Replace('-', '').Replace('_', '')
+    $cb = $b.Replace('-', '').Replace('_', '')
+    return (-not [string]::IsNullOrWhiteSpace($ca)) -and
+        [string]::Equals($ca, $cb, [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-LocalIpv4List {
+    $list = New-Object System.Collections.Generic.List[string]
+    try {
+        $nics = [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces()
+        foreach ($n in $nics) {
+            if ($n.OperationalStatus -ne 'Up') { continue }
+            foreach ($a in $n.GetIPProperties().UnicastAddresses) {
+                if ($a.Address.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) { continue }
+                $ip = [string]$a.Address
+                if ([string]::IsNullOrWhiteSpace($ip) -or $ip.StartsWith('127.')) { continue }
+                $list.Add($ip)
+            }
+        }
+    }
+    catch { }
+    return $list
+}
+
+function Test-TargetedAtThisPc {
+    param([string]$TargetComputerName, [string]$RemoteIp)
+    if ([string]::IsNullOrWhiteSpace($TargetComputerName) -and [string]::IsNullOrWhiteSpace($RemoteIp)) {
+        return $true
+    }
+    if (-not [string]::IsNullOrWhiteSpace($TargetComputerName) -and
+        (Test-ComputerNamesLooselyMatch -Left $TargetComputerName -Right $env:COMPUTERNAME)) {
+        return $true
+    }
+    if (-not [string]::IsNullOrWhiteSpace($RemoteIp)) {
+        $want = $RemoteIp.Trim()
+        foreach ($ip in (Get-LocalIpv4List)) {
+            if ([string]::Equals($ip, $want, [StringComparison]::OrdinalIgnoreCase)) { return $true }
+        }
+    }
+    return $false
+}
+
 function Try-ReadSyncRequest {
     $text = Get-ClipboardTextSafe
     if ([string]::IsNullOrWhiteSpace($text)) { return $null }
@@ -329,6 +375,8 @@ function Try-ReadSyncRequest {
         if (Try-ParseDateTimeUtc ([string]$obj.sessionEndedAtUtc) ([ref]$tmp)) { $ended = $tmp }
         return [pscustomobject]@{
             RequestId          = [string]$obj.requestId
+            TargetComputerName = [string]$obj.targetComputerName
+            RemoteIp           = [string]$obj.remoteIp
             SessionStartedUtc  = $started
             SessionEndedUtc    = $ended
         }
@@ -397,9 +445,6 @@ function Resolve-CollectWindow {
     }
 }
 
-# ============================================================
-# TFS OM collect (same approach as Collect-TfsRecent3.ps1)
-# ============================================================
 function Collect-TfsPayload {
     param(
         [string]$RequestId,
@@ -409,17 +454,12 @@ function Collect-TfsPayload {
     )
 
     $window = Resolve-CollectWindow -SyncStartedUtc $SyncStartedUtc -SyncEndedUtc $SyncEndedUtc
-    Write-AgentLog ("TFS_COLLECT_START | mode=TFS_OM url=$CollectionUrl window=$($window.FromUtc.ToString('o'))~$($window.ToUtc.ToString('o')) source=$($window.Source)")
+    Write-AgentLog ("TFS_COLLECT_START | url=$CollectionUrl window=$($window.FromUtc.ToString('o'))~$($window.ToUtc.ToString('o')) source=$($window.Source)")
 
     $clientDll = Resolve-TfsDllPath -AssemblyName 'Microsoft.TeamFoundation.Client' -Preferred $TfsClientDllDefault
     $vcDll = Resolve-TfsDllPath -AssemblyName 'Microsoft.TeamFoundation.VersionControl.Client' -Preferred $TfsVcDllDefault
-
-    if (-not (Test-Path -LiteralPath $clientDll)) {
-        throw "TFS Client DLL not found (Team Explorer required): $clientDll"
-    }
-    if (-not (Test-Path -LiteralPath $vcDll)) {
-        throw "TFS VersionControl DLL not found: $vcDll"
-    }
+    if (-not (Test-Path -LiteralPath $clientDll)) { throw "TFS Client DLL not found: $clientDll" }
+    if (-not (Test-Path -LiteralPath $vcDll)) { throw "TFS VersionControl DLL not found: $vcDll" }
 
     Add-Type -Path $clientDll -ErrorAction Stop
     Add-Type -Path $vcDll -ErrorAction Stop
@@ -428,25 +468,16 @@ function Collect-TfsPayload {
     try {
         $tfsCollection = New-Object Microsoft.TeamFoundation.Client.TfsTeamProjectCollection ([Uri]$CollectionUrl)
         $tfsCollection.EnsureAuthenticated()
-
         $vcType = [Microsoft.TeamFoundation.VersionControl.Client.VersionControlServer]
         $versionControl = $tfsCollection.GetService($vcType)
-        if ($null -eq $versionControl) {
-            throw 'VersionControlServer service could not be loaded.'
-        }
+        if ($null -eq $versionControl) { throw 'VersionControlServer service could not be loaded.' }
 
         $authorizedIdentity = $versionControl.AuthorizedIdentity
         $authorizedUserId = [string](Get-FirstProp -Object $authorizedIdentity -Names @('UniqueName', 'DisplayName'))
         $authorizedUserName = [string](Get-FirstProp -Object $authorizedIdentity -Names @('DisplayName', 'UniqueName'))
-        if ([string]::IsNullOrWhiteSpace($authorizedUserId)) {
-            $authorizedUserId = [string]$versionControl.AuthorizedUser
-        }
-        if ([string]::IsNullOrWhiteSpace($authorizedUserName)) {
-            $authorizedUserName = $authorizedUserId
-        }
-        if ([string]::IsNullOrWhiteSpace($authorizedUserId)) {
-            throw 'Authorized TFS user could not be resolved.'
-        }
+        if ([string]::IsNullOrWhiteSpace($authorizedUserId)) { $authorizedUserId = [string]$versionControl.AuthorizedUser }
+        if ([string]::IsNullOrWhiteSpace($authorizedUserName)) { $authorizedUserName = $authorizedUserId }
+        if ([string]::IsNullOrWhiteSpace($authorizedUserId)) { throw 'Authorized TFS user could not be resolved.' }
 
         Write-AgentLog ("TFS_OM_AUTH | user=$authorizedUserId")
 
@@ -454,42 +485,19 @@ function Collect-TfsPayload {
         $fromLocal = $window.FromLocal
         $toLocal = $window.ToLocal
         $maxCount = $TfsMaxChangesets
-
-        $changesetItems = @(Get-OmChangesets `
-                -VersionControl $versionControl `
-                -UserId $authorizedUserId `
-                -FromLocal $fromLocal `
-                -ToLocal $toLocal `
-                -MaxCount $maxCount)
+        $changesetItems = @(Get-OmChangesets -VersionControl $versionControl -UserId $authorizedUserId -FromLocal $fromLocal -ToLocal $toLocal -MaxCount $maxCount)
 
         if ($changesetItems.Count -eq 0) {
-            Write-AgentLog ('TFS_COLLECT_EMPTY_WINDOW | fallback=TODAY_FALLBACK')
+            Write-AgentLog 'TFS_COLLECT_EMPTY_WINDOW | fallback=TODAY_FALLBACK'
             $queryMode = 'TODAY_FALLBACK'
             $fromLocal = [DateTime]::Today
             $toLocal = [DateTime]::Now.AddMinutes(1)
             $maxCount = $TfsFallbackTodayMax
-            $changesetItems = @(Get-OmChangesets `
-                    -VersionControl $versionControl `
-                    -UserId $authorizedUserId `
-                    -FromLocal $fromLocal `
-                    -ToLocal $toLocal `
-                    -MaxCount $maxCount)
-            Write-AgentLog ("TFS_FALLBACK_DONE | count=$($changesetItems.Count)")
+            $changesetItems = @(Get-OmChangesets -VersionControl $versionControl -UserId $authorizedUserId -FromLocal $fromLocal -ToLocal $toLocal -MaxCount $maxCount)
         }
 
-        $sessionStartLocal = if ($queryMode -eq 'TODAY_FALLBACK') {
-            [DateTime]::Today.ToString('yyyy-MM-dd HH:mm:ss')
-        }
-        else {
-            $window.FromLocal.ToString('yyyy-MM-dd HH:mm:ss')
-        }
-        $sessionEndLocal = if ($queryMode -eq 'TODAY_FALLBACK') {
-            (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
-        }
-        else {
-            $window.ToLocal.ToString('yyyy-MM-dd HH:mm:ss')
-        }
-
+        $sessionStartLocal = if ($queryMode -eq 'TODAY_FALLBACK') { [DateTime]::Today.ToString('yyyy-MM-dd HH:mm:ss') } else { $window.FromLocal.ToString('yyyy-MM-dd HH:mm:ss') }
+        $sessionEndLocal = if ($queryMode -eq 'TODAY_FALLBACK') { (Get-Date).ToString('yyyy-MM-dd HH:mm:ss') } else { $window.ToLocal.ToString('yyyy-MM-dd HH:mm:ss') }
         $now = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
         $payload = [ordered]@{
             type               = 'GBC_TFS_RECENT_CHANGESETS'
@@ -509,31 +517,22 @@ function Collect-TfsPayload {
             collectedAt        = $now
             requestId          = $(if ([string]::IsNullOrWhiteSpace($RequestId)) { $null } else { $RequestId })
             deliveryId         = [Guid]::NewGuid().ToString('N')
-            deliveryMode       = $(if ([string]::IsNullOrWhiteSpace($DeliveryMode)) { 'DISCONNECT' } else { $DeliveryMode })
+            deliveryMode       = $(if ([string]::IsNullOrWhiteSpace($DeliveryMode)) { 'PENDING_RECONNECT' } else { $DeliveryMode })
             deliverySentAt     = $now
             authorizedUserId   = $authorizedUserId
             returnedItemCount  = $changesetItems.Count
             changesets         = $changesetItems
         }
-
-        Write-AgentLog ("TFS_COLLECT_DONE | count=$($changesetItems.Count) mode=$queryMode author=$authorizedUserId")
-        return (ConvertTo-CompactJson $payload)
+        Write-AgentLog ("TFS_COLLECT_DONE | count=$($changesetItems.Count) mode=$queryMode")
+        return (Convert-ToCompactJson $payload)
     }
     finally {
-        if ($null -ne $tfsCollection) {
-            try { $tfsCollection.Dispose() } catch { }
-        }
+        if ($null -ne $tfsCollection) { try { $tfsCollection.Dispose() } catch { } }
     }
 }
 
 function Get-OmChangesets {
-    param(
-        $VersionControl,
-        [string]$UserId,
-        [DateTime]$FromLocal,
-        [DateTime]$ToLocal,
-        [int]$MaxCount
-    )
+    param($VersionControl, [string]$UserId, [DateTime]$FromLocal, [DateTime]$ToLocal, [int]$MaxCount)
 
     $latest = [Microsoft.TeamFoundation.VersionControl.Client.VersionSpec]::Latest
     $fromSpec = New-Object Microsoft.TeamFoundation.VersionControl.Client.DateVersionSpec ($FromLocal)
@@ -544,18 +543,7 @@ function Get-OmChangesets {
     foreach ($path in @($ServerPath, '$/')) {
         try {
             $history = @(
-                $VersionControl.QueryHistory(
-                    $path,
-                    $latest,
-                    0,
-                    $recursion,
-                    $UserId,
-                    $fromSpec,
-                    $toSpec,
-                    $MaxCount,
-                    $true,
-                    $false
-                )
+                $VersionControl.QueryHistory($path, $latest, 0, $recursion, $UserId, $fromSpec, $toSpec, $MaxCount, $true, $false)
             )
             Write-AgentLog ("TFS_OM_QUERY_OK | path=$path count=$($history.Count)")
             break
@@ -565,7 +553,6 @@ function Get-OmChangesets {
             $history = $null
         }
     }
-
     if ($null -eq $history) { return @() }
 
     $items = @()
@@ -576,7 +563,6 @@ function Get-OmChangesets {
         $authorId = [string](Get-FirstProp -Object $changeset -Names @('Owner', 'Committer'))
         $authorName = [string](Get-FirstProp -Object $changeset -Names @('OwnerDisplayName', 'CommitterDisplayName', 'Owner', 'Committer'))
         $creationDate = $changeset.CreationDate
-
         $changedFiles = @()
         foreach ($change in @($changeset.Changes)) {
             if ($null -eq $change -or $null -eq $change.Item) { continue }
@@ -588,7 +574,6 @@ function Get-OmChangesets {
             $isFolder = $itemType -match 'Folder'
             $version = Get-FirstProp -Object $item -Names @('ChangesetId', 'Version')
             if ($null -eq $version) { $version = $changeset.ChangesetId }
-
             $changedFiles += [ordered]@{
                 changeType = (Normalize-ChangeType ([string]$change.ChangeType))
                 itemType   = $(if ($isFolder) { 'folder' } else { 'file' })
@@ -597,12 +582,11 @@ function Get-OmChangesets {
                 version    = [string]$version
             }
         }
-
         $items += [ordered]@{
             changesetId      = [int]$changeset.ChangesetId
             authorId         = $authorId
             authorName       = $authorName
-            checkedInAt      = $creationDate.ToLocalTime().ToString('yyyy-MM-dd HH:mm:ss')
+            checkedInAt      = $creationDate.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
             comment          = [string]$changeset.Comment
             changedFileCount = $changedFiles.Count
             changedFiles     = $changedFiles
@@ -624,45 +608,43 @@ function Update-PendingForReconnect {
         if ([string]::IsNullOrWhiteSpace([string]$obj.deliveryId)) {
             $obj | Add-Member -NotePropertyName deliveryId -NotePropertyValue ([Guid]::NewGuid().ToString('N')) -Force
         }
-        return (ConvertTo-CompactJson $obj)
+        return (Convert-ToCompactJson $obj)
     }
     catch {
         return $TfsJson
     }
 }
 
-# ============================================================
-# Actions
-# ============================================================
-function Invoke-Connect {
-    $hasPending = Test-Path -LiteralPath $PendingPath
-
-    $sync = $null
-    for ($i = 0; $i -lt 10 -and $null -eq $sync; $i++) {
-        $sync = Try-ReadSyncRequest
-        if ($null -eq $sync) { Start-Sleep -Milliseconds 300 }
+function Wait-ForTargetedSync {
+    param([int]$Seconds, [string]$Reason)
+    Write-AgentLog ("CONNECT_WAIT_SYNC | reason=$Reason up to ${Seconds}s this=$env:COMPUTERNAME")
+    for ($i = 0; $i -lt $Seconds; $i++) {
+        $candidate = Try-ReadSyncRequest
+        if ($null -ne $candidate) {
+            if (-not (Test-TargetedAtThisPc -TargetComputerName $candidate.TargetComputerName -RemoteIp $candidate.RemoteIp)) {
+                Write-AgentLog ("CONNECT_IGNORE_OTHER_PC | target=$($candidate.TargetComputerName) ip=$($candidate.RemoteIp) this=$env:COMPUTERNAME")
+            }
+            else {
+                Write-AgentLog ("CONNECT_SYNC_REQUEST_OK | requestId=$($candidate.RequestId) at=${i}s reason=$Reason")
+                return $candidate
+            }
+        }
+        Start-Sleep -Seconds 1
     }
+    return $null
+}
 
+function Send-TfsForSync {
+    param($Sync)
+
+    # Confirm local WorkHub first (no restore). TFS collect can take longer than
+    # the 8s wait; if we exit after CONNECT, WorkHub rewrites SYNC onto an empty agent.
     $status = New-RdpStatusObject -EventId 21 -TriggerType 'AURORA_CONNECT' `
         -SessionRaw 'rdp-tcp#0 Active' -IsVerifiedDisconnect $null
-    $statusJson = ConvertTo-CompactJson $status
-    Write-JsonFile -Value $status -Path $LastStatusPath
-    [void](Send-ClipboardPayload -Text ($RdpPrefix + $statusJson))
-
-    # Normal connect: status only, then exit. No SYNC wait.
-    # TFS fetch: SYNC must already be on clipboard before this script runs (local writes it pre-RDP).
-    if ($null -eq $sync) {
-        $sync = Try-ReadSyncRequest
-    }
-
-    if ($null -eq $sync) {
-        Set-SessionStartedMark
-        Write-AgentLog ("CONNECT_DEFAULT | no SYNC_REQUEST | status sent | exit")
-        return
-    }
-
-    Write-AgentLog ("CONNECT_SYNC_REQUEST_OK | requestId=$($sync.RequestId) pending=$(Test-Path -LiteralPath $PendingPath)")
-    Start-Sleep -Seconds 1
+    $statusJson = Convert-ToCompactJson $status
+    [void](Set-ClipboardTextSafe ($RdpPrefix + $statusJson))
+    Start-Sleep -Milliseconds 2500
+    Write-AgentLog 'CONNECT_STATUS_FOR_TFS | CONNECT held 2.5s then TFS collect'
 
     $tfsJson = $null
     $source = $null
@@ -679,43 +661,66 @@ function Invoke-Connect {
     if ([string]::IsNullOrWhiteSpace($tfsJson)) {
         try {
             $tfsJson = Collect-TfsPayload `
-                -RequestId $sync.RequestId `
+                -RequestId $Sync.RequestId `
                 -DeliveryMode 'PENDING_RECONNECT' `
-                -SyncStartedUtc $sync.SessionStartedUtc `
-                -SyncEndedUtc $sync.SessionEndedUtc
+                -SyncStartedUtc $Sync.SessionStartedUtc `
+                -SyncEndedUtc $Sync.SessionEndedUtc
             $source = 'fresh_collect'
         }
         catch {
             Write-AgentLog ("CONNECT_TFS_FAILED | " + $_.Exception.Message)
             Write-AgentError $_
+            Clear-ProtocolClipboard
+            Restore-UserClipboard
             return
         }
     }
     else {
-        $tfsJson = Update-PendingForReconnect -TfsJson $tfsJson -RequestId $sync.RequestId
+        $tfsJson = Update-PendingForReconnect -TfsJson $tfsJson -RequestId $Sync.RequestId
     }
 
     $copied = Send-ClipboardPayload -Text ($TfsPrefix + $tfsJson) -IsTfs
-    Write-AgentLog ("CONNECT_TFS_SENT | source=$source requestId=$($sync.RequestId) clipboardOk=$copied length=$($tfsJson.Length)")
+    Write-AgentLog ("CONNECT_TFS_SENT | source=$source requestId=$($Sync.RequestId) clipboardOk=$copied length=$($tfsJson.Length)")
     if ($copied -and (Test-Path -LiteralPath $PendingPath)) {
         Remove-Item -LiteralPath $PendingPath -Force -ErrorAction SilentlyContinue
     }
     Set-SessionStartedMark
 }
 
-function Invoke-Disconnect {
-    # Main path is connect + SYNC. Disconnect trigger is optional.
-    Write-AgentLog 'DISCONNECT_SKIP | no-op (use connect + SYNC_REQUEST to fetch TFS)'
+function Invoke-Connect {
+    $status = New-RdpStatusObject -EventId 21 -TriggerType 'AURORA_CONNECT' `
+        -SessionRaw 'rdp-tcp#0 Active' -IsVerifiedDisconnect $null
+    Write-JsonFile -Value $status -Path $LastStatusPath
+
+    # Status first: do not wait 15s before CONNECT (gallery/DB never updates).
+    # Peek SYNC briefly; if missing, write CONNECT so WorkHub confirms, then watch rewrite.
+    $sync = Wait-ForTargetedSync -Seconds 2 -Reason 'peek'
+
+    if ($null -eq $sync) {
+        $statusJson = Convert-ToCompactJson $status
+        [void](Send-ClipboardPayload -Text ($RdpPrefix + $statusJson))
+        Write-AgentLog 'CONNECT_DEFAULT | CONNECT 2.5s then restore — watch SYNC rewrite'
+
+        $sync = Wait-ForTargetedSync -Seconds 50 -Reason 'after_connect_rewrite'
+    }
+
+    if ($null -eq $sync) {
+        Set-SessionStartedMark
+        Write-AgentLog 'CONNECT_DONE | no SYNC_REQUEST (normal session)'
+        return
+    }
+
+    Send-TfsForSync -Sync $sync
 }
 
-# ============================================================
-# Main
-# ============================================================
+function Invoke-Disconnect {
+    Write-AgentLog 'DISCONNECT_SKIP | no disconnect trigger (fetch = connect + SYNC_REQUEST)'
+}
+
 try {
     $userName = "$env:USERDOMAIN\$env:USERNAME"
     Write-AgentLog ("$userName | $env:COMPUTERNAME | $Action")
-
-    switch ($Action.ToLowerInvariant()) {
+    switch ($Action) {
         'connect' { Invoke-Connect }
         'disconnect' { Invoke-Disconnect }
         default {

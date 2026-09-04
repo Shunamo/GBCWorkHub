@@ -413,6 +413,33 @@
         </DrawingImage.Drawing>
     </DrawingImage>
 
+    <!-- Date_range_fill.svg — 날짜·시간 조회 -->
+    <DrawingImage x:Key="DateRangeFillIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#76ADFF">
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M2,9 C2,7.11438 2,6.17157 2.58579,5.58579 C3.17157,5 4.11438,5 6,5 H18 C19.8856,5 20.8284,5 21.4142,5.58579 C22,6.17157 22,7.11438 22,9 C22,9.4714 22,9.70711 21.8536,9.85355 C21.7071,10 21.4714,10 21,10 H3 C2.5286,10 2.29289,10 2.14645,9.85355 C2,9.70711 2,9.4714 2,9 Z" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#76ADFF">
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry FillRule="EvenOdd"
+                                      Figures="M2,18 C2,19.8856 2,20.8284 2.58579,21.4142 C3.17157,22 4.11438,22 6,22 H18 C19.8856,22 20.8284,22 21.4142,21.4142 C22,20.8284 22,19.8856 22,18 V13 C22,12.5286 22,12.2929 21.8536,12.1464 C21.7071,12 21.4714,12 21,12 H3 C2.5286,12 2.29289,12 2.14645,12.1464 C2,12.2929 2,12.5286 2,13 V18 Z M7,15 C7,14.5286 7,14.2929 7.14645,14.1464 C7.29289,14 7.5286,14 8,14 H10 C10.4714,14 10.7071,14 10.8536,14.1464 C11,14.2929 11,14.5286 11,15 C11,15.4714 11,15.7071 10.8536,15.8536 C10.7071,16 10.4714,16 10,16 H8 C7.5286,16 7.29289,16 7.14645,15.8536 C7,15.7071 7,15.4714 7,15 Z M7.14645,18.1464 C7,18.2929 7,18.5286 7,19 C7,19.4714 7,19.7071 7.14645,19.8536 C7.29289,20 7.5286,20 8,20 H10 C10.4714,20 10.7071,20 10.8536,19.8536 C11,19.7071 11,19.4714 11,19 C11,18.5286 11,18.2929 10.8536,18.1464 C10.7071,18 10.4714,18 10,18 H8 C7.5286,18 7.29289,18 7.14645,18.1464 Z M13,15 C13,14.5286 13,14.2929 13.1464,14.1464 C13.2929,14 13.5286,14 14,14 H16 C16.4714,14 16.7071,14 16.8536,14.1464 C17,14.2929 17,14.5286 17,15 C17,15.4714 17,15.7071 16.8536,15.8536 C16.7071,16 16.4714,16 16,16 H14 C13.5286,16 13.2929,16 13.1464,15.8536 C13,15.7071 13,15.4714 13,15 Z M13.1464,18.1464 C13,18.2929 13,18.5286 13,19 C13,19.4714 13,19.7071 13.1464,19.8536 C13.2929,20 13.5286,20 14,20 H16 C16.4714,20 16.7071,20 16.8536,19.8536 C17,19.7071 17,19.4714 17,19 C17,18.5286 17,18.2929 16.8536,18.1464 C16.7071,18 16.4714,18 16,18 H14 C13.5286,18 13.2929,18 13.1464,18.1464 Z" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#76ADFF" Thickness="2" StartLineCap="Round" EndLineCap="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M7,3 L7,6 M17,3 L17,6" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
     <!-- Search_light.svg — 검색 -->
     <DrawingImage x:Key="SearchLightIcon">
         <DrawingImage.Drawing>
@@ -511,6 +538,30 @@
                     </GeometryDrawing.Pen>
                     <GeometryDrawing.Geometry>
                         <PathGeometry Figures="M15,6 L9,12 L15,18" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Copy_alt.svg — 클립보드 복사 -->
+    <DrawingImage x:Key="CopyAltIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#475569" Thickness="2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M15,3 H9 C6.79086,3 5,4.79086 5,7 V15" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#475569" Thickness="2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M13.5,7 C14.696,7 15.5096,7.00158 16.1279,7.07129 C16.726,7.13873 17.0169,7.25897 17.2178,7.41309 C17.3564,7.51946 17.4805,7.64361 17.5869,7.78223 C17.741,7.98307 17.8613,8.274 17.9287,8.87207 C17.9984,9.49043 18,10.304 18,11.5 V15.5 C18,16.696 17.9984,17.5096 17.9287,18.1279 C17.8613,18.726 17.741,19.0169 17.5869,19.2178 C17.4805,19.3564 17.3564,19.4805 17.2178,19.5869 C17.0169,19.741 16.726,19.8613 16.1279,19.9287 C15.5096,19.9984 14.696,20 13.5,20 C12.304,20 11.4904,19.9984 10.8721,19.9287 C10.274,19.8613 9.98307,19.741 9.78223,19.5869 C9.64361,19.4805 9.51946,19.3564 9.41309,19.2178 C9.25897,19.0169 9.13873,18.726 9.07129,18.1279 C9.00158,17.5096 9,16.696 9,15.5 V11.5 C9,10.304 9.00158,9.49043 9.07129,8.87207 C9.13873,8.274 9.25897,7.98307 9.41309,7.78223 C9.51946,7.6436 9.6436,7.51946 9.78223,7.41309 C9.98307,7.25897 10.274,7.13873 10.8721,7.07129 C11.4904,7.00158 12.304,7 13.5,7 Z" />
                     </GeometryDrawing.Geometry>
                 </GeometryDrawing>
             </DrawingGroup>
@@ -799,6 +850,262 @@
                                  Geometry="M3,11 H21 V15.2 C21,16.8802 21,17.7202 20.673,18.362 C20.3854,18.9265 19.9265,19.3854 19.362,19.673 C18.7202,20 17.8802,20 16.2,20 H7.8 C6.11984,20 5.27976,20 4.63803,19.673 C4.07354,19.3854 3.6146,18.9265 3.32698,18.362 C3,17.7202 3,16.8802 3,15.2 V11 Z" />
                 <GeometryDrawing Brush="#CD94FF"
                                  Geometry="M3,7 C3,6.06812 3,5.60218 3.15224,5.23463 C3.35523,4.74458 3.74458,4.35523 4.23463,4.15224 C4.60218,4 5.06812,4 6,4 H8.34315 C9.16065,4 9.5694,4 9.93694,4.15224 C10.3045,4.30448 10.5935,4.59351 11.1716,5.17157 L13,7 H3 Z" />
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- 나 모듈: 업무기록 -->
+    <DrawingImage x:Key="NoteLineIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.4" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M8,4 H16 V7 H8 Z M7,7 H17 V20 H7 Z" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.4" StartLineCap="Round" EndLineCap="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M10,11 H14 M10,15 H13" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- 나 모듈: 체크인 보관함 -->
+    <DrawingImage x:Key="InboxTrayLineIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.4" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M4,9 L12,15 L20,9 M4,9 H20 V20 H4 Z" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.4" StartLineCap="Round" EndLineCap="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <LineGeometry StartPoint="9,16" EndPoint="15,16" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- 나 모듈: PC 접속 이력 -->
+    <DrawingImage x:Key="MonitorClockLineIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.4" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M3,5 H16 V14 H3 Z M7,18 H12 M9.5,14 V18" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.4" StartLineCap="Round" EndLineCap="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="18.5,16.5" RadiusX="3.6" RadiusY="3.6" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#222222" Thickness="1.4" StartLineCap="Round" EndLineCap="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M18.5,15.2 V16.5 H19.7" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Full_Screen_Corner.svg — 섹션 확장 -->
+    <DrawingImage x:Key="FullScreenCornerIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#334155">
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M4,20 H3 V21 H4 V20 Z M9.70711,15.7071 C10.0976,15.3166 10.0976,14.6834 9.70711,14.2929 C9.31658,13.9024 8.68342,13.9024 8.29289,14.2929 L9.70711,15.7071 Z M3,14 V20 H5 V14 H3 Z M4,21 H10 V19 H4 V21 Z M4.70711,20.7071 L9.70711,15.7071 L8.29289,14.2929 L3.29289,19.2929 Z" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#334155">
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M20,4 H21 V3 H20 V4 Z M14.2929,8.29289 C13.9024,8.68342 13.9024,9.31658 14.2929,9.70711 C14.6834,10.0976 15.3166,10.0976 15.7071,9.70711 L14.2929,8.29289 Z M21,10 V4 H19 V10 H21 Z M20,3 H14 V5 H20 V3 Z M19.2929,3.29289 L14.2929,8.29289 L15.7071,9.70711 L20.7071,4.70711 Z" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Arhive_alt_big_fill.svg — 체크인 보관함 (전체 목록) -->
+    <DrawingImage x:Key="ArchiveAltBigFillIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#5D69B1" Thickness="2" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M5.46,6.72 C5.79994,6.26675 6.33344,6 6.9,6 H17.1 C17.6666,6 18.2001,6.26675 18.54,6.72 L20.64,9.52 C20.8737,9.83157 21,10.2105 21,10.6 V17.2 C21,18.1941 20.1941,19 19.2,19 H4.8 C3.80589,19 3,18.1941 3,17.2 V10.6 C3,10.2105 3.12632,9.83157 3.36,9.52 Z" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#5D69B1">
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M3,10 H7.38197 C7.76074,10 8.107,10.214 8.27639,10.5528 L8.72361,11.4472 C8.893,11.786 9.23926,12 9.61803,12 H14.382 C14.7607,12 15.107,11.786 15.2764,11.4472 L15.7236,10.5528 C15.893,10.214 16.2393,10 16.618,10 H21 V17 C21,18.1046 20.1046,19 19,19 H5 C3.89543,19 3,18.1046 3,17 Z" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Arhive_load_fill.svg — 체크인 보관함 -->
+    <DrawingImage x:Key="ArchiveLoadFillIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#76ADFF">
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry FillRule="EvenOdd"
+                                      Figures="M21,11 V16 C21,18.8284 21,20.2426 20.1213,21.1213 C19.2426,22 17.8284,22 15,22 H9 C6.17157,22 4.75736,22 3.87868,21.1213 C3,20.2426 3,18.8284 3,16 V11 C3,11.9319 3,12.3978 3.15224,12.7654 C3.35523,13.2554 3.74458,13.6448 4.23463,13.8478 C4.60218,14 5.06812,14 6,14 H6.67544 C7.25646,14 7.54696,14 7.77888,14.1338 C7.83745,14.1675 7.89245,14.2072 7.94303,14.2521 C8.14326,14.4298 8.23513,14.7054 8.41886,15.2566 L8.54415,15.6325 C8.76416,16.2925 8.87416,16.6225 9.13605,16.8112 C9.39794,17 9.7458,17 10.4415,17 H13.5585 C14.2542,17 14.6021,17 14.864,16.8112 C15.1258,16.6225 15.2358,16.2925 15.4558,15.6325 L15.5811,15.2566 C15.7649,14.7054 15.8567,14.4298 16.057,14.2521 C16.1075,14.2072 16.1625,14.1675 16.2211,14.1338 C16.453,14 16.7435,14 17.3246,14 H18 C18.9319,14 19.3978,14 19.7654,13.8478 C20.2554,13.6448 20.6448,13.2554 20.8478,12.7654 C21,12.3978 21,11.9319 21,11 Z" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#76ADFF" Thickness="2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M16,6 H17 C18.8856,6 19.8284,6 20.4142,6.58579 C21,7.17157 21,8.11438 21,10 V18 C21,19.8856 21,20.8284 20.4142,21.4142 C19.8284,22 18.8856,22 17,22 H7 C5.11438,22 4.17157,22 3.58579,21.4142 C3,20.8284 3,19.8856 3,18 V10 C3,8.11438 3,7.17157 3.58579,6.58579 C4.17157,6 5.11438,6 7,6 H8" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#76ADFF" Thickness="2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M16,10 L12,13 L8,10 M12,13 L12,3" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Arhive_load_fill.svg — 업무기록 툴바 보관함 (조금 더 진한 색) -->
+    <DrawingImage x:Key="ArchiveLoadFillIconDeep">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#2568C8">
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry FillRule="EvenOdd"
+                                      Figures="M21,11 V16 C21,18.8284 21,20.2426 20.1213,21.1213 C19.2426,22 17.8284,22 15,22 H9 C6.17157,22 4.75736,22 3.87868,21.1213 C3,20.2426 3,18.8284 3,16 V11 C3,11.9319 3,12.3978 3.15224,12.7654 C3.35523,13.2554 3.74458,13.6448 4.23463,13.8478 C4.60218,14 5.06812,14 6,14 H6.67544 C7.25646,14 7.54696,14 7.77888,14.1338 C7.83745,14.1675 7.89245,14.2072 7.94303,14.2521 C8.14326,14.4298 8.23513,14.7054 8.41886,15.2566 L8.54415,15.6325 C8.76416,16.2925 8.87416,16.6225 9.13605,16.8112 C9.39794,17 9.7458,17 10.4415,17 H13.5585 C14.2542,17 14.6021,17 14.864,16.8112 C15.1258,16.6225 15.2358,16.2925 15.4558,15.6325 L15.5811,15.2566 C15.7649,14.7054 15.8567,14.4298 16.057,14.2521 C16.1075,14.2072 16.1625,14.1675 16.2211,14.1338 C16.453,14 16.7435,14 17.3246,14 H18 C18.9319,14 19.3978,14 19.7654,13.8478 C20.2554,13.6448 20.6448,13.2554 20.8478,12.7654 C21,12.3978 21,11.9319 21,11 Z" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#2568C8" Thickness="2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M16,6 H17 C18.8856,6 19.8284,6 20.4142,6.58579 C21,7.17157 21,8.11438 21,10 V18 C21,19.8856 21,20.8284 20.4142,21.4142 C19.8284,22 18.8856,22 17,22 H7 C5.11438,22 4.17157,22 3.58579,21.4142 C3,20.8284 3,19.8856 3,18 V10 C3,8.11438 3,7.17157 3.58579,6.58579 C4.17157,6 5.11438,6 7,6 H8" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#2568C8" Thickness="2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M16,10 L12,13 L8,10 M12,13 L12,3" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="FileDockFillIcon">
+        <DrawingImage.Drawing>
+            <GeometryDrawing Brush="#76ADFF">
+                <GeometryDrawing.Geometry>
+                    <PathGeometry FillRule="EvenOdd"
+                                  Figures="M12,2 V7 L12,7.05441 C11.9999,7.47848 11.9998,7.8906 12.0455,8.23052 C12.097,8.61372 12.2226,9.051 12.5858,9.41421 C12.949,9.77743 13.3863,9.90295 13.7695,9.95447 C14.1094,10.0002 14.5215,10.0001 14.9456,10 L15,10 H20 V16 C20,18.8284 20,20.2426 19.1213,21.1213 C18.2426,22 16.8284,22 14,22 H10 C7.17157,22 5.75736,22 4.87868,21.1213 C4,20.2426 4,18.8284 4,16 V8 C4,5.17157 4,3.75736 4.87868,2.87868 C5.75736,2 7.17157,2 10,2 H12 Z M14,2.00462 V7 C14,7.49967 14.0021,7.77383 14.0277,7.96402 L14.0287,7.97131 L14.036,7.97231 C14.2262,7.99788 14.5003,8 15,8 H19.9954 C19.9852,7.58836 19.9525,7.31595 19.8478,7.06306 C19.6955,6.69552 19.4065,6.40649 18.8284,5.82843 L16.1716,3.17157 C15.5935,2.59351 15.3045,2.30448 14.9369,2.15224 C14.684,2.04749 14.4116,2.01481 14,2.00462 Z M8,13 C8,12.4477 8.44772,12 9,12 L15,12 C15.5523,12 16,12.4477 16,13 C16,13.5523 15.5523,14 15,14 L9,14 C8.44772,14 8,13.5523 8,13 Z M9,16 C8.44772,16 8,16.4477 8,17 C8,17.5523 8.44772,18 9,18 H13 C13.5523,18 14,17.5523 14,17 C14,16.4477 13.5523,16 13,16 H9 Z" />
+                </GeometryDrawing.Geometry>
+            </GeometryDrawing>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- desktop_fill.svg — PC 접속 이력 -->
+    <DrawingImage x:Key="DesktopFillIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#76ADFF">
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M3,6 C3,4.89543 3.89543,4 5,4 H19 C20.1046,4 21,4.89543 21,6 V15 H3 V6 Z" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#76ADFF">
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M1,17 C1,16.4477 1.44772,16 2,16 H22 C22.5523,16 23,16.4477 23,17 V18 C23,19.1046 22.1046,20 21,20 H3 C1.89543,20 1,19.1046 1,18 V17 Z" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- User_circle.svg — 점유명 / 마이페이지 -->
+    <DrawingImage x:Key="UserCircleIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#76ADFF">
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry FillRule="EvenOdd"
+                                      Figures="M2,12 C2,6.47715 6.47715,2 12,2 C17.5228,2 22,6.47715 22,12 C22,15.0141 20.6665,17.7167 18.5573,19.5501 C18.0996,18.3251 17.306,17.2481 16.2613,16.4465 C15.0388,15.5085 13.5409,15 12,15 C10.4591,15 8.96118,15.5085 7.73867,16.4465 C6.69405,17.2481 5.90038,18.3251 5.44269,19.5501 C3.33349,17.7167 2,15.0141 2,12 Z M16.8296,20.7059 C16.8337,20.7212 16.8381,20.7363 16.8429,20.7512 C15.4081,21.5469 13.757,22 12,22 C10.243,22 8.59193,21.5469 7.15711,20.7512 C7.16185,20.7363 7.16628,20.7212 7.17037,20.7059 C7.45525,19.6427 8.08297,18.7033 8.95619,18.0332 C9.82942,17.3632 10.8993,17 12,17 C13.1007,17 14.1706,17.3632 15.0438,18.0332 C15.917,18.7033 16.5448,19.6427 16.8296,20.7059 Z M10,9 C10,7.89543 10.8954,7 12,7 C13.1046,7 14,7.89543 14,9 C14,10.1046 13.1046,11 12,11 C10.8954,11 10,10.1046 10,9 Z M12,5 C9.79086,5 8,6.79086 8,9 C8,11.2091 9.79086,13 12,13 C14.2091,13 16,11.2091 16,9 C16,6.79086 14.2091,5 12,5 Z" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#76ADFF" Thickness="1" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry RadiusX="9.5" RadiusY="9.5" Rect="2.5,2.5,19,19" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- Load_list_alt_fill.svg — 임시저장 -->
+    <DrawingImage x:Key="LoadListAltFillIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#8C8C8C" Thickness="2" StartLineCap="Round" EndLineCap="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M3,3 H21" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#8C8C8C">
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry FillRule="EvenOdd"
+                                      Figures="M19,3 H5 V17.8 C5,18.9201 5,19.4802 5.21799,19.908 C5.40973,20.2843 5.71569,20.5903 6.09202,20.782 C6.51984,21 7.0799,21 8.2,21 H12.76 C12.844,21 12.886,21 12.9181,20.9837 C12.9463,20.9693 12.9693,20.9463 12.9837,20.9181 C13,20.886 13,20.844 13,20.76 V18.2 C13,17.0799 13,16.5198 13.218,16.092 C13.4097,15.7157 13.7157,15.4097 14.092,15.218 C14.5198,15 15.0799,15 16.2,15 H18.76 C18.844,15 18.886,15 18.9181,14.9837 C18.9463,14.9693 18.9693,14.9463 18.9837,14.9181 C19,14.886 19,14.844 19,14.76 V3 Z M11,13 V9.41421 L9.70711,10.7071 C9.31658,11.0976 8.68342,11.0976 8.29289,10.7071 C7.90237,10.3166 7.90237,9.68342 8.29289,9.29289 L11.1868,6.39896 C11.2053,6.38051 11.2242,6.36282 11.2436,6.34589 C11.4269,6.13403 11.6978,6 12,6 C12.3022,6 12.5731,6.13403 12.7564,6.34589 C12.7758,6.36282 12.7947,6.38051 12.8132,6.39896 L15.7071,9.29289 C16.0976,9.68342 16.0976,10.3166 15.7071,10.7071 C15.3166,11.0976 14.6834,11.0976 14.2929,10.7071 L13,9.41421 V13 C13,13.5523 12.5523,14 12,14 C11.4477,14 11,13.5523 11,13 Z" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#8C8C8C">
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M15.2561,20.7439 L18.7439,17.2561 C18.8384,17.1616 18.7715,17 18.6379,17 H15.5 C15.2239,17 15,17.2239 15,17.5 V20.6379 C15,20.7715 15.1616,20.8384 15.2561,20.7439 Z" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
             </DrawingGroup>
         </DrawingImage.Drawing>
     </DrawingImage>

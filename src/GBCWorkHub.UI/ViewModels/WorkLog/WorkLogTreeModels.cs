@@ -665,7 +665,10 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             set
             {
                 if (SetProperty(ref _menuName, value))
+                {
                     RaisePropertyChanged("Title");
+                    RaisePropertyChanged("IsPlaceholderTitle");
+                }
             }
         }
 
@@ -782,7 +785,17 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
 
         public override string Title
         {
-            get { return string.IsNullOrWhiteSpace(MenuName) ? "메뉴 미입력" : MenuName; }
+            get
+            {
+                return string.IsNullOrWhiteSpace(MenuName)
+                    ? WorkLogFieldMasters.TreePlaceholderMenu
+                    : MenuName;
+            }
+        }
+
+        public bool IsPlaceholderTitle
+        {
+            get { return string.IsNullOrWhiteSpace(MenuName); }
         }
 
         public string MetaLine
@@ -826,18 +839,24 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             set
             {
                 if (SetProperty(ref _type, value))
+                {
                     RaisePropertyChanged("Title");
+                    RaisePropertyChanged("IsPlaceholderTitle");
+                }
             }
         }
 
         public override string Title
         {
+            get { return IsPlaceholderTitle ? WorkLogFieldMasters.TreePlaceholderType : Type; }
+        }
+
+        public bool IsPlaceholderTitle
+        {
             get
             {
-                if (string.IsNullOrWhiteSpace(Type)
-                    || string.Equals(Type, WorkLogFieldMasters.Unselected, StringComparison.Ordinal))
-                    return WorkLogFieldMasters.Unselected;
-                return Type;
+                return string.IsNullOrWhiteSpace(Type)
+                    || string.Equals(Type, WorkLogFieldMasters.Unselected, StringComparison.Ordinal);
             }
         }
 
@@ -886,20 +905,16 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
 
         public override string Title
         {
-            get
-            {
-                if (!string.IsNullOrWhiteSpace(Category)
-                    && !string.Equals(Category, WorkLogFieldMasters.Unselected, StringComparison.Ordinal))
-                    return Category;
-                // Table/EQS 등 빈 Category 정상 — Client/Server만 플레이스홀더
-                return IsPlaceholderTitle ? WorkLogFieldMasters.Unselected : string.Empty;
-            }
+            get { return IsPlaceholderTitle ? WorkLogFieldMasters.TreePlaceholderCategory : Category; }
         }
 
-        /// <summary>Client/Server에서 Category 비움일 때만 연한 플레이스홀더.</summary>
         public bool IsPlaceholderTitle
         {
-            get { return WorkLogFieldMasters.RequiresCategoryHint(Type, Category); }
+            get
+            {
+                return string.IsNullOrWhiteSpace(Category)
+                    || string.Equals(Category, WorkLogFieldMasters.Unselected, StringComparison.Ordinal);
+            }
         }
 
         public bool HasDisplayTitle
@@ -1048,17 +1063,15 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         {
             get
             {
-                if (!string.IsNullOrWhiteSpace(ProjectName))
-                    return ProjectName;
-                // DB Object/EQS/Global Resource 등 빈 Project Name 정상 — 필요한 경우만 플레이스홀더
-                return IsPlaceholderTitle ? WorkLogFieldMasters.Unselected : string.Empty;
+                return IsPlaceholderTitle
+                    ? WorkLogFieldMasters.TreePlaceholderProject
+                    : ProjectName;
             }
         }
 
-        /// <summary>UI/BIZ 등 Project가 필요한 경우에만 연한 플레이스홀더.</summary>
         public bool IsPlaceholderTitle
         {
-            get { return WorkLogFieldMasters.RequiresProjectNameHint(Type, Category, ProjectName); }
+            get { return string.IsNullOrWhiteSpace(ProjectName); }
         }
 
         public bool HasDisplayTitle

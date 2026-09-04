@@ -8,40 +8,37 @@
         Background="Transparent"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
-        SizeToContent="Manual">
+        SizeToContent="WidthAndHeight">
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogGlassStyles.xaml" />
+                <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogEditGlassOverrides.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Window.Resources>
 
-    <Grid Background="#990F172A">
-        <Grid Margin="32,28">
-            <Border HorizontalAlignment="Center" VerticalAlignment="Center"
-                    Background="Transparent"
-                    CornerRadius="14"
-                    MinWidth="720"
-                    MaxWidth="1200"
-                    MinHeight="480"
-                    MaxHeight="860"
-                    Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Grid}}"
-                    Height="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Grid}}">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="28" ShadowDepth="6" Opacity="0.18" Color="#3B5070" />
-                </Border.Effect>
-                <Border x:Name="CardBorder"
-                        Style="{StaticResource GlassSurfaceStyle}"
-                        Effect="{x:Null}"
-                        Padding="0"
-                        CornerRadius="14"
-                        ClipToBounds="True"
-                        SizeChanged="CardBorder_SizeChanged"
-                        Loaded="CardBorder_SizeChanged">
-                    <wl:TfsImportDialog Background="Transparent" />
-                </Border>
+    <Grid Background="#660F172A">
+        <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+                Background="Transparent"
+                CornerRadius="16"
+                Margin="24"
+                MinWidth="380" MaxWidth="500">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="22" ShadowDepth="4" Opacity="0.14" Color="#2F4466" />
+            </Border.Effect>
+            <Border x:Name="CardBorder"
+                    Background="{StaticResource EditGlassFill}"
+                    BorderBrush="#D9FFFFFF"
+                    BorderThickness="1.5"
+                    Effect="{x:Null}"
+                    Padding="20"
+                    CornerRadius="16"
+                    ClipToBounds="True"
+                    SizeChanged="CardBorder_SizeChanged"
+                    Loaded="CardBorder_SizeChanged">
+                <wl:TfsImportDialog Background="Transparent" />
             </Border>
-        </Grid>
+        </Border>
     </Grid>
 </Window>

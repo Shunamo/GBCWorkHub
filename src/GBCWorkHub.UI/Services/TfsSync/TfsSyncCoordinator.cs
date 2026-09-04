@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using GBCWorkHub.BIZ;
 using GBCWorkHub.DTO;
+using GBCWorkHub.DTO.WorkLog;
 using GBCWorkHub.UI.Models;
 using GBCWorkHub.UI.Models.Popup;
 using GBCWorkHub.UI.Services;
@@ -53,6 +54,8 @@ namespace GBCWorkHub.UI.Services.TfsSync
         public string ClipboardHashBefore { get; set; }
         /// <summary>CMC 등: mstsc 재접속 없이 클립보드만으로 TFS 수신</summary>
         public bool ClipboardOnly { get; set; }
+        /// <summary>원격 RDP 없이 로컬 더미 페이로드로 가져오기·보관함·일지작성 흐름을 탄다.</summary>
+        public bool UseLocalDummyPayload { get; set; }
     }
 
     public sealed class TfsSyncResult
@@ -89,6 +92,7 @@ namespace GBCWorkHub.UI.Services.TfsSync
 
         private readonly object _sync = new object();
         private bool _syncInFlight;
+        private bool _retryAfterFail;
         private bool _userCancelled;
         private TfsSyncRequest _activeRequest;
         private TfsSyncState _state = TfsSyncState.Idle;
@@ -179,6 +183,13 @@ namespace GBCWorkHub.UI.Services.TfsSync
             if (request == null || string.IsNullOrWhiteSpace(request.RemoteIp))
                 return;
 
+            if (!TfsCheckinFetchSettings.IsEnabled)
+            {
+                DiagnosticLogger.Info("TFS_PROMPT_SKIPPED",
+                    FormatLog(request, null, "reason=checkin_fetch_disabled"));
+                return;
+            }
+
             if (TfsSyncPromptGate.ShouldSkipPrompt(request.RemoteIp, request.SessionStartedAt))
             {
                 DiagnosticLogger.Info("TFS_PROMPT_SKIPPED",
@@ -186,55 +197,61 @@ namespace GBCWorkHub.UI.Services.TfsSync
                 return;
             }
 
-            var popupRequest = new PopupRequest
+            var existPopup = new PopupRequest
             {
                 Kind = PopupKind.Confirm,
                 Icon = PopupIconKind.Question,
                 Title = "원격 작업이 종료되었습니다",
-                Message = "이번 원격 작업에서 생성된 TFS 체크인 내역을 가져오시겠습니까?",
+                Message = "체크인 내역이 존재합니까?",
                 Detail = BuildDetail(request),
                 DedupKey = "TfsSyncPrompt:" + request.RemoteIp,
                 Buttons = new[]
                 {
-                    new PopupButtonDefinition("가져오기", PopupResultType.Primary, isDefault: true),
-                    new PopupButtonDefinition("나중에", PopupResultType.Secondary),
-                    new PopupButtonDefinition("이번에는 안 함", PopupResultType.Tertiary, isCancel: true)
+                    new PopupButtonDefinition("예", PopupResultType.Primary, isDefault: true),
+                    new PopupButtonDefinition("아니오", PopupResultType.Secondary, isCancel: true)
                 }
             };
 
-            PopupResult result = await _popup.ShowConfirmAsync(popupRequest).ConfigureAwait(true);
+            PopupResult existResult = await _popup.ShowConfirmAsync(existPopup).ConfigureAwait(true);
 
-            if (result == null || result.ResultType == PopupResultType.None)
+            if (existResult != null && existResult.ResultType == PopupResultType.None)
                 return;
 
-            if (result.IsPrimary)
+            if (existResult == null || !existResult.IsPrimary)
+            {
+                TfsSyncPromptGate.MarkHandled(request.RemoteIp, request.SessionStartedAt, "no_checkin");
+                DiagnosticLogger.Info("TFS_SYNC_BUTTON_CLICKED", FormatLog(request, null, "button=아니오"));
+                return;
+            }
+
+            var fetchPopup = new PopupRequest
+            {
+                Kind = PopupKind.Confirm,
+                Icon = PopupIconKind.Question,
+                Title = "TFS 체크인",
+                Message = "체크인 내역을 가져오시겠습니까?",
+                Detail = BuildDetail(request),
+                DedupKey = "TfsSyncFetch:" + request.RemoteIp,
+                Buttons = new[]
+                {
+                    new PopupButtonDefinition("가져오기", PopupResultType.Primary, isDefault: true),
+                    new PopupButtonDefinition("나중에", PopupResultType.Secondary, isCancel: true)
+                }
+            };
+
+            PopupResult fetchResult = await _popup.ShowConfirmAsync(fetchPopup).ConfigureAwait(true);
+
+            if (fetchResult != null && fetchResult.IsPrimary)
             {
                 DiagnosticLogger.Info("TFS_SYNC_BUTTON_CLICKED", FormatLog(request, null, "button=가져오기"));
                 await RunFetchAsync(request).ConfigureAwait(true);
                 return;
             }
 
-            if (result.IsSecondary)
-            {
-                TfsPendingSessionStore.Upsert(new TfsPendingSession
-                {
-                    RemoteIp = request.RemoteIp,
-                    RemoteComputerName = request.RemoteComputerName,
-                    SessionToken = request.SessionToken,
-                    SessionStartedAt = request.SessionStartedAt,
-                    SessionEndedAt = request.SessionEndedAt,
-                    Status = "LATER"
-                });
-                if (_getPendingBadgeRefresh != null)
-                    _getPendingBadgeRefresh();
+            if (fetchResult != null && fetchResult.ResultType == PopupResultType.None)
                 return;
-            }
 
-            // 이번에는 안 함 → 같은 세션에서 팝업 재표시 방지 (CMC 웹 종료 중복 감지)
-            TfsSyncPromptGate.MarkHandled(request.RemoteIp, request.SessionStartedAt, "declined");
-            TfsPendingSessionStore.Remove(request.RemoteIp);
-            if (_getPendingBadgeRefresh != null)
-                _getPendingBadgeRefresh();
+            DeferFetchLater(request);
         }
 
         public async Task RetryPendingAsync(TfsPendingSession pending)
@@ -247,10 +264,45 @@ namespace GBCWorkHub.UI.Services.TfsSync
                 RemoteComputerName = pending.RemoteComputerName,
                 SessionToken = pending.SessionToken,
                 SessionStartedAt = pending.SessionStartedAt,
-                SessionEndedAt = pending.SessionEndedAt
+                SessionEndedAt = pending.SessionEndedAt,
+                ClipboardOnly = pending.ClipboardOnly
             };
             DiagnosticLogger.Info("TFS_SYNC_BUTTON_CLICKED", FormatLog(request, null, "button=다시시도"));
-            await RunFetchAsync(request).ConfigureAwait(true);
+            await RunFetchAsync(request, forceReconnect: true).ConfigureAwait(true);
+        }
+
+        public Task FetchForSessionWindowAsync(
+            string remoteIp,
+            string computerName,
+            DateTime startedAt,
+            DateTime endedAt,
+            bool clipboardOnly)
+        {
+            var request = new TfsSyncRequest
+            {
+                RemoteIp = remoteIp,
+                RemoteComputerName = computerName,
+                SessionStartedAt = startedAt,
+                SessionEndedAt = endedAt,
+                ClipboardOnly = clipboardOnly
+            };
+            DiagnosticLogger.Info("TFS_SYNC_BUTTON_CLICKED", FormatLog(request, null, "button=접속구간"));
+            return RunFetchAsync(request, forceReconnect: true);
+        }
+
+        public Task FetchForUsageLogAsync(RemotePcUsageLogDto log, bool clipboardOnly)
+        {
+            if (log == null
+                || string.IsNullOrWhiteSpace(log.RemoteAccessIpAddress)
+                || !log.RequestedAt.HasValue
+                || !log.EndedAt.HasValue)
+                return Task.FromResult(0);
+            return FetchForSessionWindowAsync(
+                log.RemoteAccessIpAddress,
+                log.RemotePcName,
+                log.RequestedAt.Value,
+                log.EndedAt.Value,
+                clipboardOnly);
         }
 
         public bool TryAcceptTfsPayload(TfsRecentChangesetsPayload payload, string rawClipboard)
@@ -462,41 +514,99 @@ namespace GBCWorkHub.UI.Services.TfsSync
 
         private async Task RunFetchAsync(TfsSyncRequest request)
         {
-            lock (_sync)
+            await RunFetchAsync(request, false).ConfigureAwait(true);
+        }
+
+        private async Task RunFetchAsync(TfsSyncRequest request, bool forceReconnect)
+        {
+            while (true)
             {
-                if (_syncInFlight)
+                lock (_sync)
+                {
+                    if (_syncInFlight)
+                        return;
+                    _syncInFlight = true;
+                    _userCancelled = false;
+                    _retryAfterFail = false;
+                    _activeRequest = request;
+                    _lastDeliveryId = null;
+                    _mstscPid = -1;
+                    if (forceReconnect || string.IsNullOrWhiteSpace(request.RequestId))
+                        request.RequestId = Guid.NewGuid().ToString("N");
+                    _state = TfsSyncState.RequestCreated;
+                }
+
+                try
+                {
+                    await ExecuteFetchOnceAsync(request, forceReconnect).ConfigureAwait(true);
+                }
+                finally
+                {
+                    if (!_retryAfterFail)
+                    {
+                        TfsClipboardAckService.TryClearSyncRequestIfPresent();
+                        TfsClipboardAckService.ScheduleRestoreAfterRemoteDisconnect();
+                    }
+
+                    lock (_sync)
+                    {
+                        _syncInFlight = false;
+                        _activeRequest = null;
+                        _payloadWaiter = null;
+                        _rdpClosedWaiter = null;
+                    }
+                    if (_getPendingBadgeRefresh != null)
+                        _getPendingBadgeRefresh();
+                }
+
+                if (!_retryAfterFail || IsUserCancelled)
                     return;
-                _syncInFlight = true;
-                _userCancelled = false;
-                _activeRequest = request;
-                _lastDeliveryId = null;
-                _mstscPid = -1;
-                if (string.IsNullOrWhiteSpace(request.RequestId))
-                    request.RequestId = Guid.NewGuid().ToString("N");
-                _state = TfsSyncState.RequestCreated;
+                forceReconnect = true;
             }
+        }
 
+        private async Task ExecuteFetchOnceAsync(TfsSyncRequest request, bool forceReconnect)
+        {
             AcceptedPayload accepted = null;
-
             try
             {
+                if (forceReconnect)
+                    TfsClipboardAckService.PrepareFreshSyncRequest();
+
                 await _popup.ShowProgressAsync(new PopupRequest
                 {
-                    Title = "TFS 체크인 내역 가져오기",
+                    Title = "체크인 내역을 가져오겠습니다",
                     ProgressStepText = "1. 로컬 클립보드 확인 중",
                     ShowCancelOnProgress = true,
                     Icon = PopupIconKind.Info,
                     Kind = PopupKind.Progress
                 }).ConfigureAwait(true);
 
-                string existingRaw;
-                TfsRecentChangesetsPayload existing = TryReadClipboardTfsPayload(request, out existingRaw);
-                if (existing != null)
+                if (request.UseLocalDummyPayload || TfsLocalDummyPayload.IsEnabled)
                 {
-                    DiagnosticLogger.Info("TFS_SYNC", "Using existing clipboard TFS payload — skip reconnect"
-                        + " requestId=" + (existing.RequestId ?? "-"));
-                    await ApplyFetchedPayloadAsync(request, existing, existingRaw, closeRdp: false).ConfigureAwait(true);
+                    TfsRecentChangesetsPayload dummy = TfsLocalDummyPayload.Build(request);
+                    await ApplyFetchedPayloadAsync(
+                        request, dummy, BuildRawFromPayload(dummy), closeRdp: false)
+                        .ConfigureAwait(true);
                     return;
+                }
+
+                if (!forceReconnect)
+                {
+                    string existingRaw;
+                    TfsRecentChangesetsPayload existing = TryReadClipboardTfsPayload(request, out existingRaw);
+                    if (existing != null)
+                    {
+                        DiagnosticLogger.Info("TFS_SYNC", "Using existing clipboard TFS payload — skip reconnect"
+                            + " requestId=" + (existing.RequestId ?? "-"));
+                        await ApplyFetchedPayloadAsync(request, existing, existingRaw, closeRdp: false).ConfigureAwait(true);
+                        return;
+                    }
+                }
+                else
+                {
+                    DiagnosticLogger.Info("TFS_SYNC", "forceReconnect — new SYNC_REQUEST + RDP"
+                        + " requestId=" + (request.RequestId ?? "-"));
                 }
 
                 // CMC: 웹 RDP라 mstsc 재접속 불가. disconnect Agent가 올린 클립보드를 조금 더 기다림.
@@ -626,12 +736,14 @@ namespace GBCWorkHub.UI.Services.TfsSync
 
                 DiagnosticLogger.Info("TFS_RDP_CONNECTED", FormatLog(request, null, null));
 
-                // 원격 rdpclip이 늦게 붙는 경우 대비: 접속 확인 후 SYNC_REQUEST 재기록
+                // 원격 rdpclip이 늦게 붙는 경우 대비: 접속 확인 후 SYNC_REQUEST 강제 재기록
+                // (접속 GBC status가 클립보드를 덮어 displaced 되면 일반 refresh는 실패함)
                 string rewriteText;
-                bool rewritten = TfsClipboardAckService.TryWriteSyncRequest(clipboardDto, out rewriteText);
+                bool rewritten = TfsClipboardAckService.TryForceWriteSyncRequest(clipboardDto, out rewriteText);
                 DiagnosticLogger.Info("TFS_REQUEST_CLIPBOARD_REWRITTEN",
                     "requestId=" + (request.RequestId ?? "-")
                     + " ok=" + rewritten
+                    + " mode=force"
                     + " length=" + (rewriteText != null ? rewriteText.Length : 0));
                 await Task.Delay(1500).ConfigureAwait(true);
 
@@ -676,22 +788,6 @@ namespace GBCWorkHub.UI.Services.TfsSync
                     FailReason = TfsSyncFailReason.Unknown,
                     Message = ex.Message
                 }).ConfigureAwait(true);
-            }
-            finally
-            {
-                // 실패/타임아웃/취소 후에도 SYNC_REQUEST가 남으면 다음 일반 접속이
-                // 원격에서 임시 TFS 재접속으로 오인됨 → 항상 정리
-                TfsClipboardAckService.TryClearSyncRequestIfPresent();
-
-                lock (_sync)
-                {
-                    _syncInFlight = false;
-                    _activeRequest = null;
-                    _payloadWaiter = null;
-                    _rdpClosedWaiter = null;
-                }
-                if (_getPendingBadgeRefresh != null)
-                    _getPendingBadgeRefresh();
             }
         }
 
@@ -830,8 +926,9 @@ namespace GBCWorkHub.UI.Services.TfsSync
             string title;
             string message;
             PopupIconKind icon;
-            string primaryLabel = "업무기록에서 선택";
+            string primaryLabel = "일지작성";
             bool offerSelect = true;
+            bool offerInbox = true;
 
             if (authorEmpty)
             {
@@ -839,6 +936,7 @@ namespace GBCWorkHub.UI.Services.TfsSync
                 message = "현재 연결된 TFS 사용자가 작성한 체크인이 없습니다.";
                 icon = PopupIconKind.Info;
                 offerSelect = false;
+                offerInbox = false;
             }
             else if (recentFallback && newUnimported > 0)
             {
@@ -846,11 +944,11 @@ namespace GBCWorkHub.UI.Services.TfsSync
                 message = "접속 시작~종료 구간에 체크인이 없어,"
                     + Environment.NewLine
                     + "오늘 동일 계정 체크인 중 업무기록에 없는 "
-                    + newUnimported + "건을 찾았습니다."
+                    + newUnimported + "건을 보관함에 넣었습니다."
                     + Environment.NewLine
-                    + "업무기록에 가져오시겠습니까?";
+                    + "지금 일지를 작성하거나 보관함에서 이어서 처리할 수 있습니다.";
                 icon = PopupIconKind.Info;
-                primaryLabel = "가져오기";
+                primaryLabel = "일지작성";
             }
             else if (recentFallback)
             {
@@ -860,12 +958,15 @@ namespace GBCWorkHub.UI.Services.TfsSync
                     : "접속 구간에 체크인이 없고, 오늘 미등록 체크인도 없습니다.";
                 icon = PopupIconKind.Info;
                 offerSelect = false;
+                offerInbox = false;
             }
             else if (finalCount > 0 || (ingest != null && ingest.AuthorMatchedCount > 0))
             {
                 title = "TFS 내역을 불러왔습니다";
-                message = "체크인 후보 " + finalCount + "건을 확인했습니다."
-                    + (before > 0 ? " (기존 포함)" : "");
+                message = "체크인 " + (newUnimported > 0 ? newUnimported : finalCount) + "건을 보관함에 넣었습니다."
+                    + (before > 0 ? " (기존 포함)" : "")
+                    + Environment.NewLine
+                    + "지금 일지를 작성하거나 보관함에서 이어서 처리할 수 있습니다.";
                 icon = PopupIconKind.Success;
             }
             else
@@ -876,18 +977,34 @@ namespace GBCWorkHub.UI.Services.TfsSync
                     : "수신된 체크인이 없습니다.";
                 icon = PopupIconKind.Info;
                 offerSelect = false;
+                offerInbox = false;
             }
 
-            PopupButtonDefinition[] buttons = offerSelect
-                ? new[]
+            PopupButtonDefinition[] buttons;
+            if (offerSelect)
+            {
+                buttons = new[]
                 {
                     new PopupButtonDefinition(primaryLabel, PopupResultType.Primary, isDefault: true),
-                    new PopupButtonDefinition("닫기", PopupResultType.Secondary, isCancel: true)
-                }
-                : new[]
+                    new PopupButtonDefinition("보관함에서 보기", PopupResultType.Secondary),
+                    new PopupButtonDefinition("닫기", PopupResultType.Cancel, isCancel: true)
+                };
+            }
+            else if (offerInbox)
+            {
+                buttons = new[]
+                {
+                    new PopupButtonDefinition("보관함에서 보기", PopupResultType.Secondary, isDefault: true),
+                    new PopupButtonDefinition("닫기", PopupResultType.Cancel, isCancel: true)
+                };
+            }
+            else
+            {
+                buttons = new[]
                 {
                     new PopupButtonDefinition("닫기", PopupResultType.Primary, isDefault: true, isCancel: true)
                 };
+            }
 
             var resultPopup = new PopupRequest
             {
@@ -899,8 +1016,12 @@ namespace GBCWorkHub.UI.Services.TfsSync
             };
 
             var go = await _popup.ShowConfirmAsync(resultPopup).ConfigureAwait(true);
-            if (offerSelect && go != null && go.IsPrimary && _selectTfsTab != null)
+            if (_selectTfsTab == null)
+                return;
+            if (offerSelect && go != null && go.IsPrimary)
                 _selectTfsTab("WorkLog");
+            else if (go != null && go.ResultType == PopupResultType.Secondary)
+                _selectTfsTab("Me");
         }
 
         private async Task<bool> WaitForConnectionOrPayloadAsync(
@@ -995,7 +1116,7 @@ namespace GBCWorkHub.UI.Services.TfsSync
                 if (request != null
                     && !string.IsNullOrWhiteSpace(request.RemoteComputerName)
                     && !string.IsNullOrWhiteSpace(pc)
-                    && !string.Equals(pc, request.RemoteComputerName, StringComparison.OrdinalIgnoreCase))
+                    && !RdpStatusBiz.ComputerNamesLooselyMatch(pc, request.RemoteComputerName))
                     return null;
 
                 return parse.Payload;
@@ -1031,29 +1152,33 @@ namespace GBCWorkHub.UI.Services.TfsSync
                 Buttons = new[]
                 {
                     new PopupButtonDefinition("다시 시도", PopupResultType.Primary, isDefault: true),
-                    new PopupButtonDefinition("나중에", PopupResultType.Secondary),
-                    new PopupButtonDefinition("닫기", PopupResultType.Tertiary, isCancel: true)
+                    new PopupButtonDefinition("나중에", PopupResultType.Secondary, isCancel: true)
                 }
             };
 
             var r = await _popup.ShowConfirmAsync(failPopup).ConfigureAwait(true);
             if (r != null && r.IsPrimary)
             {
-                await RunFetchAsync(request).ConfigureAwait(true);
+                _retryAfterFail = true;
+                DiagnosticLogger.Info("TFS_SYNC_BUTTON_CLICKED", FormatLog(request, null, "button=다시시도"));
                 return;
             }
-            if (r != null && r.IsSecondary && request != null)
-            {
-                TfsPendingSessionStore.Upsert(new TfsPendingSession
-                {
-                    RemoteIp = request.RemoteIp,
-                    RemoteComputerName = request.RemoteComputerName,
-                    SessionToken = request.SessionToken,
-                    SessionStartedAt = request.SessionStartedAt,
-                    SessionEndedAt = request.SessionEndedAt,
-                    Status = "LATER"
-                });
-            }
+            if (r != null && r.ResultType == PopupResultType.None)
+                return;
+            if (request != null)
+                DeferFetchLater(request);
+        }
+
+        private void DeferFetchLater(TfsSyncRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.RemoteIp))
+                return;
+
+            TfsSyncPromptGate.MarkHandled(request.RemoteIp, request.SessionStartedAt, "later");
+            TfsPendingSessionStore.Remove(request.RemoteIp);
+            if (_getPendingBadgeRefresh != null)
+                _getPendingBadgeRefresh();
+            DiagnosticLogger.Info("TFS_SYNC_DEFERRED", FormatLog(request, null, "status=LATER timeline=occupancy"));
         }
 
         private void MarkGalleryAvailableLocal(string remoteIp)
@@ -1093,7 +1218,7 @@ namespace GBCWorkHub.UI.Services.TfsSync
             string pc = payload.ResolveComputerName();
             if (!string.IsNullOrWhiteSpace(req.RemoteComputerName)
                 && !string.IsNullOrWhiteSpace(pc)
-                && !string.Equals(pc, req.RemoteComputerName, StringComparison.OrdinalIgnoreCase))
+                && !RdpStatusBiz.ComputerNamesLooselyMatch(pc, req.RemoteComputerName))
             {
                 rejectReason = "computerName mismatch";
                 return false;
@@ -1140,15 +1265,7 @@ namespace GBCWorkHub.UI.Services.TfsSync
 
         private static string ToUtcRoundTrip(DateTime value)
         {
-            DateTimeOffset offset;
-            if (value.Kind == DateTimeKind.Utc)
-                offset = new DateTimeOffset(value, TimeSpan.Zero);
-            else if (value.Kind == DateTimeKind.Local)
-                offset = new DateTimeOffset(value);
-            else
-                offset = new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Local));
-
-            return offset.ToUniversalTime().ToString("o");
+            return KoreaTime.ToRoundTripUtc(value);
         }
 
         private static string BuildRawFromPayload(TfsRecentChangesetsPayload payload)
@@ -1158,7 +1275,7 @@ namespace GBCWorkHub.UI.Services.TfsSync
         }
 
         /// <summary>
-        /// AURORA(IP): mstsc /v: / RC(PC명 점유키): 게시 .rdp
+        /// AURORA 등(IP): mstsc /v: / RC(PC명 점유키): 게시 .rdp
         /// </summary>
         private bool TryStartTfsReconnectRdp(TfsSyncRequest request, out string message, out string launchMode)
         {
@@ -1175,6 +1292,21 @@ namespace GBCWorkHub.UI.Services.TfsSync
             if (string.IsNullOrWhiteSpace(pcName))
                 pcName = shareKey;
 
+            // PC명만 넘어온 경우(접속구간 칩): Host/점유키에서 IPv4를 찾아 AURORA는 mstsc로
+            if (!LooksLikeIpv4(shareKey))
+            {
+                string resolvedIp = TryResolveIpv4ForReconnect(shareKey, pcName);
+                if (!string.IsNullOrWhiteSpace(resolvedIp))
+                {
+                    DiagnosticLogger.Info("TFS_SYNC",
+                        "Resolved reconnect IP from PC name shareKey=" + shareKey
+                        + " pc=" + pcName
+                        + " ip=" + resolvedIp);
+                    shareKey = resolvedIp;
+                    request.RemoteIp = resolvedIp;
+                }
+            }
+
             if (!LooksLikeIpv4(shareKey))
             {
                 var found = PublishedRdpLauncher.TryFindForPc("RC", pcName);
@@ -1184,7 +1316,8 @@ namespace GBCWorkHub.UI.Services.TfsSync
                 if (!found.Succeeded)
                 {
                     message = found.Message
-                        ?? "RC 재접속용 게시 RDP 파일을 찾지 못했습니다.";
+                        ?? "원격 재접속 대상을 찾지 못했습니다.\n"
+                        + "AURORA는 PC Host IP가, RC는 게시 .rdp가 필요합니다.";
                     return false;
                 }
 
@@ -1204,6 +1337,48 @@ namespace GBCWorkHub.UI.Services.TfsSync
                 RdpLaunchPurpose.TfsSyncReconnect,
                 startMinimized: false,
                 out message);
+        }
+
+        private static string TryResolveIpv4ForReconnect(string shareKey, string pcName)
+        {
+            try
+            {
+                var biz = new RemotePcBiz();
+                foreach (string site in new[]
+                {
+                    WorkLogSiteCodes.Aurora,
+                    WorkLogSiteCodes.Mngha,
+                    WorkLogSiteCodes.Cmc,
+                    WorkLogSiteCodes.Rc
+                })
+                {
+                    var list = biz.GetRemotePcListBySite(site);
+                    if (list == null)
+                        continue;
+                    foreach (var dto in list)
+                    {
+                        if (dto == null)
+                            continue;
+                        bool nameHit = !string.IsNullOrWhiteSpace(dto.PcName)
+                            && (string.Equals(dto.PcName.Trim(), pcName, StringComparison.OrdinalIgnoreCase)
+                                || string.Equals(dto.PcName.Trim(), shareKey, StringComparison.OrdinalIgnoreCase));
+                        bool keyHit = !string.IsNullOrWhiteSpace(dto.IpAddress)
+                            && string.Equals(dto.IpAddress.Trim(), shareKey, StringComparison.OrdinalIgnoreCase);
+                        if (!nameHit && !keyHit)
+                            continue;
+
+                        if (LooksLikeIpv4(dto.HostAddress))
+                            return dto.HostAddress.Trim();
+                        if (LooksLikeIpv4(dto.IpAddress))
+                            return dto.IpAddress.Trim();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.Warn("TFS_SYNC", "TryResolveIpv4ForReconnect failed: " + ex.Message);
+            }
+            return null;
         }
 
         private static bool LooksLikeIpv4(string value)

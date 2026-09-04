@@ -745,7 +745,7 @@ namespace GBCWorkHub.SessionAgent
             AppendJson(cs, "changesetId", changesetId).Append(',');
             AppendJson(cs, "authorName", authorName).Append(',');
             AppendJson(cs, "authorId", authorId).Append(',');
-            AppendJson(cs, "checkedInAt", creation.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")).Append(',');
+            AppendJson(cs, "checkedInAt", creation.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")).Append(',');
             AppendJson(cs, "comment", comment).Append(',');
             AppendJson(cs, "changedFileCount", files.Count).Append(',');
             cs.Append("\"changedFiles\":[");
@@ -1171,14 +1171,14 @@ namespace GBCWorkHub.SessionAgent
         private static string FormatIsoDate(string raw)
         {
             if (string.IsNullOrWhiteSpace(raw))
-                return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                return DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
 
             DateTime dt;
             if (DateTime.TryParse(raw, CultureInfo.InvariantCulture,
                 DateTimeStyles.RoundtripKind, out dt))
-                return dt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+                return dt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
 
-            return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            return DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
         }
 
         /// <summary>

@@ -41,7 +41,8 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             string pcName,
             string type,
             string category,
-            string deployStatus)
+            string deployStatus,
+            string teamName)
         {
             return new WorkLogListQuery
             {
@@ -55,7 +56,8 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 WriteStatus = null,
                 Type = ToDbFilterOrNull(type),
                 Category = ToDbFilterOrNull(category),
-                DeployStatus = ToDbFilterOrNull(deployStatus)
+                DeployStatus = ToDbFilterOrNull(deployStatus),
+                TeamName = ToDbFilterOrNull(teamName)
             };
         }
 
@@ -87,6 +89,16 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         public Task<WorkLogPageResult> GetPageAsync(WorkLogListQuery query)
         {
             return _workLogBiz.GetPageAsync(query);
+        }
+
+        public Task<System.Collections.Generic.IList<string>> GetDistinctTeamNamesAsync()
+        {
+            return _workLogBiz.GetDistinctTeamNamesAsync();
+        }
+
+        public Task<int> FillMissingTeamAsync(string authorName, string teamName, string localPcIp)
+        {
+            return _workLogBiz.FillMissingTeamAsync(authorName, teamName, localPcIp);
         }
 
         /// <summary>DTO 매핑 + Save. 성공 시 logId 반영된 DTO 반환.</summary>

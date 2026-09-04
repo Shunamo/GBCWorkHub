@@ -13,6 +13,13 @@ namespace GBCWorkHub.UI.Models.Popup
         public bool ShowCancelOnProgress { get; set; }
         public IList<PopupButtonDefinition> Buttons { get; set; }
         public string DedupKey { get; set; }
+        public bool ShowInput { get; set; }
+        public string InputText { get; set; }
+        public bool ShowAffiliationInput { get; set; }
+        public bool RequireAffiliation { get; set; }
+        public string AffiliationText { get; set; }
+        public string InfoIp { get; set; }
+        public string InfoWindowsAccount { get; set; }
 
         public PopupRequest()
         {

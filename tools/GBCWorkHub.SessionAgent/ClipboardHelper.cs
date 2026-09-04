@@ -10,7 +10,7 @@ namespace GBCWorkHub.SessionAgent
     /// </summary>
     internal static class ClipboardHelper
     {
-        private const int DefaultHoldMs = 1500;
+        private const int DefaultHoldMs = 2500;
         private const int TfsPayloadHoldMs = 4000;
 
         private static string _userClipboardBackup;
@@ -93,6 +93,13 @@ namespace GBCWorkHub.SessionAgent
                     && !string.Equals(current, backup, StringComparison.Ordinal))
                     return false;
 
+                if (!string.IsNullOrEmpty(current)
+                    && (current.StartsWith("GBCWORKHUB_TFS::", StringComparison.Ordinal)
+                        || current.StartsWith("GBCWORKHUB_SESSION_RESULT::", StringComparison.Ordinal)
+                        || current.StartsWith("GBCWORKHUB_TFS_SYNC_REQUEST::", StringComparison.Ordinal)
+                        || current.StartsWith("GBCWORKHUB_SESSION_TOKEN::", StringComparison.Ordinal)))
+                    return false;
+
                 for (int attempt = 0; attempt < 5; attempt++)
                 {
                     try
@@ -132,6 +139,11 @@ namespace GBCWorkHub.SessionAgent
 
                 if (string.IsNullOrEmpty(current) || !IsProtocolText(current))
                     return false;
+                if (current.StartsWith("GBCWORKHUB_TFS::", StringComparison.Ordinal)
+                    || current.StartsWith("GBCWORKHUB_SESSION_RESULT::", StringComparison.Ordinal)
+                    || current.StartsWith("GBCWORKHUB_TFS_SYNC_REQUEST::", StringComparison.Ordinal)
+                    || current.StartsWith("GBCWORKHUB_SESSION_TOKEN::", StringComparison.Ordinal))
+                    return false;
 
                 for (int attempt = 0; attempt < 5; attempt++)
                 {
@@ -161,6 +173,10 @@ namespace GBCWorkHub.SessionAgent
                     return;
                 string current = Clipboard.GetText();
                 if (string.IsNullOrEmpty(current) || IsProtocolText(current))
+                    return;
+                string t = current.TrimStart();
+                if (t.StartsWith("powershell.exe -STA", StringComparison.OrdinalIgnoreCase)
+                    || t.StartsWith("powershell -STA", StringComparison.OrdinalIgnoreCase))
                     return;
                 _userClipboardBackup = current;
             }

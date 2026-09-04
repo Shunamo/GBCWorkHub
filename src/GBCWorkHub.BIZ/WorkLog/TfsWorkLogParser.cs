@@ -27,6 +27,7 @@ namespace GBCWorkHub.BIZ.WorkLog
         private static readonly Regex TicketRegex = new Regex(
             @"(?:\[\s*TN[\s\.\-]*(\d+)(?:\([^)]*\))?\s*\])"
             + @"|(?:(?<![A-Za-z0-9_])TN[\s\.\-]+(\d+)(?:\([^)]*\))?)"
+            + @"|(?:\[\s*(?!CS\b)((?:\d{3,}\s*[,/\s]\s*)+\d{3,})\s*\])"
             + @"|(?:\[\s*(?!CS\b)(\d{3,})\s*\])",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
@@ -64,7 +65,9 @@ namespace GBCWorkHub.BIZ.WorkLog
             draft.TfsAuthorName = changeset.AuthorName;
             draft.CheckedInAt = TryParseDate(changeset.CheckedInAt);
 
-            draft.Pc = sessionContext.ResolvePc();
+            draft.Pc = !string.IsNullOrWhiteSpace(sessionContext.RemoteComputerName)
+                ? sessionContext.RemoteComputerName.Trim()
+                : sessionContext.ResolvePc();
             // Person in charge는 이름 기입 칸 — 세션/IP로 자동 채우지 않음
             draft.PersonInCharge = string.Empty;
             draft.StartDate = sessionContext.SessionStartedAt;
@@ -148,20 +151,10 @@ namespace GBCWorkHub.BIZ.WorkLog
         {
             string raw = comment ?? string.Empty;
             draft.TicketNo = ExtractTicketNumbers(raw);
-
-            string cleaned;
-            if (TryCleanTicketContents(raw, out cleaned))
-            {
-                draft.TicketContents = cleaned;
-                draft.TicketContentsIsSuggested = true;
-                draft.Warnings.Add("Ticket Contents는 추천값입니다. 확인하세요.");
-            }
-            else
-            {
-                draft.TicketContents = raw;
-                draft.TicketContentsIsSuggested = true;
-                draft.Warnings.Add("Ticket Contents는 TFS Comment 원문입니다. 확인하세요.");
-            }
+            // 체크인 메시지는 TFS 원문 유지 ([티켓] 포함). 티켓 번호만 따로 파싱.
+            draft.TicketContents = raw.Trim();
+            draft.TicketContentsIsSuggested = true;
+            draft.Warnings.Add("Ticket Contents는 TFS 체크인 메시지 원문입니다. 확인하세요.");
         }
 
         /// <summary>코멘트에서 티켓 번호들을 추출 (콤마 구분, 중복 제거). [CS n] 은 무시.</summary>
@@ -183,10 +176,37 @@ namespace GBCWorkHub.BIZ.WorkLog
                 string n = FirstCapturingGroup(match);
                 if (string.IsNullOrEmpty(n))
                     continue;
-                if (!nums.Any(x => string.Equals(x, n, StringComparison.Ordinal)))
-                    nums.Add(n);
+                foreach (string part in n.Split(new[] { ',', '/', ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    string t = part.Trim();
+                    if (t.Length < 3)
+                        continue;
+                    bool digits = true;
+                    for (int i = 0; i < t.Length; i++)
+                    {
+                        if (t[i] < '0' || t[i] > '9')
+                        {
+                            digits = false;
+                            break;
+                        }
+                    }
+                    if (!digits)
+                        continue;
+                    if (!nums.Any(x => string.Equals(x, t, StringComparison.Ordinal)))
+                        nums.Add(t);
+                }
             }
+            nums.Sort(CompareTicketNumbers);
             return string.Join(", ", nums);
+        }
+
+        private static int CompareTicketNumbers(string a, string b)
+        {
+            int ia;
+            int ib;
+            if (int.TryParse(a, out ia) && int.TryParse(b, out ib))
+                return ia.CompareTo(ib);
+            return string.CompareOrdinal(a, b);
         }
 
         private static bool IsChangesetMarkerMatch(string matched)
@@ -252,7 +272,8 @@ namespace GBCWorkHub.BIZ.WorkLog
             if (ticketsRemoved)
                 changed = true;
 
-            work = Regex.Replace(work, @"^\s*[\(\)\[\]:\-–—]+\s*", string.Empty).Trim();
+            // 티켓 제거 후 남은 닫는 구두점만 정리. 본문 앞 '[' 는 지우지 않음.
+            work = Regex.Replace(work, @"^\s*[\)\]:\-–—,]+(?=[^\[]|$)\s*", string.Empty).Trim();
             work = Regex.Replace(work, @"\s{2,}", " ").Trim();
 
             if (string.IsNullOrWhiteSpace(work))

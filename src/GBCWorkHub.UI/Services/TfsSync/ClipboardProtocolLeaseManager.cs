@@ -11,11 +11,11 @@ namespace GBCWorkHub.UI.Services.TfsSync
     /// ACK의 "hold 경과"는 <see cref="CompleteAckLease"/>를 호출자가 원하는 시점에 부르는 것으로 표현한다
     /// (운영 코드에서는 Task.Delay 이후 호출).
     ///
-    /// 핵심 불변식(Exact CAS, 설계 원칙 A):
-    /// 어떤 lease의 복원/삭제도 "현재 클립보드 == lease.WrittenText" 일 때만 수행한다.
-    /// 값이 다르면 사용자 복사본이거나 다른 세션의 메시지이므로 절대 손대지 않는다.
-    /// 이 불변식 하나로 ACK/SYNC_REQUEST/다른 세션 메시지 간 상호 훼손이 구조적으로 불가능해진다 —
-    /// lease가 교체되면 새 lease가 쓴 텍스트로 클립보드가 바뀌므로, 이전 lease의 CAS는 자동으로 실패한다.
+    /// 핵심 규칙(prefix):
+    /// 클립보드가 GBCWORKHUB 로 시작하면 우리 프로토콜이다 → 사용자 백업 복원, 백업이 없으면 프로토콜만 정리.
+    /// prefix가 없으면 사용자가 복사한 값이다 → 절대 건드리지 않는다.
+    /// 빈 클립보드(RDP 종료 후 비움)는 prefix가 아니지만, 백업이 있으면 복원한다.
+    /// 예외: 아직 수집하지 않은 GBCWORKHUB_TFS:: / SESSION_RESULT 는 로컬이 쓴 잔여물이 아니므로 덮지 않는다.
     /// </summary>
     public sealed class ClipboardProtocolLeaseManager
     {
@@ -26,6 +26,8 @@ namespace GBCWorkHub.UI.Services.TfsSync
         private readonly object _sync = new object();
         private ClipboardProtocolLease _activeLease;
         private int _generation;
+        /// <summary>프로토콜 쓰기 전에 잡아 둔 마지막 사용자 텍스트. RDP 종료 후 rdpclip이 비워도 로컬에서 되돌린다.</summary>
+        private string _lastGoodUserBackup;
 
         /// <param name="accessor">클립보드 IO. 테스트에서는 fake 주입.</param>
         /// <param name="looksLikeOwnProtocolNoise">
@@ -123,8 +125,19 @@ namespace GBCWorkHub.UI.Services.TfsSync
 
             if (lease.IsDisplaced)
             {
-                Log("SYNC_REFRESH_SKIPPED_DISPLACED", requestId, lease);
-                return new ClipboardWriteResult { Outcome = ClipboardWriteOutcome.Displaced, Lease = lease };
+                string displacedCurrent;
+                bool gotDisplaced = _accessor.TryGetText(out displacedCurrent);
+                string displacedText = gotDisplaced ? (displacedCurrent ?? string.Empty) : string.Empty;
+                bool canReclaim = !gotDisplaced
+                    || string.IsNullOrEmpty(displacedText)
+                    || (_looksLikeOwnProtocolNoise(displacedText)
+                        && (isBlockingForeignPayload == null || !isBlockingForeignPayload(displacedText)));
+                if (!canReclaim)
+                {
+                    Log("SYNC_REFRESH_SKIPPED_DISPLACED", requestId, lease);
+                    return new ClipboardWriteResult { Outcome = ClipboardWriteOutcome.Displaced, Lease = lease };
+                }
+                // GBC status 등으로 displaced된 경우 아래에서 회수
             }
 
             string current;
@@ -164,6 +177,28 @@ namespace GBCWorkHub.UI.Services.TfsSync
                 return new ClipboardWriteResult { Outcome = ClipboardWriteOutcome.SkippedForeignInboundPresent, Lease = lease };
             }
 
+            // 원격 접속 확인(GBC status 등)이 SYNC_REQUEST를 덮은 경우 — 사용자 일반 텍스트가 아니면 회수
+            if (got
+                && !string.IsNullOrEmpty(currentForCompare)
+                && _looksLikeOwnProtocolNoise(currentForCompare))
+            {
+                try
+                {
+                    _accessor.SetText(text);
+                }
+                catch (Exception ex)
+                {
+                    _log("SYNC_REFRESH_EXCEPTION requestId=" + (requestId ?? "-") + " ex=" + ex.GetType().Name);
+                    return Fail();
+                }
+
+                lease.WrittenText = text;
+                lease.WrittenHash = ComputeHash(text);
+                lease.IsDisplaced = false;
+                Log("SYNC_REFRESH_RECLAIMED_PROTOCOL", requestId, lease);
+                return new ClipboardWriteResult { Outcome = ClipboardWriteOutcome.Written, Lease = lease };
+            }
+
             // 사용자가 새 내용을 복사했거나 알 수 없는 다른 값이 올라와 있다 — 절대 덮지 않는다.
             lease.IsDisplaced = true;
             Log("SYNC_REFRESH_DISPLACED", requestId, lease);
@@ -171,8 +206,106 @@ namespace GBCWorkHub.UI.Services.TfsSync
         }
 
         /// <summary>
-        /// SYNC_REQUEST 종료(성공/실패/취소/타임아웃/예외 공통 경로). 활성 SyncRequest lease가
-        /// 있고 현재 클립보드가 정확히 그 값일 때만 사용자 백업 복원 또는 Clear.
+        /// 접속 직후 SYNC_REQUEST 재기록. GBC status 등 프로토콜/빈 클립보드는 덮고,
+        /// 미수집 TFS 페이로드·일반 사용자 텍스트는 덮지 않는다. displaced 플래그도 해제 가능.
+        /// </summary>
+        public ClipboardWriteResult TryForceRefreshSyncRequest(
+            string requestId,
+            string text,
+            Func<string, bool> isBlockingForeignPayload)
+        {
+            if (string.IsNullOrEmpty(text))
+                return Fail();
+
+            ClipboardProtocolLease lease;
+            lock (_sync)
+                lease = _activeLease;
+
+            bool sameLease = lease != null
+                && lease.Kind == ClipboardLeaseKind.SyncRequest
+                && string.Equals(lease.RequestId ?? string.Empty, requestId ?? string.Empty, StringComparison.Ordinal);
+
+            if (!sameLease)
+                return BeginSyncRequest(requestId, text, isBlockingForeignPayload);
+
+            string current;
+            bool got = _accessor.TryGetText(out current);
+            string currentText = got ? (current ?? string.Empty) : string.Empty;
+
+            if (got && isBlockingForeignPayload != null && isBlockingForeignPayload(currentText))
+            {
+                Log("SYNC_FORCE_SKIPPED_FOREIGN_PAYLOAD", requestId, lease);
+                return new ClipboardWriteResult { Outcome = ClipboardWriteOutcome.SkippedForeignInboundPresent, Lease = lease };
+            }
+
+            if (got
+                && !string.IsNullOrEmpty(currentText)
+                && !_looksLikeOwnProtocolNoise(currentText)
+                && !string.Equals(currentText, lease.WrittenText ?? string.Empty, StringComparison.Ordinal))
+            {
+                lease.IsDisplaced = true;
+                Log("SYNC_FORCE_SKIPPED_USER_TEXT", requestId, lease);
+                return new ClipboardWriteResult { Outcome = ClipboardWriteOutcome.Displaced, Lease = lease };
+            }
+
+            try
+            {
+                _accessor.SetText(text);
+            }
+            catch (Exception ex)
+            {
+                _log("SYNC_FORCE_EXCEPTION requestId=" + (requestId ?? "-") + " ex=" + ex.GetType().Name);
+                return Fail();
+            }
+
+            lease.WrittenText = text;
+            lease.WrittenHash = ComputeHash(text);
+            lease.IsDisplaced = false;
+            Log("SYNC_FORCE_REWRITTEN", requestId, lease);
+            return new ClipboardWriteResult { Outcome = ClipboardWriteOutcome.Written, Lease = lease };
+        }
+
+        /// <summary>
+        /// 사용자가 명시적으로 다시 시도할 때만. 남은 GBCWORKHUB* 프로토콜(미수집 TFS 포함)을
+        /// 치워서 새 SYNC_REQUEST를 쓸 수 있게 한다. prefix 없는 사용자 텍스트는 건드리지 않는다.
+        /// </summary>
+        public bool TryDiscardInboundPayloadForRetry()
+        {
+            string current;
+            bool got = _accessor.TryGetText(out current);
+            string currentText = got ? (current ?? string.Empty) : string.Empty;
+
+            if (!HasWorkHubPrefix(currentText))
+                return false;
+
+            string restore;
+            lock (_sync)
+            {
+                restore = _activeLease != null && !string.IsNullOrEmpty(_activeLease.UserBackup)
+                    ? _activeLease.UserBackup
+                    : _lastGoodUserBackup;
+                _activeLease = null;
+            }
+
+            try
+            {
+                if (!string.IsNullOrEmpty(restore) && !HasWorkHubPrefix(restore))
+                    _accessor.SetText(restore);
+                else
+                    _accessor.Clear();
+                Log("SYNC_RETRY_DISCARDED_INBOUND", null, null);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _log("SYNC_RETRY_DISCARD_EX ex=" + ex.GetType().Name);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// SYNC_REQUEST 종료(성공/실패/취소/타임아웃/예외 공통 경로).
+        /// 현재 클립보드가 GBCWORKHUB* 이거나 비어 있으면 복원/정리. 일반 텍스트는 유지.
         /// </summary>
         public bool TryEndActiveSyncRequestLease()
         {
@@ -217,9 +350,7 @@ namespace GBCWorkHub.UI.Services.TfsSync
         }
 
         /// <summary>
-        /// ACK hold 경과 시점에 호출. 현재 클립보드가 정확히 이 lease가 쓴 ACK 문구일 때만
-        /// 사용자 백업을 복원(또는 백업이 없었으면 Clear)한다. 그 사이 사용자가 새로 복사했거나
-        /// 다른 Payload/ACK/SYNC_REQUEST가 도착했으면 아무것도 하지 않는다.
+        /// ACK hold 경과 시점에 호출. prefix가 있으면 복원/정리, 없으면 사용자 복사를 유지.
         /// </summary>
         public bool CompleteAckLease(ClipboardProtocolLease lease)
         {
@@ -233,8 +364,9 @@ namespace GBCWorkHub.UI.Services.TfsSync
         // ---------------------------------------------------------------
 
         /// <summary>
-        /// 임의의 lease를 exact CAS로 종료한다(복원 또는 Clear). 이미 다른 lease로 교체되었거나
-        /// 현재 클립보드가 더 이상 lease.WrittenText가 아니면 아무것도 하지 않고 false.
+        /// 클립보드 처리 기준은 prefix 하나다.
+        /// GBCWORKHUB* 이면 사용자 백업 복원, 백업이 없으면 프로토콜만 정리(Clear).
+        /// prefix가 없는 일반 텍스트는 절대 건드리지 않는다.
         /// </summary>
         public bool TryEndLease(ClipboardProtocolLease lease)
         {
@@ -244,22 +376,29 @@ namespace GBCWorkHub.UI.Services.TfsSync
             lock (_sync)
             {
                 if (!ReferenceEquals(_activeLease, lease))
-                {
-                    // 이미 다른 lease가 이어받음 — 이 lease는 자기 몫이 없다.
                     return false;
-                }
             }
 
             string current;
             bool got = _accessor.TryGetText(out current);
-            string currentForCompare = got ? (current ?? string.Empty) : string.Empty;
-            string writtenForCompare = lease.WrittenText ?? string.Empty;
-            bool exact = string.Equals(currentForCompare, writtenForCompare, StringComparison.Ordinal);
+            string currentText = got ? (current ?? string.Empty) : string.Empty;
+            bool hasPrefix = HasWorkHubPrefix(currentText);
+            string restore = !string.IsNullOrEmpty(lease.UserBackup)
+                ? lease.UserBackup
+                : _lastGoodUserBackup;
 
-            if (!exact)
+            if (IsUnreadInboundPayload(currentText))
             {
                 lease.IsDisplaced = true;
-                Log("LEASE_END_SKIPPED_NOT_EXACT", lease.RequestId, lease);
+                Log("LEASE_END_SKIPPED_INBOUND_PAYLOAD", lease.RequestId, lease);
+                ClearIfStillActive(lease);
+                return false;
+            }
+
+            if (!hasPrefix && !string.IsNullOrEmpty(currentText))
+            {
+                lease.IsDisplaced = true;
+                Log("LEASE_END_SKIPPED_NO_PREFIX", lease.RequestId, lease);
                 ClearIfStillActive(lease);
                 return false;
             }
@@ -267,17 +406,18 @@ namespace GBCWorkHub.UI.Services.TfsSync
             bool acted = false;
             try
             {
-                if (!string.IsNullOrEmpty(lease.UserBackup))
+                if (!string.IsNullOrEmpty(restore))
                 {
-                    _accessor.SetText(lease.UserBackup);
+                    _accessor.SetText(restore);
                     acted = true;
-                    Log("LEASE_END_RESTORED_BACKUP", lease.RequestId, lease);
+                    Log(hasPrefix ? "LEASE_END_RESTORED_PREFIX" : "LEASE_END_RESTORED_EMPTY",
+                        lease.RequestId, lease);
                 }
-                else
+                else if (hasPrefix)
                 {
                     _accessor.Clear();
                     acted = true;
-                    Log("LEASE_END_CLEARED_NO_BACKUP", lease.RequestId, lease);
+                    Log("LEASE_END_CLEARED_PREFIX_NO_BACKUP", lease.RequestId, lease);
                 }
             }
             catch (Exception ex)
@@ -300,18 +440,143 @@ namespace GBCWorkHub.UI.Services.TfsSync
         }
 
         /// <summary>
-        /// 백업 후보를 정한다. 현재 값이 진짜 사용자 텍스트면 그것을 백업한다.
-        /// 비어 있거나 우리 자신의 프로토콜 잔재(예: 직전 ACK/SYNC_REQUEST)라면, 그 프로토콜
-        /// 잔재를 남긴 이전 lease가 들고 있던 UserBackup을 그대로 이어받는다 — 그렇지 않으면
-        /// ACK → SYNC_REQUEST처럼 프로토콜 쓰기가 연쇄될 때 맨 처음 사용자 텍스트를 영영 잃는다.
+        /// 비밀번호 붙여넣기 전에 우리가 올린 아웃바운드 프로토콜만 치운다.
+        /// 사용자 텍스트와 미수집 TFS/SESSION_RESULT 는 유지한다.
         /// </summary>
+        public bool TryReleaseClipboardForUserCredentials()
+        {
+            ClipboardProtocolLease lease;
+            lock (_sync)
+                lease = _activeLease;
+            bool acted = false;
+            if (lease != null)
+                acted = TryEndLease(lease);
+
+            string current;
+            bool got = _accessor.TryGetText(out current);
+            string currentText = got ? (current ?? string.Empty) : string.Empty;
+
+            if (IsUnreadInboundPayload(currentText))
+                return acted;
+            if (!string.IsNullOrEmpty(currentText) && !HasWorkHubPrefix(currentText))
+                return acted;
+
+            string restore;
+            lock (_sync)
+                restore = _lastGoodUserBackup;
+
+            try
+            {
+                if (!string.IsNullOrEmpty(restore) && !HasWorkHubPrefix(restore))
+                {
+                    _accessor.SetText(restore);
+                    Log("CREDENTIALS_RESTORED_BACKUP", null, null);
+                    return true;
+                }
+                if (HasWorkHubPrefix(currentText))
+                {
+                    _accessor.Clear();
+                    Log("CREDENTIALS_CLEARED_PROTOCOL", null, null);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                _log("CREDENTIALS_RELEASE_EX ex=" + ex.GetType().Name);
+                return acted;
+            }
+
+            return acted;
+        }
+
+        /// <summary>
+        /// rdpclip이 비우기 전에, 지금 클립보드가 사용자 텍스트면 그 값을 기억한다.
+        /// </summary>
+        public void CaptureCurrentAsUserBackupIfReal()
+        {
+            string current;
+            if (!_accessor.TryGetText(out current))
+                return;
+            if (string.IsNullOrWhiteSpace(current) || _looksLikeOwnProtocolNoise(current))
+                return;
+            lock (_sync)
+                _lastGoodUserBackup = current;
+            Log("USER_BACKUP_CAPTURED", null, _activeLease);
+        }
+
+        /// <summary>
+        /// 클립보드가 비었거나 우리 프로토콜만 남아 있으면, 세션 중 기억한 사용자 텍스트를 로컬에 되돌린다.
+        /// mstsc 종료 후 rdpclip이 비운 뒤에 호출한다.
+        /// </summary>
+        public bool TryRestoreRememberedBackupIfEmptyOrProtocol()
+        {
+            string backup;
+            lock (_sync)
+            {
+                backup = _lastGoodUserBackup;
+                if (string.IsNullOrEmpty(backup) && _activeLease != null)
+                    backup = _activeLease.UserBackup;
+            }
+            if (string.IsNullOrEmpty(backup))
+                return false;
+
+            string current;
+            bool got = _accessor.TryGetText(out current);
+            if (got && IsUnreadInboundPayload(current))
+                return false;
+            if (got && !string.IsNullOrEmpty(current)
+                && !HasWorkHubPrefix(current)
+                && !string.Equals(current, backup, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            try
+            {
+                _accessor.SetText(backup);
+                Log("REMEMBERED_BACKUP_RESTORED", null, _activeLease);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _log("REMEMBERED_BACKUP_RESTORE_EX ex=" + ex.GetType().Name);
+                return false;
+            }
+        }
+
+        private static bool HasWorkHubPrefix(string text)
+        {
+            return !string.IsNullOrEmpty(text)
+                && text.StartsWith("GBCWORKHUB", StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// 원격이 올린 응답. 로컬 lease 정리로 덮으면 수집이 실패한다.
+        /// GBCWORKHUB_TFS_SYNC_REQUEST:: 는 여기에 포함되지 않는다(StartsWith GBCWORKHUB_TFS:: 가 아님).
+        /// </summary>
+        private static bool IsUnreadInboundPayload(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return false;
+            return text.StartsWith("GBCWORKHUB_TFS::", StringComparison.Ordinal)
+                || text.StartsWith("GBCWORKHUB_SESSION_RESULT::", StringComparison.Ordinal);
+        }
+
         private string ResolveBackup(string current)
         {
             if (!string.IsNullOrEmpty(current) && !_looksLikeOwnProtocolNoise(current))
+            {
+                lock (_sync)
+                    _lastGoodUserBackup = current;
                 return current;
+            }
 
             lock (_sync)
-                return _activeLease != null ? _activeLease.UserBackup : null;
+            {
+                if (_activeLease != null && !string.IsNullOrEmpty(_activeLease.UserBackup))
+                    return _activeLease.UserBackup;
+                return _lastGoodUserBackup;
+            }
         }
 
         private ClipboardProtocolLease AdoptExistingAsLease(

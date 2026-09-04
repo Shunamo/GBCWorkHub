@@ -4,6 +4,7 @@ using System.Configuration;
 using System.Data;
 using System.Text;
 using System.Threading.Tasks;
+using GBCWorkHub.DTO;
 using GBCWorkHub.DTO.WorkLog;
 using Oracle.ManagedDataAccess.Client;
 
@@ -25,6 +26,20 @@ namespace GBCWorkHub.DAC
         private readonly string _connectionString;
         private bool _lastConnectionOk;
         private string _lastConnectionError;
+        private bool _teamNmProbed;
+        private bool _hasTeamNm;
+
+        private const string HeaderSelectBase =
+            @"LOG_ID, CLIENT_KEY, WRITE_STATUS, TICKET_NO, TICKET_CONTENTS,
+              MENU_NM, PC_NM, PERSON_IN_CHARGE, LOCAL_PC_IP,
+              START_DT, END_DT, DEPLOY_STATUS, DEPLOY_DT, WORK_COMMENT,
+              CHANGESET_ID, TFS_COMMENT, TFS_AUTHOR, AUTHOR_NM, CHECKED_IN_AT,
+              CHANGED_FILE_COUNT, NEEDS_TICKET_REVIEW, CREATED_AT, UPDT_DTM,
+              SITE_CD";
+
+        /// <summary>목록 그룹과 동일: 체크인 → 시작 → 종료 → 배포일. ALL은 사이트 구분 없이 이 순.</summary>
+        private const string TimelineDateExpr =
+            "NVL(w.CHECKED_IN_AT, NVL(w.START_DT, NVL(w.END_DT, w.DEPLOY_DT)))";
 
         public OracleWorkLogRepository()
         {
@@ -79,6 +94,247 @@ namespace GBCWorkHub.DAC
         public Task<ISet<int>> GetRegisteredChangesetIdsAsync()
         {
             return Task.Run(() => (ISet<int>)GetRegisteredChangesetIdsCore());
+        }
+
+        public Task<int> RenameAuthorAsync(string oldName, string newName, string localPcIp)
+        {
+            return Task.Run(() => RenameAuthorCore(oldName, newName, localPcIp));
+        }
+
+        public Task<int> RenameTeamAsync(string authorName, string teamName, string localPcIp)
+        {
+            return Task.Run(() => RenameTeamCore(authorName, teamName, localPcIp));
+        }
+
+        public Task<int> FillMissingTeamAsync(string authorName, string teamName, string localPcIp)
+        {
+            return Task.Run(() => FillMissingTeamCore(authorName, teamName, localPcIp));
+        }
+
+        public Task<IList<string>> GetDistinctTeamNamesAsync()
+        {
+            return Task.Run(() => (IList<string>)GetDistinctTeamNamesCore());
+        }
+
+        private int RenameAuthorCore(string oldName, string newName, string localPcIp)
+        {
+            if (string.IsNullOrWhiteSpace(oldName) || string.IsNullOrWhiteSpace(newName))
+                return 0;
+            if (string.Equals(oldName.Trim(), newName.Trim(), StringComparison.Ordinal))
+                return 0;
+            if (!IsConfigured)
+                return 0;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                {
+                    int rows = 0;
+                    using (var cmd = CreateCommand(conn))
+                    {
+                        cmd.CommandText =
+                            @"UPDATE " + HeaderTable + @"
+                                 SET AUTHOR_NM = :newNm,
+                                     UPDT_DTM = SYSTIMESTAMP
+                               WHERE UPPER(TRIM(AUTHOR_NM)) = UPPER(:oldNm)
+                                 AND (:ip IS NULL OR UPPER(TRIM(LOCAL_PC_IP)) = UPPER(:ip))";
+                        cmd.Parameters.Add("newNm", OracleDbType.Varchar2).Value = Trim(newName.Trim(), 200);
+                        cmd.Parameters.Add("oldNm", OracleDbType.Varchar2).Value = oldName.Trim();
+                        cmd.Parameters.Add("ip", OracleDbType.Varchar2).Value =
+                            string.IsNullOrWhiteSpace(localPcIp) ? (object)DBNull.Value : localPcIp.Trim();
+                        rows += cmd.ExecuteNonQuery();
+                    }
+                    using (var cmd = CreateCommand(conn))
+                    {
+                        cmd.CommandText =
+                            @"UPDATE " + HeaderTable + @"
+                                 SET PERSON_IN_CHARGE = :newNm,
+                                     UPDT_DTM = SYSTIMESTAMP
+                               WHERE UPPER(TRIM(PERSON_IN_CHARGE)) = UPPER(:oldNm)
+                                 AND (:ip IS NULL OR UPPER(TRIM(LOCAL_PC_IP)) = UPPER(:ip))";
+                        cmd.Parameters.Add("newNm", OracleDbType.Varchar2).Value = Trim(newName.Trim(), 200);
+                        cmd.Parameters.Add("oldNm", OracleDbType.Varchar2).Value = oldName.Trim();
+                        cmd.Parameters.Add("ip", OracleDbType.Varchar2).Value =
+                            string.IsNullOrWhiteSpace(localPcIp) ? (object)DBNull.Value : localPcIp.Trim();
+                        rows += cmd.ExecuteNonQuery();
+                    }
+                    _lastConnectionOk = true;
+                    _lastConnectionError = null;
+                    return rows;
+                }
+            }
+            catch (Exception ex)
+            {
+                Fail(ex);
+                WorkHubFileLogger.Warn("WORKLOG_RENAME", "RenameAuthor failed: " + _lastConnectionError);
+                return -1;
+            }
+        }
+
+        private int RenameTeamCore(string authorName, string teamName, string localPcIp)
+        {
+            if (string.IsNullOrWhiteSpace(authorName))
+                return 0;
+            if (!IsConfigured)
+                return 0;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                {
+                    EnsureTeamNmColumn(conn);
+                    if (!_hasTeamNm)
+                        return 0;
+
+                    using (var cmd = CreateCommand(conn))
+                    {
+                    cmd.CommandText =
+                        @"UPDATE " + HeaderTable + @"
+                             SET TEAM_NM = :teamNm,
+                                 UPDT_DTM = SYSTIMESTAMP
+                           WHERE UPPER(TRIM(AUTHOR_NM)) = UPPER(:authorNm)
+                              OR UPPER(TRIM(PERSON_IN_CHARGE)) = UPPER(:authorNm)
+                              OR (:hasIp = 1 AND UPPER(TRIM(LOCAL_PC_IP)) = UPPER(:ip))";
+                    BindTeamUpdate(cmd, authorName, teamName, localPcIp);
+                    int rows = cmd.ExecuteNonQuery();
+                    _lastConnectionOk = true;
+                    _lastConnectionError = null;
+                    return rows;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Fail(ex);
+                WorkHubFileLogger.Warn("WORKLOG_RENAME", "RenameTeam failed: " + _lastConnectionError);
+                return -1;
+            }
+        }
+
+        private int FillMissingTeamCore(string authorName, string teamName, string localPcIp)
+        {
+            if (string.IsNullOrWhiteSpace(authorName) || string.IsNullOrWhiteSpace(teamName))
+                return 0;
+            if (!IsConfigured)
+                return 0;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                {
+                    EnsureTeamNmColumn(conn);
+                    if (!_hasTeamNm)
+                        return 0;
+
+                    using (var cmd = CreateCommand(conn))
+                    {
+                        cmd.CommandText =
+                            @"UPDATE " + HeaderTable + @"
+                                 SET TEAM_NM = :teamNm,
+                                     UPDT_DTM = SYSTIMESTAMP
+                               WHERE (TEAM_NM IS NULL OR TRIM(TEAM_NM) IS NULL)
+                                 AND (" + SqlAuthorMatchesName() + @"
+                                   OR (:hasIp = 1 AND UPPER(TRIM(LOCAL_PC_IP)) = UPPER(:ip)))";
+                        BindTeamUpdate(cmd, authorName, teamName, localPcIp);
+                        int rows = cmd.ExecuteNonQuery();
+                        _lastConnectionOk = true;
+                        _lastConnectionError = null;
+                        if (rows > 0)
+                            WorkHubFileLogger.Info("WORKLOG_RENAME", "FillMissingTeam rows=" + rows);
+                        return rows;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Fail(ex);
+                WorkHubFileLogger.Warn("WORKLOG_RENAME", "FillMissingTeam failed: " + _lastConnectionError);
+                return -1;
+            }
+        }
+
+        private static void BindTeamUpdate(OracleCommand cmd, string authorName, string teamName, string localPcIp)
+        {
+            cmd.Parameters.Add("teamNm", OracleDbType.NVarchar2).Value =
+                string.IsNullOrWhiteSpace(teamName)
+                    ? (object)DBNull.Value
+                    : Trim(teamName.Trim(), 100);
+            cmd.Parameters.Add("authorNm", OracleDbType.NVarchar2).Value = authorName.Trim();
+            cmd.Parameters.Add("hasIp", OracleDbType.Int32).Value =
+                string.IsNullOrWhiteSpace(localPcIp) ? 0 : 1;
+            cmd.Parameters.Add("ip", OracleDbType.Varchar2).Value =
+                string.IsNullOrWhiteSpace(localPcIp) ? (object)"-" : localPcIp.Trim();
+        }
+
+        /// <summary>점유명 정확 일치, "김수현 진료지원" 접두, 작성자/담당자/TFS 작성자 포함.</summary>
+        private static string SqlAuthorMatchesName()
+        {
+            return SqlTeamKeyExpr("NVL(TRIM(AUTHOR_NM), '')") + " = " + SqlTeamKeyExpr("TRIM(:authorNm)")
+                + " OR " + SqlTeamKeyExpr("NVL(TRIM(AUTHOR_NM), '')")
+                + " LIKE " + SqlTeamKeyExpr("TRIM(:authorNm)") + " || '%'"
+                + " OR INSTR("
+                + SqlTeamKeyExpr("NVL(TRIM(AUTHOR_NM), '') || NVL(TRIM(PERSON_IN_CHARGE), '') || NVL(TRIM(TFS_AUTHOR), '')")
+                + ", " + SqlTeamKeyExpr("TRIM(:authorNm)") + ") > 0"
+                + " OR UPPER(TRIM(PERSON_IN_CHARGE)) = UPPER(:authorNm)"
+                + " OR UPPER(TRIM(TFS_AUTHOR)) = UPPER(:authorNm)";
+        }
+
+        private static string SqlTeamKeyCol(string column)
+        {
+            return SqlTeamKeyExpr("NVL(TRIM(" + column + "), '')");
+        }
+
+        private static string SqlTeamKeyExpr(string expr)
+        {
+            return "REPLACE(REPLACE(REPLACE(" + expr + ", ' ', ''), UNISTR('\\00B7'), ''), UNISTR('\\2022'), '')";
+        }
+
+        private List<string> GetDistinctTeamNamesCore()
+        {
+            var list = new List<string>();
+            if (!IsConfigured)
+                return list;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                {
+                    EnsureTeamNmColumn(conn);
+                    if (!_hasTeamNm)
+                        return list;
+
+                    using (var cmd = CreateCommand(conn))
+                    {
+                        cmd.CommandText =
+                            @"SELECT MIN(TRIM(TEAM_NM))
+                                FROM " + HeaderTable + @"
+                               WHERE TEAM_NM IS NOT NULL
+                                 AND TRIM(TEAM_NM) IS NOT NULL
+                               GROUP BY " + SqlTeamKeyCol("TEAM_NM") + @"
+                               ORDER BY MIN(TRIM(TEAM_NM))";
+                        using (var reader = cmd.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                if (reader.IsDBNull(0))
+                                    continue;
+                                string name = Convert.ToString(reader.GetValue(0));
+                                if (!string.IsNullOrWhiteSpace(name))
+                                    list.Add(name.Trim());
+                            }
+                        }
+                    }
+                    _lastConnectionOk = true;
+                    _lastConnectionError = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                Fail(ex);
+                WorkHubFileLogger.Warn("WORKLOG_SELECT", "GetDistinctTeamNames failed: " + _lastConnectionError);
+            }
+
+            return list;
         }
 
         private HashSet<int> GetRegisteredChangesetIdsCore()
@@ -225,18 +481,14 @@ namespace GBCWorkHub.DAC
             {
                 using (var conn = OpenConnection())
                 {
+                    EnsureTeamNmColumn(conn);
                     var map = new Dictionary<long, WorkLogRecordDto>();
                     using (var cmd = CreateCommand(conn))
                     {
                         cmd.CommandText =
-                            @"SELECT LOG_ID, CLIENT_KEY, WRITE_STATUS, TICKET_NO, TICKET_CONTENTS,
-                                     MENU_NM, PC_NM, PERSON_IN_CHARGE, LOCAL_PC_IP,
-                                     START_DT, END_DT, DEPLOY_STATUS, DEPLOY_DT, WORK_COMMENT,
-                                     CHANGESET_ID, TFS_COMMENT, TFS_AUTHOR, AUTHOR_NM, CHECKED_IN_AT,
-                                     CHANGED_FILE_COUNT, NEEDS_TICKET_REVIEW, CREATED_AT, UPDT_DTM,
-                                     SITE_CD
-                                FROM " + HeaderTable + @"
-                               ORDER BY UPDT_DTM DESC NULLS LAST, LOG_ID DESC";
+                            @"SELECT " + HeaderSelectBase + HeaderSelectTeam + @"
+                                FROM " + HeaderTable + @" w
+                               ORDER BY " + TimelineDateExpr + @" DESC NULLS LAST, w.LOG_ID DESC";
                         using (var reader = cmd.ExecuteReader())
                         {
                             while (reader.Read())
@@ -281,6 +533,7 @@ namespace GBCWorkHub.DAC
             {
                 using (var conn = OpenConnection())
                 {
+                    EnsureTeamNmColumn(conn);
                     string whereSql;
                     Action<OracleCommand> bindFilters;
                     BuildListFilter(query, out whereSql, out bindFilters);
@@ -300,15 +553,10 @@ namespace GBCWorkHub.DAC
                     using (var cmd = CreateCommand(conn))
                     {
                         cmd.CommandText =
-                            @"SELECT LOG_ID, CLIENT_KEY, WRITE_STATUS, TICKET_NO, TICKET_CONTENTS,
-                                     MENU_NM, PC_NM, PERSON_IN_CHARGE, LOCAL_PC_IP,
-                                     START_DT, END_DT, DEPLOY_STATUS, DEPLOY_DT, WORK_COMMENT,
-                                     CHANGESET_ID, TFS_COMMENT, TFS_AUTHOR, AUTHOR_NM, CHECKED_IN_AT,
-                                     CHANGED_FILE_COUNT, NEEDS_TICKET_REVIEW, CREATED_AT, UPDT_DTM,
-                                     SITE_CD
+                            @"SELECT " + HeaderSelectBase + HeaderSelectTeam + @"
                                 FROM " + HeaderTable + @" w
                                WHERE 1=1" + whereSql + @"
-                               ORDER BY UPDT_DTM DESC NULLS LAST, LOG_ID DESC
+                               ORDER BY " + TimelineDateExpr + @" DESC NULLS LAST, w.LOG_ID DESC
                                OFFSET :offset ROWS FETCH NEXT :pageSize ROWS ONLY";
                         bindFilters(cmd);
                         cmd.Parameters.Add("offset", OracleDbType.Int32).Value = query.Offset;
@@ -356,10 +604,63 @@ namespace GBCWorkHub.DAC
             string search = NormalizeFilterText(query != null ? query.SearchText : null);
             string site = NormalizeAllFilter(query != null ? query.SiteCode : null);
             string pc = NormalizeFilterText(query != null ? query.PcName : null);
+            var pcKeys = new List<string>();
+            if (pc != null)
+                pcKeys.Add(pc);
+            if (query != null && query.PcAliases != null)
+            {
+                foreach (string alias in query.PcAliases)
+                {
+                    string a = NormalizeFilterText(alias);
+                    if (a == null)
+                        continue;
+                    bool dup = false;
+                    for (int i = 0; i < pcKeys.Count; i++)
+                    {
+                        if (string.Equals(pcKeys[i], a, StringComparison.OrdinalIgnoreCase))
+                        {
+                            dup = true;
+                            break;
+                        }
+                    }
+                    if (!dup)
+                        pcKeys.Add(a);
+                }
+            }
+            if (pcKeys.Count > 8)
+                pcKeys = pcKeys.GetRange(0, 8);
             string writeStatus = NormalizeAllFilter(query != null ? query.WriteStatus : null);
             string type = NormalizeAllFilter(query != null ? query.Type : null);
             string category = NormalizeAllFilter(query != null ? query.Category : null);
             string deploy = NormalizeAllFilter(query != null ? query.DeployStatus : null);
+            string authorName = NormalizeFilterText(query != null ? query.AuthorName : null);
+            string authorLocalIp = NormalizeFilterText(query != null ? query.AuthorLocalPcIp : null);
+            string teamName = NormalizeAllFilter(query != null ? query.TeamName : null);
+            string occAuthor = NormalizeFilterText(query != null ? query.OccupancyAuthorName : null);
+            string occIp = NormalizeFilterText(query != null ? query.OccupancyLocalPcIp : null);
+            var searchAliases = new List<string>();
+            if (query != null && query.SearchAliases != null)
+            {
+                foreach (string alias in query.SearchAliases)
+                {
+                    string a = NormalizeFilterText(alias);
+                    if (a == null)
+                        continue;
+                    bool dup = false;
+                    for (int i = 0; i < searchAliases.Count; i++)
+                    {
+                        if (string.Equals(searchAliases[i], a, StringComparison.OrdinalIgnoreCase))
+                        {
+                            dup = true;
+                            break;
+                        }
+                    }
+                    if (!dup)
+                        searchAliases.Add(a);
+                }
+            }
+            if (searchAliases.Count > 8)
+                searchAliases = searchAliases.GetRange(0, 8);
             DateTime? from = query != null ? query.FromDate : null;
             DateTime? to = query != null ? query.ToDate : null;
 
@@ -374,11 +675,17 @@ namespace GBCWorkHub.DAC
                 sql.Append(" AND ").Append(deployDateExpr).Append(" <= TRUNC(:toDt)");
             if (site != null)
                 sql.Append(" AND UPPER(TRIM(w.SITE_CD)) = UPPER(:siteCd)");
-            if (pc != null)
+            if (pcKeys.Count > 0)
             {
-                // PC filter chips use remote Host IP; rows may store IP in PC_NM and/or LOCAL_PC_IP
-                sql.Append(" AND (UPPER(TRIM(w.PC_NM)) = UPPER(:pcNm)");
-                sql.Append(" OR UPPER(TRIM(w.LOCAL_PC_IP)) = UPPER(:pcNm))");
+                sql.Append(" AND (");
+                for (int i = 0; i < pcKeys.Count; i++)
+                {
+                    if (i > 0)
+                        sql.Append(" OR ");
+                    sql.Append("UPPER(TRIM(w.PC_NM)) = UPPER(:pcA").Append(i).Append(")");
+                    sql.Append(" OR UPPER(TRIM(w.LOCAL_PC_IP)) = UPPER(:pcA").Append(i).Append(")");
+                }
+                sql.Append(")");
             }
             if (writeStatus != null)
                 sql.Append(" AND w.WRITE_STATUS = :writeStatus");
@@ -432,6 +739,74 @@ namespace GBCWorkHub.DAC
                 sql.Append(")");
             }
 
+            if (authorName != null)
+            {
+                sql.Append(" AND (UPPER(TRIM(w.AUTHOR_NM)) = UPPER(:authorNm)");
+                if (authorLocalIp != null)
+                {
+                    sql.Append(" OR ((w.AUTHOR_NM IS NULL OR TRIM(w.AUTHOR_NM) IS NULL)");
+                    sql.Append(" AND UPPER(TRIM(w.LOCAL_PC_IP)) = UPPER(:authorLocalIp))");
+                }
+                sql.Append(")");
+            }
+            else if (authorLocalIp != null)
+            {
+                sql.Append(" AND UPPER(TRIM(w.LOCAL_PC_IP)) = UPPER(:authorLocalIp)");
+            }
+
+            if (teamName != null)
+            {
+                sql.Append(" AND (");
+                if (_hasTeamNm)
+                {
+                    sql.Append(SqlTeamKeyCol("w.TEAM_NM")).Append(" = ").Append(SqlTeamKeyExpr("TRIM(:teamNm)"));
+                    sql.Append(" OR INSTR(")
+                        .Append(SqlTeamKeyExpr(
+                            "NVL(TRIM(w.TEAM_NM), '') || NVL(TRIM(w.AUTHOR_NM), '') || NVL(TRIM(w.PERSON_IN_CHARGE), '') || NVL(TRIM(w.TFS_AUTHOR), '')"))
+                        .Append(", ").Append(SqlTeamKeyExpr("TRIM(:teamNm)")).Append(") > 0");
+                }
+                else
+                {
+                    sql.Append("INSTR(")
+                        .Append(SqlTeamKeyExpr(
+                            "NVL(TRIM(w.AUTHOR_NM), '') || NVL(TRIM(w.PERSON_IN_CHARGE), '') || NVL(TRIM(w.TFS_AUTHOR), '')"))
+                        .Append(", ").Append(SqlTeamKeyExpr("TRIM(:teamNm)")).Append(") > 0");
+                }
+
+                if (occAuthor != null || occIp != null)
+                {
+                    sql.Append(" OR (");
+                    if (_hasTeamNm)
+                    {
+                        sql.Append("(w.TEAM_NM IS NULL OR TRIM(w.TEAM_NM) IS NULL OR ")
+                            .Append(SqlTeamKeyCol("w.TEAM_NM")).Append(" = ").Append(SqlTeamKeyExpr("TRIM(:teamNm)"))
+                            .Append(") AND (");
+                    }
+
+                    bool firstOcc = true;
+                    if (occAuthor != null)
+                    {
+                        sql.Append("INSTR(")
+                            .Append(SqlTeamKeyExpr(
+                                "NVL(TRIM(w.AUTHOR_NM), '') || NVL(TRIM(w.PERSON_IN_CHARGE), '') || NVL(TRIM(w.TFS_AUTHOR), '')"))
+                            .Append(", ").Append(SqlTeamKeyExpr("TRIM(:occAuthor)")).Append(") > 0");
+                        firstOcc = false;
+                    }
+                    if (occIp != null)
+                    {
+                        if (!firstOcc)
+                            sql.Append(" OR ");
+                        sql.Append("UPPER(TRIM(w.LOCAL_PC_IP)) = UPPER(:occIp)");
+                    }
+
+                    if (_hasTeamNm)
+                        sql.Append(")");
+                    sql.Append(")");
+                }
+
+                sql.Append(")");
+            }
+
             if (search != null)
             {
                 sql.Append(" AND (");
@@ -439,28 +814,65 @@ namespace GBCWorkHub.DAC
                 sql.Append(" OR UPPER(w.TICKET_CONTENTS) LIKE :q ESCAPE '\\'");
                 sql.Append(" OR UPPER(w.TFS_COMMENT) LIKE :q ESCAPE '\\'");
                 sql.Append(" OR UPPER(w.AUTHOR_NM) LIKE :q ESCAPE '\\'");
+                if (_hasTeamNm)
+                {
+                    sql.Append(" OR UPPER(w.TEAM_NM) LIKE :q ESCAPE '\\'");
+                    sql.Append(" OR UPPER(TRIM(w.AUTHOR_NM) || ' ' || NVL(TRIM(w.TEAM_NM), '')) LIKE :q ESCAPE '\\'");
+                    sql.Append(" OR UPPER(TRIM(w.AUTHOR_NM) || ' · ' || NVL(TRIM(w.TEAM_NM), '')) LIKE :q ESCAPE '\\'");
+                }
                 sql.Append(" OR UPPER(w.TFS_AUTHOR) LIKE :q ESCAPE '\\'");
                 sql.Append(" OR UPPER(w.PERSON_IN_CHARGE) LIKE :q ESCAPE '\\'");
                 sql.Append(" OR UPPER(w.MENU_NM) LIKE :q ESCAPE '\\'");
                 sql.Append(" OR UPPER(w.WORK_COMMENT) LIKE :q ESCAPE '\\'");
+                sql.Append(" OR UPPER(w.PC_NM) LIKE :q ESCAPE '\\'");
+                sql.Append(" OR UPPER(w.LOCAL_PC_IP) LIKE :q ESCAPE '\\'");
+                sql.Append(" OR UPPER(w.SITE_CD) LIKE :q ESCAPE '\\'");
+                sql.Append(" OR UPPER(w.WRITE_STATUS) LIKE :q ESCAPE '\\'");
+                sql.Append(" OR UPPER(w.DEPLOY_STATUS) LIKE :q ESCAPE '\\'");
+                sql.Append(" OR UPPER(w.CLIENT_KEY) LIKE :q ESCAPE '\\'");
+                sql.Append(" OR TO_CHAR(w.START_DT, 'YYYY-MM-DD HH24:MI') LIKE :q ESCAPE '\\'");
+                sql.Append(" OR TO_CHAR(w.END_DT, 'YYYY-MM-DD HH24:MI') LIKE :q ESCAPE '\\'");
+                sql.Append(" OR TO_CHAR(w.DEPLOY_DT, 'YYYY-MM-DD HH24:MI') LIKE :q ESCAPE '\\'");
+                sql.Append(" OR TO_CHAR(w.CHECKED_IN_AT, 'YYYY-MM-DD HH24:MI') LIKE :q ESCAPE '\\'");
                 sql.Append(" OR TO_CHAR(w.CHANGESET_ID) LIKE :q ESCAPE '\\'");
                 sql.Append(" OR EXISTS (SELECT 1 FROM ").Append(ProjectTable).Append(" p");
                 sql.Append(" WHERE p.LOG_ID = w.LOG_ID");
-                sql.Append(" AND (UPPER(p.PROJECT_NM) LIKE :q ESCAPE '\\' OR UPPER(p.WORK_COMMENT) LIKE :q ESCAPE '\\'))");
+                sql.Append(" AND (UPPER(p.PROJECT_NM) LIKE :q ESCAPE '\\'");
+                sql.Append(" OR UPPER(p.WORK_COMMENT) LIKE :q ESCAPE '\\'");
+                sql.Append(" OR UPPER(p.TYPE_NM) LIKE :q ESCAPE '\\'");
+                sql.Append(" OR UPPER(p.CATEGORY_NM) LIKE :q ESCAPE '\\'");
+                sql.Append(" OR UPPER(p.DEPLOY_STATUS) LIKE :q ESCAPE '\\'))");
+                sql.Append(" OR EXISTS (SELECT 1 FROM ").Append(SourceTable).Append(" s");
+                sql.Append(" WHERE s.LOG_ID = w.LOG_ID");
+                sql.Append(" AND (UPPER(s.TYPE_NM) LIKE :q ESCAPE '\\'");
+                sql.Append(" OR UPPER(s.CATEGORY_NM) LIKE :q ESCAPE '\\'");
+                sql.Append(" OR UPPER(s.FILE_NM) LIKE :q ESCAPE '\\'");
+                sql.Append(" OR UPPER(s.ORIGINAL_PATH) LIKE :q ESCAPE '\\'))");
                 sql.Append(" OR EXISTS (SELECT 1 FROM ").Append(ChangesetTable).Append(" c");
                 sql.Append(" WHERE c.LOG_ID = w.LOG_ID AND TO_CHAR(c.CHANGESET_ID) LIKE :q ESCAPE '\\')");
+                for (int i = 0; i < searchAliases.Count; i++)
+                {
+                    sql.Append(" OR UPPER(TRIM(w.PC_NM)) = UPPER(:sa").Append(i).Append(")");
+                    sql.Append(" OR UPPER(TRIM(w.LOCAL_PC_IP)) = UPPER(:sa").Append(i).Append(")");
+                }
                 sql.Append(")");
             }
 
             whereSql = sql.ToString();
 
             string bindSite = site;
-            string bindPc = pc;
+            IList<string> bindPcKeys = pcKeys;
             string bindWs = writeStatus;
             string bindType = type;
             string bindCategory = category;
             string bindDeploy = deploy;
             string bindSearch = search == null ? null : ("%" + EscapeLike(search.ToUpperInvariant()) + "%");
+            string bindAuthorName = authorName;
+            string bindAuthorLocalIp = authorLocalIp;
+            string bindTeamName = teamName;
+            string bindOccAuthor = occAuthor;
+            string bindOccIp = occIp;
+            IList<string> bindSearchAliases = searchAliases;
             DateTime? bindFrom = from;
             DateTime? bindTo = to;
 
@@ -472,8 +884,11 @@ namespace GBCWorkHub.DAC
                     cmd.Parameters.Add("toDt", OracleDbType.TimeStamp).Value = bindTo.Value.Date;
                 if (bindSite != null)
                     cmd.Parameters.Add("siteCd", OracleDbType.Varchar2).Value = bindSite;
-                if (bindPc != null)
-                    cmd.Parameters.Add("pcNm", OracleDbType.Varchar2).Value = bindPc;
+                if (bindPcKeys != null)
+                {
+                    for (int i = 0; i < bindPcKeys.Count; i++)
+                        cmd.Parameters.Add("pcA" + i, OracleDbType.Varchar2).Value = bindPcKeys[i];
+                }
                 if (bindWs != null)
                     cmd.Parameters.Add("writeStatus", OracleDbType.Varchar2).Value = bindWs;
                 if (bindDeploy != null)
@@ -484,6 +899,21 @@ namespace GBCWorkHub.DAC
                     cmd.Parameters.Add("categoryNm", OracleDbType.Varchar2).Value = bindCategory;
                 if (bindSearch != null)
                     cmd.Parameters.Add("q", OracleDbType.Varchar2).Value = bindSearch;
+                if (bindAuthorName != null)
+                    cmd.Parameters.Add("authorNm", OracleDbType.Varchar2).Value = bindAuthorName;
+                if (bindAuthorLocalIp != null)
+                    cmd.Parameters.Add("authorLocalIp", OracleDbType.Varchar2).Value = bindAuthorLocalIp;
+                if (bindTeamName != null)
+                    cmd.Parameters.Add("teamNm", OracleDbType.NVarchar2).Value = bindTeamName;
+                if (bindOccAuthor != null)
+                    cmd.Parameters.Add("occAuthor", OracleDbType.NVarchar2).Value = bindOccAuthor;
+                if (bindOccIp != null)
+                    cmd.Parameters.Add("occIp", OracleDbType.Varchar2).Value = bindOccIp;
+                if (bindSearchAliases != null)
+                {
+                    for (int i = 0; i < bindSearchAliases.Count; i++)
+                        cmd.Parameters.Add("sa" + i, OracleDbType.Varchar2).Value = bindSearchAliases[i];
+                }
             };
         }
 
@@ -543,13 +973,9 @@ namespace GBCWorkHub.DAC
                 using (var conn = OpenConnection())
                 using (var cmd = CreateCommand(conn))
                 {
+                    EnsureTeamNmColumn(conn);
                     cmd.CommandText =
-                        @"SELECT LOG_ID, CLIENT_KEY, WRITE_STATUS, TICKET_NO, TICKET_CONTENTS,
-                                 MENU_NM, PC_NM, PERSON_IN_CHARGE, LOCAL_PC_IP,
-                                 START_DT, END_DT, DEPLOY_STATUS, DEPLOY_DT, WORK_COMMENT,
-                                 CHANGESET_ID, TFS_COMMENT, TFS_AUTHOR, AUTHOR_NM, CHECKED_IN_AT,
-                                 CHANGED_FILE_COUNT, NEEDS_TICKET_REVIEW, CREATED_AT, UPDT_DTM,
-                                 SITE_CD
+                        @"SELECT " + HeaderSelectBase + HeaderSelectTeam + @"
                             FROM " + HeaderTable + @"
                            WHERE LOG_ID = :logId";
                     cmd.Parameters.Add("logId", OracleDbType.Int64).Value = logId;
@@ -681,6 +1107,7 @@ namespace GBCWorkHub.DAC
                 using (var conn = OpenConnection())
                 using (var tx = conn.BeginTransaction())
                 {
+                    EnsureTeamNmColumn(conn);
                     bool isNew = record.LogId <= 0;
                     if (isNew)
                         record.LogId = NextVal(conn, HeaderSeq);
@@ -733,20 +1160,40 @@ namespace GBCWorkHub.DAC
         {
             using (var cmd = CreateCommand(conn))
             {
-                cmd.CommandText =
-                    @"INSERT INTO " + HeaderTable + @" (
-                          LOG_ID, CLIENT_KEY, SITE_CD, WRITE_STATUS, TICKET_NO, TICKET_CONTENTS,
-                          MENU_NM, PC_NM, PERSON_IN_CHARGE, LOCAL_PC_IP,
-                          START_DT, END_DT, DEPLOY_STATUS, DEPLOY_DT, WORK_COMMENT,
-                          CHANGESET_ID, TFS_COMMENT, TFS_AUTHOR, AUTHOR_NM, CHECKED_IN_AT,
-                          CHANGED_FILE_COUNT, NEEDS_TICKET_REVIEW, CREATED_AT, UPDT_DTM
-                      ) VALUES (
-                          :logId, :clientKey, :siteCd, :writeStatus, :ticketNo, :ticketContents,
-                          :menuNm, :pcNm, :person, :localIp,
-                          :startDt, :endDt, :deployStatus, :deployDt, :workComment,
-                          :changesetId, :tfsComment, :tfsAuthor, :authorNm, :checkedInAt,
-                          :changedFileCount, :needsReview, SYSTIMESTAMP, SYSTIMESTAMP
-                      )";
+                if (_hasTeamNm)
+                {
+                    cmd.CommandText =
+                        @"INSERT INTO " + HeaderTable + @" (
+                              LOG_ID, CLIENT_KEY, SITE_CD, WRITE_STATUS, TICKET_NO, TICKET_CONTENTS,
+                              MENU_NM, PC_NM, PERSON_IN_CHARGE, LOCAL_PC_IP,
+                              START_DT, END_DT, DEPLOY_STATUS, DEPLOY_DT, WORK_COMMENT,
+                              CHANGESET_ID, TFS_COMMENT, TFS_AUTHOR, AUTHOR_NM, TEAM_NM, CHECKED_IN_AT,
+                              CHANGED_FILE_COUNT, NEEDS_TICKET_REVIEW, CREATED_AT, UPDT_DTM
+                          ) VALUES (
+                              :logId, :clientKey, :siteCd, :writeStatus, :ticketNo, :ticketContents,
+                              :menuNm, :pcNm, :person, :localIp,
+                              :startDt, :endDt, :deployStatus, :deployDt, :workComment,
+                              :changesetId, :tfsComment, :tfsAuthor, :authorNm, :teamNm, :checkedInAt,
+                              :changedFileCount, :needsReview, SYSTIMESTAMP, SYSTIMESTAMP
+                          )";
+                }
+                else
+                {
+                    cmd.CommandText =
+                        @"INSERT INTO " + HeaderTable + @" (
+                              LOG_ID, CLIENT_KEY, SITE_CD, WRITE_STATUS, TICKET_NO, TICKET_CONTENTS,
+                              MENU_NM, PC_NM, PERSON_IN_CHARGE, LOCAL_PC_IP,
+                              START_DT, END_DT, DEPLOY_STATUS, DEPLOY_DT, WORK_COMMENT,
+                              CHANGESET_ID, TFS_COMMENT, TFS_AUTHOR, AUTHOR_NM, CHECKED_IN_AT,
+                              CHANGED_FILE_COUNT, NEEDS_TICKET_REVIEW, CREATED_AT, UPDT_DTM
+                          ) VALUES (
+                              :logId, :clientKey, :siteCd, :writeStatus, :ticketNo, :ticketContents,
+                              :menuNm, :pcNm, :person, :localIp,
+                              :startDt, :endDt, :deployStatus, :deployDt, :workComment,
+                              :changesetId, :tfsComment, :tfsAuthor, :authorNm, :checkedInAt,
+                              :changedFileCount, :needsReview, SYSTIMESTAMP, SYSTIMESTAMP
+                          )";
+                }
                 BindHeader(cmd, r);
                 cmd.ExecuteNonQuery();
             }
@@ -775,7 +1222,9 @@ namespace GBCWorkHub.DAC
                              CHANGESET_ID = :changesetId,
                              TFS_COMMENT = :tfsComment,
                              TFS_AUTHOR = :tfsAuthor,
-                             AUTHOR_NM = :authorNm,
+                             AUTHOR_NM = :authorNm,"
+                    + (_hasTeamNm ? @"
+                             TEAM_NM = :teamNm," : string.Empty) + @"
                              CHECKED_IN_AT = :checkedInAt,
                              CHANGED_FILE_COUNT = :changedFileCount,
                              NEEDS_TICKET_REVIEW = :needsReview,
@@ -811,6 +1260,8 @@ namespace GBCWorkHub.DAC
             cmd.Parameters.Add("tfsComment", OracleDbType.Varchar2).Value = (object)Trim(r.TfsComment, 2000) ?? DBNull.Value;
             cmd.Parameters.Add("tfsAuthor", OracleDbType.Varchar2).Value = (object)Trim(r.TfsAuthor, 200) ?? DBNull.Value;
             cmd.Parameters.Add("authorNm", OracleDbType.Varchar2).Value = (object)Trim(r.AuthorName, 200) ?? DBNull.Value;
+            if (_hasTeamNm)
+                cmd.Parameters.Add("teamNm", OracleDbType.NVarchar2).Value = (object)Trim(r.TeamName, 100) ?? DBNull.Value;
             cmd.Parameters.Add("checkedInAt", OracleDbType.TimeStamp).Value = ToDbDate(r.CheckedInAt);
             cmd.Parameters.Add("changedFileCount", OracleDbType.Int32).Value = r.ChangedFileCount;
             cmd.Parameters.Add("needsReview", OracleDbType.Char).Value = r.NeedsTicketReview ? "Y" : "N";
@@ -1102,7 +1553,8 @@ namespace GBCWorkHub.DAC
                 NeedsTicketReview = IsYes(ReadString(reader, 20)),
                 CreatedAt = ReadTimestamp(reader, 21),
                 UpdatedAt = ReadTimestamp(reader, 22),
-                SiteCode = reader.FieldCount > 23 ? ReadString(reader, 23) : null
+                SiteCode = reader.FieldCount > 23 ? ReadString(reader, 23) : null,
+                TeamName = reader.FieldCount > 24 ? ReadString(reader, 24) : null
             };
         }
 
@@ -1135,6 +1587,7 @@ namespace GBCWorkHub.DAC
         {
             var conn = new OracleConnection(_connectionString);
             conn.Open();
+            OracleKoreaSession.Apply(conn);
             _lastConnectionOk = true;
             _lastConnectionError = null;
             return conn;
@@ -1145,6 +1598,38 @@ namespace GBCWorkHub.DAC
             var cmd = conn.CreateCommand();
             cmd.BindByName = true;
             return cmd;
+        }
+
+        private string HeaderSelectTeam
+        {
+            get { return _hasTeamNm ? ", TEAM_NM" : string.Empty; }
+        }
+
+        private void EnsureTeamNmColumn(OracleConnection conn)
+        {
+            if (_teamNmProbed)
+                return;
+            _teamNmProbed = true;
+            try
+            {
+                using (var cmd = CreateCommand(conn))
+                {
+                    cmd.CommandText = "SELECT TEAM_NM FROM " + HeaderTable + " WHERE ROWNUM = 0";
+                    cmd.ExecuteScalar();
+                }
+                _hasTeamNm = true;
+            }
+            catch (OracleException ex)
+            {
+                if (ex.Number == 904)
+                {
+                    _hasTeamNm = false;
+                    WorkHubFileLogger.Warn("WORKLOG_SCHEMA",
+                        "TEAM_NM column missing; queries run without it. Apply sql/12_ALTER_WRK_TEAM_NM.sql when DBA can.");
+                    return;
+                }
+                throw;
+            }
         }
 
         private void Fail(Exception ex)
@@ -1189,12 +1674,12 @@ namespace GBCWorkHub.DAC
             if (reader.IsDBNull(ordinal))
                 return null;
             object v = reader.GetValue(ordinal);
-            if (v is DateTime)
-                return (DateTime)v;
             DateTime dt;
-            if (DateTime.TryParse(Convert.ToString(v), out dt))
-                return dt;
-            return null;
+            if (v is DateTime)
+                dt = (DateTime)v;
+            else if (!DateTime.TryParse(Convert.ToString(v), out dt))
+                return null;
+            return KoreaTime.ToKorea(dt);
         }
 
         private static object ToDbDate(DateTime? value)

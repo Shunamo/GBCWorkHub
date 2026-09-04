@@ -37,7 +37,9 @@ namespace GBCWorkHub.UI.Services
             if (!string.IsNullOrWhiteSpace(exactPath))
             {
                 if (!File.Exists(exactPath))
-                    return LaunchResult.Fail("설정된 RDP 파일이 없습니다.\n" + exactPath);
+                    return LaunchResult.Fail(
+                        "설정된 RDP 파일이 없습니다.\n" + exactPath + "\n\n"
+                        + BuildMissingFileMessage(pc, exactPath));
                 return LaunchResult.Ok(exactPath);
             }
 
@@ -58,10 +60,7 @@ namespace GBCWorkHub.UI.Services
 
             if (matches.Count == 0)
             {
-                return LaunchResult.Fail(
-                    pc + " 용 RDP 파일을 찾지 못했습니다.\n"
-                    + "파일명 검색: " + tried + "\n"
-                    + "사용자 폴더에 파일을 받은 뒤 다시 시도하세요.");
+                return LaunchResult.Fail(BuildMissingFileMessage(pc, tried));
             }
 
             string best = matches
@@ -116,6 +115,23 @@ namespace GBCWorkHub.UI.Services
                 .Where(p => !string.IsNullOrWhiteSpace(p))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+        }
+
+        private static string BuildMissingFileMessage(string pcName, string tried)
+        {
+            string compact = CompactForFileSearch(pcName);
+            string example = !string.IsNullOrWhiteSpace(compact)
+                ? "cpub-" + compact + "-QuickSessionCollection-CmsRdsh.rdp"
+                : "cpub-" + (pcName ?? "PC") + "-*.rdp";
+
+            return (pcName ?? "PC") + " 용 게시 RDP 파일이 이 PC에 없습니다.\n\n"
+                + "WorkHub가 .rdp를 만들지 않습니다.\n"
+                + "Forti VPN 연결 후 RC RD Web(원격 데스크톱 웹)에서 해당 PC를 누르면\n"
+                + "브라우저가 게시 .rdp를 다운로드합니다. 그 파일을 그대로 쓰면 됩니다.\n\n"
+                + "파일 이름 예:\n  " + example + "\n"
+                + "두는 곳: 다운로드, 바탕화면, 문서\n"
+                + (string.IsNullOrWhiteSpace(tried) ? "" : "검색 패턴: " + tried + "\n")
+                + "받은 뒤 다시 접속하세요.";
         }
 
         private static string CompactForFileSearch(string pcName)

@@ -22,5 +22,13 @@ namespace GBCWorkHub.DAC
         Task<int> DeleteAllAsync();
         /// <summary>등록된 Changeset ID 전체 (미등록 폴백 필터용).</summary>
         Task<ISet<int>> GetRegisteredChangesetIdsAsync();
+        /// <summary>점유명 변경 시 이 PC에서 쓴 AUTHOR_NM / PERSON_IN_CHARGE 를 새 이름으로 고친다.</summary>
+        Task<int> RenameAuthorAsync(string oldName, string newName, string localPcIp);
+        /// <summary>이 PC에서 쓴 작성자의 TEAM_NM 을 소속으로 맞춘다.</summary>
+        Task<int> RenameTeamAsync(string authorName, string teamName, string localPcIp);
+        /// <summary>AUTHOR_NM 이 같고 TEAM_NM 이 비어 있는 업무기록에 소속을 채운다.</summary>
+        Task<int> FillMissingTeamAsync(string authorName, string teamName, string localPcIp);
+        /// <summary>업무기록 TEAM_NM 목록. 공백 제거 키가 같으면 하나로 묶는다.</summary>
+        Task<IList<string>> GetDistinctTeamNamesAsync();
     }
 }

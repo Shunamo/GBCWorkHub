@@ -18,7 +18,12 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#99FFFFFF" />
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource WlGlassButtonHoverBg}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                                <Setter Property="Foreground" Value="#94A3B8" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -53,15 +58,34 @@
                             <Setter Property="Foreground" Value="#1E293B" />
                             <Setter Property="FontWeight" Value="SemiBold" />
                         </DataTrigger>
-                        <DataTrigger Binding="{Binding HasPendingTfs}" Value="True">
-                            <Setter Property="Content" Value="업무기록 ●" />
-                        </DataTrigger>
                         <DataTrigger Binding="{Binding WorkLogList.HasNewCandidates}" Value="True">
                             <Setter Property="Content" Value="업무기록 ●" />
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
             </Button.Style>
+        </Button>
+        <Button Margin="6,0,0,0"
+                Command="{Binding SelectMainTabCommand}" CommandParameter="Me"
+                ToolTip="내 페이지"
+                HorizontalAlignment="Left">
+            <Button.Style>
+                <Style TargetType="Button" BasedOn="{StaticResource TabBarButton}">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsMeTab}" Value="True">
+                            <Setter Property="Background" Value="#CCE8F0FF" />
+                            <Setter Property="Foreground" Value="#1E293B" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Button.Style>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Image Source="{StaticResource UserCircleIcon}" Width="16" Height="16"
+                       Margin="0,0,8,0" Stretch="Uniform" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding OccupancyDisplayName}" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
         </Button>
     </StackPanel>
 </UserControl>

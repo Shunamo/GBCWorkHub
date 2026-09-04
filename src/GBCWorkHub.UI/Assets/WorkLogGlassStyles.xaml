@@ -22,16 +22,20 @@
     <SolidColorBrush x:Key="WlGlassOnDarkMuted" Color="#64748B" po:Freeze="True" />
     <SolidColorBrush x:Key="WlGlassInk" Color="#1E293B" po:Freeze="True" />
     <SolidColorBrush x:Key="WlGlassMuted" Color="#64748B" po:Freeze="True" />
-    <SolidColorBrush x:Key="WlGlassAccent" Color="#4F67D8" po:Freeze="True" />
+    <SolidColorBrush x:Key="WlGlassAccent" Color="#76ADFF" po:Freeze="True" />
+    <SolidColorBrush x:Key="WlGlassNoteCardBg" Color="#F2FFFFFF" po:Freeze="True" />
+    <SolidColorBrush x:Key="WlGlassNoteCardBorder" Color="#D9FFFFFF" po:Freeze="True" />
     <SolidColorBrush x:Key="WlGlassChipBg" Color="#EEF1F5" po:Freeze="True" />
     <SolidColorBrush x:Key="WlGlassChipBorder" Color="#D9DFE8" po:Freeze="True" />
     <SolidColorBrush x:Key="WlGlassChipText" Color="#4D596A" po:Freeze="True" />
     <SolidColorBrush x:Key="WlGlassRowBg" Color="#C8FFFFFF" po:Freeze="True" />
     <SolidColorBrush x:Key="WlGlassRowBorder" Color="#D9FFFFFF" po:Freeze="True" />
-    <SolidColorBrush x:Key="WlGlassRowHoverBg" Color="#E8FFFFFF" po:Freeze="True" />
-    <SolidColorBrush x:Key="WlGlassRowHoverBorder" Color="#FFFFFFFF" po:Freeze="True" />
+    <SolidColorBrush x:Key="WlGlassRowHoverBg" Color="#D4E0EE" po:Freeze="True" />
+    <SolidColorBrush x:Key="WlGlassRowHoverBorder" Color="#B8C8DA" po:Freeze="True" />
     <SolidColorBrush x:Key="WlGlassRowSelectedBg" Color="#D9E8FF" po:Freeze="True" />
     <SolidColorBrush x:Key="WlGlassRowSelectedBorder" Color="#CCFFFFFF" po:Freeze="True" />
+    <SolidColorBrush x:Key="WlGlassButtonHoverBg" Color="#D4DEEA" po:Freeze="True" />
+    <SolidColorBrush x:Key="WlGlassButtonHoverBorder" Color="#B8C6D6" po:Freeze="True" />
 
     <!-- ?? WorkLogDetailCard? ?? ?? ? (?? ??) -->
     <LinearGradientBrush x:Key="WlGlassTicketFill" StartPoint="0,0" EndPoint="0.18,1" po:Freeze="True">
@@ -40,9 +44,9 @@
         <GradientStop Color="#66EEF3FF" Offset="1" />
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="WlGlassTicketHoverFill" StartPoint="0,0" EndPoint="0.18,1" po:Freeze="True">
-        <GradientStop Color="#F2FFFFFF" Offset="0" />
-        <GradientStop Color="#CCFFFFFF" Offset="0.4" />
-        <GradientStop Color="#99F2F6FF" Offset="1" />
+        <GradientStop Color="#D8E4F0" Offset="0" />
+        <GradientStop Color="#C4D4E4" Offset="0.4" />
+        <GradientStop Color="#B4C8DC" Offset="1" />
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="WlGlassTicketSelectedFill" StartPoint="0,0" EndPoint="0.2,1" po:Freeze="True">
         <GradientStop Color="#E6F0FF" Offset="0" />
@@ -55,6 +59,19 @@
     <SolidColorBrush x:Key="WlGlassDeployBusyFg" Color="#8A5B19" po:Freeze="True" />
     <SolidColorBrush x:Key="WlGlassDeployFocusBg" Color="#E9EEFF" po:Freeze="True" />
     <SolidColorBrush x:Key="WlGlassDeployFocusFg" Color="#405CC3" po:Freeze="True" />
+    <!-- 소속 틴트: 엑셀 범례(보라/파랑/초록/노랑)를 유리 UI에 맞춰 채도만 낮춘 것 -->
+    <SolidColorBrush x:Key="WlTeamSupportWash" Color="#EEEAF6" po:Freeze="True" />
+    <SolidColorBrush x:Key="WlTeamSupportBar" Color="#8B7EB5" po:Freeze="True" />
+    <SolidColorBrush x:Key="WlTeamSupportFg" Color="#5C5280" po:Freeze="True" />
+    <SolidColorBrush x:Key="WlTeamNursingWash" Color="#E8EEF8" po:Freeze="True" />
+    <SolidColorBrush x:Key="WlTeamNursingBar" Color="#6B8FDB" po:Freeze="True" />
+    <SolidColorBrush x:Key="WlTeamNursingFg" Color="#405CC3" po:Freeze="True" />
+    <SolidColorBrush x:Key="WlTeamAdminWash" Color="#E7F1EC" po:Freeze="True" />
+    <SolidColorBrush x:Key="WlTeamAdminBar" Color="#5B9A7A" po:Freeze="True" />
+    <SolidColorBrush x:Key="WlTeamAdminFg" Color="#246B4D" po:Freeze="True" />
+    <SolidColorBrush x:Key="WlTeamEtcWash" Color="#F6F1DE" po:Freeze="True" />
+    <SolidColorBrush x:Key="WlTeamEtcBar" Color="#C9B056" po:Freeze="True" />
+    <SolidColorBrush x:Key="WlTeamEtcFg" Color="#8A6B18" po:Freeze="True" />
 
     <LinearGradientBrush x:Key="WlGlassAtmosphereBrush" StartPoint="0,0" EndPoint="1,1" po:Freeze="True">
         <GradientStop Color="#F4F7FB" Offset="0" />
@@ -163,6 +180,147 @@
         </Style.Triggers>
     </Style>
 
+    <!-- 노트/폴더 상단 포스트잇 탭: 글자 너비, 왼쪽 정렬. 선택 시 눌린 느낌. -->
+    <Style x:Key="NotebookTabButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource WlGlassMuted}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Bottom" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd"
+                            Margin="0,8,4,0"
+                            CornerRadius="8,8,0,0"
+                            Background="#66FFFFFF"
+                            BorderBrush="#D9FFFFFF"
+                            BorderThickness="1,1,1,0"
+                            Padding="12,7"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#88C8D8EA" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                            <Setter Property="Foreground" Value="#94A3B8" />
+                            <Setter TargetName="Bd" Property="Background" Value="#4DFFFFFF" />
+                        </Trigger>
+                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                            <Setter Property="Foreground" Value="White" />
+                            <Setter TargetName="Bd" Property="Margin" Value="0,0,4,-1" />
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource WlGlassAccent}" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource WlGlassAccent}" />
+                            <Setter TargetName="Bd" Property="Padding" Value="12,9,12,8" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" Value="On">
+                            <Setter Property="Foreground" Value="White" />
+                            <Setter TargetName="Bd" Property="Margin" Value="0,0,4,-1" />
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource WlGlassAccent}" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource WlGlassAccent}" />
+                            <Setter TargetName="Bd" Property="Padding" Value="12,9,12,8" />
+                        </DataTrigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True" />
+                                <Condition Property="Tag" Value="On" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Bd" Property="Background" Value="#5B9AEF" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="#5B9AEF" />
+                        </MultiTrigger>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding IsSelected}" Value="True" />
+                                <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource TemplatedParent}}" Value="True" />
+                            </MultiDataTrigger.Conditions>
+                            <Setter TargetName="Bd" Property="Background" Value="#5B9AEF" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="#5B9AEF" />
+                        </MultiDataTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 큰 폴더 안 작은 폴더 탭. 선택색은 바깥(#76ADFF)보다 연한 하늘색. -->
+    <Style x:Key="NotebookInnerTabButton" TargetType="Button" BasedOn="{StaticResource NotebookTabButton}">
+        <Setter Property="Foreground" Value="{StaticResource WlGlassMuted}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd"
+                            Margin="0,6,3,0"
+                            CornerRadius="6,6,0,0"
+                            Background="#4DFFFFFF"
+                            BorderBrush="#D9FFFFFF"
+                            BorderThickness="1,1,1,0"
+                            Padding="9,5"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#77C0D0E4" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                            <Setter Property="Foreground" Value="#94A3B8" />
+                        </Trigger>
+                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                            <Setter Property="Foreground" Value="#1E293B" />
+                            <Setter TargetName="Bd" Property="Margin" Value="0,0,3,-1" />
+                            <Setter TargetName="Bd" Property="Background" Value="#D8FFFFFF" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="#E8FFFFFF" />
+                            <Setter TargetName="Bd" Property="Padding" Value="9,6,9,6" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" Value="On">
+                            <Setter Property="Foreground" Value="#1E293B" />
+                            <Setter TargetName="Bd" Property="Margin" Value="0,0,3,-1" />
+                            <Setter TargetName="Bd" Property="Background" Value="#D8FFFFFF" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="#E8FFFFFF" />
+                            <Setter TargetName="Bd" Property="Padding" Value="9,6,9,6" />
+                        </DataTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="NotebookInnerBodyBorder" TargetType="Border">
+        <Setter Property="Background" Value="#D8FFFFFF" />
+        <Setter Property="BorderBrush" Value="#E8FFFFFF" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="0,10,10,10" />
+        <Setter Property="Padding" Value="10" />
+        <Setter Property="MinHeight" Value="160" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="UseLayoutRounding" Value="True" />
+    </Style>
+
+    <Style x:Key="NotebookBodyBorder" TargetType="Border">
+        <Setter Property="Background" Value="#A6FFFFFF" />
+        <Setter Property="BorderBrush" Value="#F2FFFFFF" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="0,12,12,12" />
+        <Setter Property="Padding" Value="16" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="UseLayoutRounding" Value="True" />
+        <Setter Property="Effect">
+            <Setter.Value>
+                <DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.08" Color="#3B5070" />
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="GlassGhostButton" TargetType="Button">
         <Setter Property="Background" Value="#B8FFFFFF" />
         <Setter Property="Foreground" Value="{StaticResource WlGlassInk}" />
@@ -184,8 +342,52 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#E6FFFFFF" />
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="#8EA4E8" />
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource WlGlassButtonHoverBg}" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource WlGlassButtonHoverBorder}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="#94A3B8" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.55" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="NotebookFilterChip" TargetType="Button">
+        <Setter Property="Background" Value="#F3F6FA" />
+        <Setter Property="Foreground" Value="{StaticResource WlGlassInk}" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="8,3" />
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="22" />
+        <Setter Property="Height" Value="22" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="0" Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#E4EAF2" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                            <Setter Property="Cursor" Value="Arrow" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -222,6 +424,8 @@
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.4" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                            <Setter Property="Foreground" Value="#94A3B8" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -258,7 +462,7 @@
                             <Setter Property="Foreground" Value="{StaticResource WlGlassAccent}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="1" />
+                            <Setter Property="Cursor" Value="Arrow" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -274,6 +478,7 @@
                 <Setter Property="Foreground" Value="{StaticResource WlGlassMuted}" />
                 <Setter Property="IsEnabled" Value="False" />
                 <Setter Property="Cursor" Value="Arrow" />
+                <Setter Property="Opacity" Value="0.45" />
             </DataTrigger>
         </Style.Triggers>
     </Style>
@@ -312,7 +517,8 @@
                             </Setter>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.45" />
+                            <Setter Property="Opacity" Value="0.4" />
+                            <Setter Property="Cursor" Value="Arrow" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -334,6 +540,12 @@
                     <Border Background="Transparent" Padding="{TemplateBinding Padding}">
                         <ContentPresenter VerticalAlignment="Center" />
                     </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -365,7 +577,11 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#FFFFFFFF" />
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource WlGlassButtonHoverBg}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                            <Setter Property="Cursor" Value="Arrow" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -409,6 +625,10 @@
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="#D1D5DB" />
                         </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                        </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
@@ -416,9 +636,9 @@
     </Style>
 
     <Style x:Key="GlassAccentButton" TargetType="Button" BasedOn="{StaticResource GlassGhostButton}">
-        <Setter Property="Background" Value="#4F67D8" />
+        <Setter Property="Background" Value="#76ADFF" />
         <Setter Property="Foreground" Value="White" />
-        <Setter Property="BorderBrush" Value="#405CC3" />
+        <Setter Property="BorderBrush" Value="#5B9AEF" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -430,7 +650,13 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#405CC3" />
+                            <Setter TargetName="Bd" Property="Background" Value="#5B9AEF" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="#94A3B8" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                            <Setter TargetName="Bd" Property="Background" Value="#E5E7EB" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="#D1D5DB" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -564,6 +790,10 @@
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="#C4C9D1" />
                         </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                        </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
@@ -571,7 +801,7 @@
     </Style>
 
     <Style x:Key="GlassFilterTitlePillActive" TargetType="Button" BasedOn="{StaticResource GlassFilterTitlePill}">
-        <Setter Property="Background" Value="#FFFFFF" />
+        <Setter Property="Background" Value="{StaticResource WlGlassRowSelectedBg}" />
         <Setter Property="Foreground" Value="#334155" />
         <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
@@ -610,6 +840,10 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="#E8EEFF" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                            <Setter Property="Cursor" Value="Arrow" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -676,6 +910,10 @@
                                     <Trigger Property="IsSelected" Value="True">
                                         <Setter TargetName="Bd" Property="Background" Value="#DDE5FF" />
                                         <Setter TargetName="Bd" Property="BorderBrush" Value="#8FA3E8" />
+                                    </Trigger>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Opacity" Value="0.4" />
+                                        <Setter TargetName="Bd" Property="Cursor" Value="Arrow" />
                                     </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>

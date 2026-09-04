@@ -77,6 +77,45 @@ namespace GBCWorkHub.BIZ
         }
 
         /// <summary>
+        /// 갤러리명 vs 원격 COMPUTERNAME: 도메인/FQDN 제거 후 비교.
+        /// 하이픈·언더스코어만 다른 경우(KEB-3VNZVP2 vs KEB3VNZVP2)도 동일로 본다.
+        /// </summary>
+        public static bool ComputerNamesLooselyMatch(string a, string b)
+        {
+            if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b))
+                return false;
+            string left = NormalizeComputerName(a);
+            string right = NormalizeComputerName(b);
+            if (string.Equals(left, right, StringComparison.OrdinalIgnoreCase))
+                return true;
+            string compactLeft = CompactComputerName(left);
+            string compactRight = CompactComputerName(right);
+            return !string.IsNullOrEmpty(compactLeft)
+                && string.Equals(compactLeft, compactRight, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static string NormalizeComputerName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return string.Empty;
+            string s = name.Trim();
+            int slash = s.LastIndexOf('\\');
+            if (slash >= 0 && slash < s.Length - 1)
+                s = s.Substring(slash + 1);
+            int dot = s.IndexOf('.');
+            if (dot > 0)
+                s = s.Substring(0, dot);
+            return s;
+        }
+
+        private static string CompactComputerName(string normalized)
+        {
+            if (string.IsNullOrEmpty(normalized))
+                return string.Empty;
+            return normalized.Replace("-", string.Empty).Replace("_", string.Empty);
+        }
+
+        /// <summary>
         /// 클립보드 텍스트 처리. 일반 텍스트는 조용히 무시.
         /// </summary>
         public ParseResult TryHandleClipboardText(string clipboardText)

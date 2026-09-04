@@ -5,7 +5,7 @@
              Background="Transparent"
              UseLayoutRounding="True"
              SnapsToDevicePixels="True"
-             TextOptions.TextFormattingMode="Display"
+             TextOptions.TextFormattingMode="Ideal"
              TextOptions.TextRenderingMode="ClearType">
     <UserControl.Resources>
         <ResourceDictionary>
@@ -49,6 +49,14 @@
                         <Border Grid.Row="0" Style="{StaticResource GlassSurfaceStyle}" Padding="14,12" Margin="0,0,0,14">
                             <DockPanel LastChildFill="True">
                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Style="{StaticResource GlassToolbarIconButton}"
+                                            Command="{Binding OpenInboxCommand}"
+                                            ToolTip="{Binding InboxButtonLabel}"
+                                            Width="Auto" Height="Auto" MinWidth="22" MinHeight="20"
+                                            Margin="0,0,6,0">
+                                        <Image Source="{StaticResource ArchiveLoadFillIconDeep}"
+                                               Width="20" Height="20" Stretch="Uniform" />
+                                    </Button>
                                     <Button Style="{StaticResource GlassToolbarIconButton}"
                                             Command="{Binding OpenImportCommand}"
                                             ToolTip="{Binding ImportButtonLabel}"
@@ -226,7 +234,7 @@
                                                     <Style TargetType="Button" BasedOn="{StaticResource GlassFilterTitlePill}">
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding IsTypeFilterActive}" Value="True">
-                                                                <Setter Property="Background" Value="#FFFFFF" />
+                                                                <Setter Property="Background" Value="{StaticResource WlGlassRowSelectedBg}" />
                                                                 <Setter Property="Foreground" Value="#334155" />
                                                                 <Setter Property="BorderBrush" Value="Transparent" />
                                                             </DataTrigger>
@@ -266,7 +274,7 @@
                                                                                             <Binding Path="DataContext.FilterType" ElementName="GlassRoot" />
                                                                                         </MultiBinding>
                                                                                     </DataTrigger.Binding>
-                                                                                    <Setter Property="Background" Value="#FFFFFF" />
+                                                                                    <Setter Property="Background" Value="{StaticResource WlGlassRowSelectedBg}" />
                                                                                 </DataTrigger>
                                                                             </Style.Triggers>
                                                                         </Style>
@@ -305,7 +313,7 @@
                                                     <Style TargetType="Button" BasedOn="{StaticResource GlassFilterTitlePill}">
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding IsCategoryFilterActive}" Value="True">
-                                                                <Setter Property="Background" Value="#FFFFFF" />
+                                                                <Setter Property="Background" Value="{StaticResource WlGlassRowSelectedBg}" />
                                                                 <Setter Property="Foreground" Value="#334155" />
                                                                 <Setter Property="BorderBrush" Value="Transparent" />
                                                             </DataTrigger>
@@ -345,7 +353,7 @@
                                                                                             <Binding Path="DataContext.FilterCategory" ElementName="GlassRoot" />
                                                                                         </MultiBinding>
                                                                                     </DataTrigger.Binding>
-                                                                                    <Setter Property="Background" Value="#FFFFFF" />
+                                                                                    <Setter Property="Background" Value="{StaticResource WlGlassRowSelectedBg}" />
                                                                                 </DataTrigger>
                                                                             </Style.Triggers>
                                                                         </Style>
@@ -384,7 +392,7 @@
                                                     <Style TargetType="Button" BasedOn="{StaticResource GlassFilterTitlePill}">
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding IsDeployFilterActive}" Value="True">
-                                                                <Setter Property="Background" Value="#FFFFFF" />
+                                                                <Setter Property="Background" Value="{StaticResource WlGlassRowSelectedBg}" />
                                                                 <Setter Property="Foreground" Value="#334155" />
                                                                 <Setter Property="BorderBrush" Value="Transparent" />
                                                             </DataTrigger>
@@ -425,7 +433,86 @@
                                                                                             <Binding Path="DataContext.FilterDeploy" ElementName="GlassRoot" />
                                                                                         </MultiBinding>
                                                                                     </DataTrigger.Binding>
-                                                                                    <Setter Property="Background" Value="#FFFFFF" />
+                                                                                    <Setter Property="Background" Value="{StaticResource WlGlassRowSelectedBg}" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </Button.Style>
+                                                                </Button>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </Border>
+                                            </Popup>
+                                        </Grid>
+
+                                        <Grid Visibility="{Binding HasTeamFilter, Converter={StaticResource GlassBoolToVis}}">
+                                            <Button x:Name="TeamFilterPill"
+                                                    Command="{Binding OpenFilterMenuCommand}" CommandParameter="team">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding TeamFilterPillLabel}" FontSize="11" FontWeight="SemiBold"
+                                                               TextTrimming="CharacterEllipsis" MaxWidth="120"
+                                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                               VerticalAlignment="Center" />
+                                                    <Image Width="7" Height="7" Margin="3,1,0,0"
+                                                           VerticalAlignment="Center" Opacity="0.7" Stretch="Uniform">
+                                                        <Image.Style>
+                                                            <Style TargetType="Image">
+                                                                <Setter Property="Source" Value="{StaticResource ExpandDownIcon}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsTeamMenuOpen}" Value="True">
+                                                                        <Setter Property="Source" Value="{StaticResource ExpandUpIcon}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Image.Style>
+                                                    </Image>
+                                                </StackPanel>
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource GlassFilterTitlePill}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsTeamFilterActive}" Value="True">
+                                                                <Setter Property="Background" Value="{StaticResource WlGlassRowSelectedBg}" />
+                                                                <Setter Property="Foreground" Value="#334155" />
+                                                                <Setter Property="BorderBrush" Value="Transparent" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                            <Popup IsOpen="{Binding IsTeamMenuOpen, Mode=TwoWay}"
+                                                   PlacementTarget="{Binding ElementName=TeamFilterPill}"
+                                                   Placement="Bottom" HorizontalOffset="-4" VerticalOffset="6"
+                                                   AllowsTransparency="True" PopupAnimation="None" StaysOpen="True"
+                                                   Opened="FilterMenuPopup_Opened">
+                                                <Border Background="Transparent" BorderThickness="0"
+                                                        Padding="2,4,0,2" RenderTransformOrigin="0,0" Opacity="0.5"
+                                                        MaxWidth="260">
+                                                    <Border.RenderTransform>
+                                                        <ScaleTransform ScaleX="0.96" ScaleY="0.96" />
+                                                    </Border.RenderTransform>
+                                                    <ItemsControl ItemsSource="{Binding TeamFilterOptions}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel Orientation="Horizontal" />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Button Content="{Binding}"
+                                                                        Command="{Binding DataContext.SelectTeamFilterCommand, ElementName=GlassRoot}"
+                                                                        CommandParameter="{Binding}">
+                                                                    <Button.Style>
+                                                                        <Style TargetType="Button" BasedOn="{StaticResource GlassFilterChipButton}">
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Value="True">
+                                                                                    <DataTrigger.Binding>
+                                                                                        <MultiBinding Converter="{StaticResource GlassStringEquals}">
+                                                                                            <Binding Path="." />
+                                                                                            <Binding Path="DataContext.FilterTeam" ElementName="GlassRoot" />
+                                                                                        </MultiBinding>
+                                                                                    </DataTrigger.Binding>
+                                                                                    <Setter Property="Background" Value="{StaticResource WlGlassRowSelectedBg}" />
                                                                                 </DataTrigger>
                                                                             </Style.Triggers>
                                                                         </Style>
@@ -464,7 +551,7 @@
                                                     <Style TargetType="Button" BasedOn="{StaticResource GlassFilterTitlePill}">
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding IsPcFilterActive}" Value="True">
-                                                                <Setter Property="Background" Value="#FFFFFF" />
+                                                                <Setter Property="Background" Value="{StaticResource WlGlassRowSelectedBg}" />
                                                                 <Setter Property="Foreground" Value="#334155" />
                                                                 <Setter Property="BorderBrush" Value="Transparent" />
                                                             </DataTrigger>
@@ -507,7 +594,7 @@
                                                                                                 <Binding Path="DataContext.FilterPcSelection" ElementName="GlassRoot" />
                                                                                             </MultiBinding>
                                                                                         </DataTrigger.Binding>
-                                                                                        <Setter Property="Background" Value="#FFFFFF" />
+                                                                                        <Setter Property="Background" Value="{StaticResource WlGlassRowSelectedBg}" />
                                                                                     </DataTrigger>
                                                                                 </Style.Triggers>
                                                                             </Style>
@@ -547,7 +634,7 @@
                                                     <Style TargetType="Button" BasedOn="{StaticResource GlassFilterTitlePill}">
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding IsDateFilterActive}" Value="True">
-                                                                <Setter Property="Background" Value="#FFFFFF" />
+                                                                <Setter Property="Background" Value="{StaticResource WlGlassRowSelectedBg}" />
                                                                 <Setter Property="Foreground" Value="#334155" />
                                                                 <Setter Property="BorderBrush" Value="Transparent" />
                                                             </DataTrigger>

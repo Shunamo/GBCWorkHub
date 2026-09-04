@@ -71,6 +71,26 @@ namespace GBCWorkHub.BIZ.WorkLog
             return _repository.GetRegisteredChangesetIdsAsync();
         }
 
+        public Task<int> RenameAuthorAsync(string oldName, string newName, string localPcIp)
+        {
+            return _repository.RenameAuthorAsync(oldName, newName, localPcIp);
+        }
+
+        public Task<int> RenameTeamAsync(string authorName, string teamName, string localPcIp)
+        {
+            return _repository.RenameTeamAsync(authorName, teamName, localPcIp);
+        }
+
+        public Task<int> FillMissingTeamAsync(string authorName, string teamName, string localPcIp)
+        {
+            return _repository.FillMissingTeamAsync(authorName, teamName, localPcIp);
+        }
+
+        public Task<IList<string>> GetDistinctTeamNamesAsync()
+        {
+            return _repository.GetDistinctTeamNamesAsync();
+        }
+
         /// <summary>엑셀 중복 스킵: 헤더+PRJ+SRC 내용이 전부 같은 건의 fingerprint.</summary>
         public async Task<ISet<string>> GetContentDedupKeysAsync()
         {

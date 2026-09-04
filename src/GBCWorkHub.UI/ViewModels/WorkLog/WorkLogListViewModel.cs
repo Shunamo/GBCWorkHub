@@ -12,6 +12,7 @@ using GBCWorkHub.DTO.WorkLog;
 using GBCWorkHub.UI.Models.Popup;
 using GBCWorkHub.UI.Services;
 using GBCWorkHub.UI.Services.Popup;
+using GBCWorkHub.UI.Services.TfsSync;
 using GBCWorkHub.UI.ViewModels;
 using Microsoft.Win32;
 
@@ -34,10 +35,12 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         private string _filterType = WorkLogFilterLabels.All;
         private string _filterCategory = WorkLogFilterLabels.All;
         private string _filterDeploy = WorkLogFilterLabels.All;
+        private string _filterTeam = WorkLogFilterLabels.All;
         private string _filterSite = WorkLogSiteCodes.All;
         private string _activeSiteCode;
         private bool _isEditOpen;
         private bool _isImportOpen;
+        private bool _isInboxOpen;
         private WorkLogEditDialogViewModel _editDialog;
         private TfsImportDialogViewModel _importDialog;
         private WorkLogListItemViewModel _selectedItem;
@@ -57,6 +60,8 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         private int _availableCandidateCount;
         private int _newCandidateCount;
         private readonly WorkLogBiz _workLogBiz = new WorkLogBiz();
+        private readonly DirectoryBiz _directory = new DirectoryBiz();
+        private readonly RemotePcShareBiz _share = new RemotePcShareBiz();
         private readonly WorkLogPersistenceService _persistence;
         private readonly WorkLogImportService _importService;
         private readonly RemotePcBiz _remotePcBiz = new RemotePcBiz();
@@ -67,7 +72,13 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         private int _pageLoadGeneration;
         private int _searchDebounceGeneration;
         private int _dateDebounceGeneration;
+        private int _teamOptionsGeneration;
+        private bool _suppressTeamFilterChanged;
+        private bool _didFillMissingTeam;
+        private IList<string> _pcFilterAliases = new List<string>();
+        private IList<string> _searchPcAliases = new List<string>();
         private const int DefaultPageSize = 30;
+        private readonly HashSet<int> _localImportedChangesetIds = new HashSet<int>();
 
         public WorkLogListViewModel()
         {
@@ -91,6 +102,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             };
             CategoryFilterOptions = new ObservableCollection<string> { WorkLogFilterLabels.All };
             DeployFilterOptions = new ObservableCollection<string> { WorkLogFilterLabels.All };
+            TeamFilterOptions = new ObservableCollection<string> { WorkLogFilterLabels.All };
             foreach (string status in WorkLogFieldMasters.CreateDeploymentStatuses())
             {
                 if (!string.Equals(status, WorkLogFieldMasters.Unselected, StringComparison.Ordinal))
@@ -115,6 +127,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             SelectTypeFilterCommand = new RelayCommand<object>(p => ApplyChipFilter(() => FilterType = p as string ?? WorkLogFilterLabels.All));
             SelectCategoryFilterCommand = new RelayCommand<object>(p => ApplyChipFilter(() => FilterCategory = p as string ?? WorkLogFilterLabels.All));
             SelectDeployFilterCommand = new RelayCommand<object>(p => ApplyChipFilter(() => FilterDeploy = p as string ?? WorkLogFilterLabels.All));
+            SelectTeamFilterCommand = new RelayCommand<object>(p => ApplyChipFilter(() => FilterTeam = p as string ?? WorkLogFilterLabels.All));
             SelectPcFilterCommand = new RelayCommand<object>(p => ApplyChipFilter(() => FilterPcSelection = p as string ?? WorkLogFilterLabels.All));
             ToggleSitePickerCommand = new RelayCommand(() =>
             {
@@ -142,9 +155,9 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             CreateWorkLogCommand = new RelayCommand(CreateFromSelected, () => SelectedItem != null);
             EditSelectedCommand = new RelayCommand(CreateFromSelected, () => SelectedItem != null);
             ClassifyWorkItemsCommand = new RelayCommand(CreateFromSelected, () => SelectedItem != null);
-            CloseEditCommand = new RelayCommand(() => CloseEdit(advanceImportQueue: true));
+            CloseEditCommand = new RelayCommand(() => OnEditCloseRequested());
             CloseDetailCommand = new RelayCommand(() => SelectedItem = null);
-            OpenImportCommand = new RelayCommand(OpenImport);
+            OpenImportCommand = new RelayCommand(OpenImportPicker);
             ImportCsvCommand = new RelayCommand(ImportCsv);
             CloseImportCommand = new RelayCommand(CloseImport, () => IsImportOpen);
             ConfirmImportCommand = new RelayCommand(ConfirmImport,
@@ -152,6 +165,10 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                     && !_tfsImport.IsConfirmingImport
                     && ImportDialog != null
                     && ImportDialog.CanConfirm);
+            Inbox = new TfsCheckinInboxViewModel();
+            Inbox.WriteRequested = WriteFromInbox;
+            OpenInboxCommand = new RelayCommand(OpenInbox);
+            CloseInboxCommand = new RelayCommand(CloseInbox, () => IsInboxOpen);
             WireImportDialogCommands(ImportDialog);
             ToggleDetailNodeCommand = new RelayCommand<WorkLogTreeNodeBase>(ToggleDetailNode);
             RefreshCommand = new RelayCommand(() => { var ignored = ReloadFromDbAsync(force: true); });
@@ -172,6 +189,30 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             _sessionContextFactory = sessionContextFactory;
             RefreshPcOptions();
             RefreshPersonOptions();
+        }
+
+        public string ResolvePcSite(string remoteIp, string remotePcName)
+        {
+            if (_remotePcs != null)
+            {
+                foreach (var pc in _remotePcs)
+                {
+                    if (pc == null)
+                        continue;
+                    if (!string.IsNullOrWhiteSpace(remoteIp)
+                        && (string.Equals(pc.IpAddress, remoteIp, StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(pc.HostAddress, remoteIp, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        if (!string.IsNullOrWhiteSpace(pc.SiteCode))
+                            return pc.SiteCode.Trim().ToUpperInvariant();
+                    }
+                    if (!string.IsNullOrWhiteSpace(remotePcName)
+                        && string.Equals(pc.PcName, remotePcName, StringComparison.OrdinalIgnoreCase)
+                        && !string.IsNullOrWhiteSpace(pc.SiteCode))
+                        return pc.SiteCode.Trim().ToUpperInvariant();
+                }
+            }
+            return TfsCheckinInboxStore.InferSiteCode(remotePcName, null);
         }
 
         /// <summary>원격 사이트 진입/이탈 시 업무기록 기본 사이트 컨텍스트.</summary>
@@ -217,6 +258,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
 
             RefreshPcOptions();
             RefreshPersonOptions();
+            RefreshInboxBadge();
 
             // openImportIfNew 무시 — 자동 팝업으로 확정/저장이 꼬이던 원인
         }
@@ -235,6 +277,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         public ObservableCollection<string> TypeFilterOptions { get; private set; }
         public ObservableCollection<string> CategoryFilterOptions { get; private set; }
         public ObservableCollection<string> DeployFilterOptions { get; private set; }
+        public ObservableCollection<string> TeamFilterOptions { get; private set; }
         /// <summary>필터용 PC 칩 ("전체" + 원격 PC).</summary>
         public ObservableCollection<string> PcFilterOptions { get; private set; }
         public ObservableCollection<string> SiteFilterOptions { get; private set; }
@@ -249,6 +292,11 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             get { return CategoryFilterOptions != null && CategoryFilterOptions.Count > 1; }
         }
 
+        public bool HasTeamFilter
+        {
+            get { return TeamFilterOptions != null && TeamFilterOptions.Count > 1; }
+        }
+
         /// <summary>사이트가 ALL이 아닐 때만 PC 필터 표시 (사이트별 IP).</summary>
         public bool HasPcFilter
         {
@@ -259,8 +307,24 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             }
         }
 
-        public bool HasItems { get { return Items.Count > 0; } }
-        public bool IsEmpty { get { return Items.Count == 0; } }
+        public int VisibleListCount
+        {
+            get
+            {
+                int n = 0;
+                if (DateGroups == null)
+                    return 0;
+                foreach (var g in DateGroups)
+                {
+                    if (g != null && g.Items != null)
+                        n += g.Items.Count;
+                }
+                return n;
+            }
+        }
+
+        public bool HasItems { get { return VisibleListCount > 0; } }
+        public bool IsEmpty { get { return VisibleListCount == 0; } }
 
         /// <summary>DB 목록 로딩 중 — 스켈레톤 UI 표시.</summary>
         public bool IsLoading
@@ -279,13 +343,13 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         /// <summary>로딩이 끝났고 항목이 없을 때만 빈 상태.</summary>
         public bool ShowEmptyState
         {
-            get { return !_isLoading && Items.Count == 0; }
+            get { return !_isLoading && VisibleListCount == 0; }
         }
 
         /// <summary>로딩 중이 아닐 때만 실제 목록 표시.</summary>
         public bool ShowListContent
         {
-            get { return !_isLoading && Items.Count > 0; }
+            get { return !_isLoading && VisibleListCount > 0; }
         }
 
         /// <summary>
@@ -355,6 +419,12 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             set { SetMenuOpen("deploy", value); }
         }
 
+        public bool IsTeamMenuOpen
+        {
+            get { return IsMenu("team"); }
+            set { SetMenuOpen("team", value); }
+        }
+
         public bool IsPcMenuOpen
         {
             get { return IsMenu("pc"); }
@@ -376,6 +446,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         public bool IsTypeFilterActive { get { return !IsFilterAll(FilterType); } }
         public bool IsCategoryFilterActive { get { return !IsFilterAll(FilterCategory); } }
         public bool IsDeployFilterActive { get { return !IsFilterAll(FilterDeploy); } }
+        public bool IsTeamFilterActive { get { return !IsFilterAll(FilterTeam); } }
         public bool IsPcFilterActive { get { return !string.IsNullOrWhiteSpace(FilterPc); } }
         public bool IsDateFilterActive
         {
@@ -396,6 +467,11 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         public string DeployFilterPillLabel
         {
             get { return IsDeployFilterActive ? (FilterDeploy ?? "Deployment") : "Deployment"; }
+        }
+
+        public string TeamFilterPillLabel
+        {
+            get { return IsTeamFilterActive ? (FilterTeam ?? "소속") : "소속"; }
         }
 
         public string PcFilterPillLabel
@@ -420,6 +496,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 return IsTypeFilterActive
                     || IsCategoryFilterActive
                     || IsDeployFilterActive
+                    || IsTeamFilterActive
                     || IsPcFilterActive
                     || IsDateFilterActive;
             }
@@ -430,6 +507,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         public ICommand SelectTypeFilterCommand { get; private set; }
         public ICommand SelectCategoryFilterCommand { get; private set; }
         public ICommand SelectDeployFilterCommand { get; private set; }
+        public ICommand SelectTeamFilterCommand { get; private set; }
         public ICommand SelectPcFilterCommand { get; private set; }
 
         private void ToggleFilterBar()
@@ -482,6 +560,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             RaisePropertyChanged("IsTypeMenuOpen");
             RaisePropertyChanged("IsCategoryMenuOpen");
             RaisePropertyChanged("IsDeployMenuOpen");
+            RaisePropertyChanged("IsTeamMenuOpen");
             RaisePropertyChanged("IsPcMenuOpen");
             RaisePropertyChanged("IsDateMenuOpen");
             RaisePropertyChanged("IsFilterMenuOpen");
@@ -661,6 +740,19 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             set { if (SetProperty(ref _filterDeploy, value ?? WorkLogFilterLabels.All)) OnFilterChanged(); }
         }
 
+        public string FilterTeam
+        {
+            get { return _filterTeam; }
+            set
+            {
+                if (!SetProperty(ref _filterTeam, value ?? WorkLogFilterLabels.All))
+                    return;
+                if (_suppressTeamFilterChanged)
+                    return;
+                OnFilterChanged();
+            }
+        }
+
         public string FilterSite
         {
             get { return _filterSite; }
@@ -800,6 +892,52 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             private set { SetProperty(ref _importDialog, value); }
         }
 
+        public TfsCheckinInboxViewModel Inbox { get; private set; }
+
+        public bool ShowInboxCloseButton
+        {
+            get { return true; }
+        }
+
+        public bool ShowInboxSiteTabs
+        {
+            get { return true; }
+        }
+
+        public bool IsInboxOpen
+        {
+            get { return _isInboxOpen; }
+            set
+            {
+                if (SetProperty(ref _isInboxOpen, value))
+                {
+                    var close = CloseInboxCommand as RelayCommand;
+                    if (close != null)
+                        close.RaiseCanExecuteChanged();
+                }
+            }
+        }
+
+        public int InboxWaitingCount
+        {
+            get { return Inbox != null ? Inbox.WaitingCount : 0; }
+        }
+
+        public bool HasInboxWaiting
+        {
+            get { return InboxWaitingCount > 0; }
+        }
+
+        public string InboxButtonLabel
+        {
+            get
+            {
+                return InboxWaitingCount > 0
+                    ? "체크인 보관함 (" + InboxWaitingCount + ")"
+                    : "체크인 보관함";
+            }
+        }
+
         public int AvailableCandidateCount
         {
             get { return _availableCandidateCount; }
@@ -875,17 +1013,22 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         public ICommand CloseEditCommand { get; private set; }
         public ICommand CloseDetailCommand { get; private set; }
         public ICommand OpenImportCommand { get; private set; }
+        public ICommand OpenInboxCommand { get; private set; }
+        public ICommand CloseInboxCommand { get; private set; }
         public ICommand ImportCsvCommand { get; private set; }
         public ICommand CloseImportCommand { get; private set; }
         public ICommand ConfirmImportCommand { get; private set; }
+
+        /// <summary>사이트·날짜·PC로 TFS 수집. MainViewModel에서 연결.</summary>
+        public Func<string, string, DateTime, DateTime, bool, Task> FetchTfsForWindow { get; set; }
         public ICommand ToggleDetailNodeCommand { get; private set; }
         public ICommand RefreshCommand { get; private set; }
         public ICommand DeleteWorkLogCommand { get; private set; }
 
-        /// <summary>TFS 동기화 완료 후 업무기록 탭에서 가져오기 팝업 오픈.</summary>
+        /// <summary>TFS 동기화 완료 후 업무기록 탭에서 체크인 목록 팝업 오픈.</summary>
         public void ShowImportDialog()
         {
-            OpenImport();
+            var _ = OpenImportFetchedAsync();
         }
 
         /// <summary>
@@ -901,7 +1044,12 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                     var fromDb = _persistence.GetRegisteredChangesetIdsAsync()
                         .ConfigureAwait(false).GetAwaiter().GetResult();
                     if (fromDb != null)
-                        return new HashSet<int>(fromDb);
+                    {
+                        var fromDbSet = new HashSet<int>(fromDb);
+                        foreach (int id in _localImportedChangesetIds)
+                            fromDbSet.Add(id);
+                        return fromDbSet;
+                    }
                 }
             }
             catch (Exception ex)
@@ -910,7 +1058,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             }
 
             // DDL 미적용 등: 완료 상태 목록만 폴백
-            var imported = new HashSet<int>();
+            var imported = new HashSet<int>(_localImportedChangesetIds);
             foreach (var item in Items)
             {
                 if (item == null)
@@ -923,10 +1071,16 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             return imported;
         }
 
-        /// <summary>화면 목록에 이미 있는 CS (가져오기 팝업 "목록에 있음" 표시용).</summary>
+        public void RememberImportedChangesetId(int changesetId)
+        {
+            if (changesetId > 0)
+                _localImportedChangesetIds.Add(changesetId);
+        }
+
+        /// <summary>이미 업무기록에 붙은 CS. 가져오기 후보에서 제외한다.</summary>
         private HashSet<int> CollectImportedChangesetIds()
         {
-            var imported = new HashSet<int>();
+            var imported = new HashSet<int>(_localImportedChangesetIds);
             foreach (var item in Items)
             {
                 if (item == null)
@@ -1038,11 +1192,29 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 return;
             dialog.CloseCommand = CloseImportCommand;
             dialog.ConfirmCommand = ConfirmImportCommand;
+            dialog.FetchSessionQueryCommand = new RelayCommand(
+                () => { var _ = FetchSessionQueryAsync(); },
+                () => dialog.CanFetchSessionQuery);
+        }
+
+        /// <summary>업무기록 툴바: 사이트·날짜·PC로 TFS 수집. 체크인은 가져온 뒤에만.</summary>
+        private void OpenImportPicker()
+        {
+            OpenImportWithCandidates(null, string.Empty);
+            ImportDialog.PrepareSessionQuery(FilterSite);
+            RefreshImportSessionPcOptions();
+        }
+
+        /// <summary>원격 TFS 수집이 끝난 뒤: 체크인 상세만.</summary>
+        private async Task OpenImportFetchedAsync()
+        {
+            OpenImportWithCandidates(_tfsCandidates, _tfsStatusMessage);
+            await Task.CompletedTask.ConfigureAwait(true);
         }
 
         private void OpenImport()
         {
-            OpenImportWithCandidates(_tfsCandidates, _tfsStatusMessage);
+            OpenImportPicker();
         }
 
         private void OpenImportWithCandidates(
@@ -1055,6 +1227,8 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             WireImportDialogCommands(ImportDialog);
 
             var imported = CollectImportedChangesetIds();
+            foreach (int id in GetImportedChangesetIds())
+                imported.Add(id);
             string status = statusMessage;
             if (string.IsNullOrWhiteSpace(status) && candidates != null)
                 status = "수신 후보 " + candidates.Count() + "건";
@@ -1075,8 +1249,187 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             // 별도 OS Window(ShowDialog) 대신 목록 위 인프로세스 오버레이
         }
 
+        private void RefreshImportSessionPcOptions()
+        {
+            if (ImportDialog == null)
+                return;
+            ImportDialog.ReplaceSessionPcOptions(CollectPcIpsForSite(ImportDialog.SessionSite));
+        }
+
+        private async Task FetchSessionQueryAsync()
+        {
+            if (ImportDialog == null || FetchTfsForWindow == null)
+                return;
+
+            DateTime fromAt;
+            DateTime toAt;
+            string error;
+            if (!ImportDialog.TryGetSearchWindow(out fromAt, out toAt, out error))
+            {
+                ImportDialog.SessionSearchMessage = error;
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(ImportDialog.SessionPc))
+            {
+                ImportDialog.SessionSearchMessage = "PC를 선택해 주세요.";
+                return;
+            }
+
+            string shareKey;
+            string pcName;
+            ResolvePcTarget(
+                ImportDialog.SessionPc,
+                ImportDialog.SessionSite,
+                out shareKey,
+                out pcName);
+            if (string.IsNullOrWhiteSpace(shareKey))
+            {
+                ImportDialog.SessionSearchMessage = "PC를 선택해 주세요.";
+                return;
+            }
+
+            ImportDialog.SessionSearchMessage = string.Empty;
+            CloseImport();
+            bool clipboardOnly = string.Equals(
+                ImportDialog.SessionSite, WorkLogSiteCodes.Cmc, StringComparison.OrdinalIgnoreCase);
+            await FetchTfsForWindow(shareKey, pcName, fromAt, toAt, clipboardOnly).ConfigureAwait(true);
+        }
+
+        /// <summary>
+        /// 가져오기 접속구간용. AURORA 등은 mstsc /v: 에 쓸 IPv4를 우선하고,
+        /// RC만 PC명 점유키(게시 .rdp)를 유지한다.
+        /// </summary>
+        private void ResolvePcTarget(
+            string selected,
+            string siteCode,
+            out string shareKey,
+            out string pcName)
+        {
+            shareKey = (selected ?? string.Empty).Trim();
+            pcName = shareKey;
+            if (string.IsNullOrWhiteSpace(shareKey))
+                return;
+
+            string site = string.IsNullOrWhiteSpace(siteCode)
+                ? null
+                : siteCode.Trim().ToUpperInvariant();
+            bool preferPublishedRdp = string.Equals(site, WorkLogSiteCodes.Rc, StringComparison.OrdinalIgnoreCase);
+
+            RemotePcDto fromSite = FindRemotePcDto(selected, site);
+            if (fromSite != null)
+            {
+                ApplyResolvedPcTarget(fromSite, preferPublishedRdp, out shareKey, out pcName);
+                return;
+            }
+
+            if (_remotePcs != null)
+            {
+                foreach (var pc in _remotePcs)
+                {
+                    if (pc == null)
+                        continue;
+                    bool ipMatch = !string.IsNullOrWhiteSpace(pc.IpAddress)
+                        && string.Equals(pc.IpAddress.Trim(), shareKey, StringComparison.OrdinalIgnoreCase);
+                    bool hostMatch = !string.IsNullOrWhiteSpace(pc.HostAddress)
+                        && string.Equals(pc.HostAddress.Trim(), shareKey, StringComparison.OrdinalIgnoreCase);
+                    bool nameMatch = !string.IsNullOrWhiteSpace(pc.PcName)
+                        && string.Equals(pc.PcName.Trim(), shareKey, StringComparison.OrdinalIgnoreCase);
+                    if (!ipMatch && !hostMatch && !nameMatch)
+                        continue;
+
+                    if (!preferPublishedRdp && LooksLikeIpAddress(pc.HostAddress))
+                        shareKey = pc.HostAddress.Trim();
+                    else if (LooksLikeIpAddress(pc.IpAddress))
+                        shareKey = pc.IpAddress.Trim();
+                    else if (!string.IsNullOrWhiteSpace(pc.IpAddress))
+                        shareKey = pc.IpAddress.Trim();
+
+                    pcName = string.IsNullOrWhiteSpace(pc.PcName) ? shareKey : pc.PcName.Trim();
+                    return;
+                }
+            }
+        }
+
+        private RemotePcDto FindRemotePcDto(string selected, string siteCode)
+        {
+            if (string.IsNullOrWhiteSpace(selected) || string.IsNullOrWhiteSpace(siteCode))
+                return null;
+            if (string.Equals(siteCode, WorkLogSiteCodes.All, StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            List<RemotePcDto> list = null;
+            try
+            {
+                list = _remotePcBiz.GetRemotePcListBySite(siteCode);
+            }
+            catch
+            {
+                return null;
+            }
+            if (list == null)
+                return null;
+
+            string key = selected.Trim();
+            foreach (var dto in list)
+            {
+                if (dto == null)
+                    continue;
+                if (!string.IsNullOrWhiteSpace(dto.PcName)
+                    && string.Equals(dto.PcName.Trim(), key, StringComparison.OrdinalIgnoreCase))
+                    return dto;
+                if (!string.IsNullOrWhiteSpace(dto.IpAddress)
+                    && string.Equals(dto.IpAddress.Trim(), key, StringComparison.OrdinalIgnoreCase))
+                    return dto;
+                if (!string.IsNullOrWhiteSpace(dto.HostAddress)
+                    && string.Equals(dto.HostAddress.Trim(), key, StringComparison.OrdinalIgnoreCase))
+                    return dto;
+            }
+            return null;
+        }
+
+        private static void ApplyResolvedPcTarget(
+            RemotePcDto dto,
+            bool preferPublishedRdp,
+            out string shareKey,
+            out string pcName)
+        {
+            pcName = !string.IsNullOrWhiteSpace(dto.PcName)
+                ? dto.PcName.Trim()
+                : (dto.IpAddress ?? string.Empty).Trim();
+
+            if (!preferPublishedRdp)
+            {
+                if (LooksLikeIpAddress(dto.HostAddress))
+                {
+                    shareKey = dto.HostAddress.Trim();
+                    return;
+                }
+                if (LooksLikeIpAddress(dto.IpAddress))
+                {
+                    shareKey = dto.IpAddress.Trim();
+                    return;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(dto.IpAddress))
+            {
+                shareKey = dto.IpAddress.Trim();
+                return;
+            }
+            if (LooksLikeIpAddress(dto.HostAddress))
+            {
+                shareKey = dto.HostAddress.Trim();
+                return;
+            }
+
+            shareKey = pcName;
+        }
+
         private void OnImportDialogPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == "SessionSite")
+                RefreshImportSessionPcOptions();
+
             if (e.PropertyName == "SelectedCount"
                 || e.PropertyName == "CanConfirm"
                 || e.PropertyName == "ImportMode"
@@ -1086,6 +1439,19 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 if (cmd != null)
                     cmd.RaiseCanExecuteChanged();
             }
+
+            if (e.PropertyName == "CanFetchSessionQuery"
+                || e.PropertyName == "SessionSite"
+                || e.PropertyName == "SessionPc"
+                || e.PropertyName == "SessionDateText"
+                || e.PropertyName == "SessionStartTimeText"
+                || e.PropertyName == "SessionEndTimeText")
+            {
+                var dialog = sender as TfsImportDialogViewModel;
+                var fetch = dialog != null ? dialog.FetchSessionQueryCommand as RelayCommand : null;
+                if (fetch != null)
+                    fetch.RaiseCanExecuteChanged();
+            }
         }
 
         private void CloseImport()
@@ -1093,6 +1459,236 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             if (ImportDialog != null)
                 ImportDialog.PropertyChanged -= OnImportDialogPropertyChanged;
             IsImportOpen = false;
+        }
+
+        private void OpenInbox()
+        {
+            IsImportOpen = false;
+            ReconcileInboxFromWorkLogs();
+            if (Inbox != null)
+                Inbox.Reload();
+            RefreshInboxBadge();
+            IsInboxOpen = true;
+        }
+
+        private void CloseInbox()
+        {
+            IsInboxOpen = false;
+            RefreshInboxBadge();
+        }
+
+        private void RefreshInboxBadge()
+        {
+            if (Inbox != null)
+                Inbox.Reload();
+            NotifyInboxBadge();
+        }
+
+        public void NotifyInboxBadge()
+        {
+            RaisePropertyChanged("InboxWaitingCount");
+            RaisePropertyChanged("HasInboxWaiting");
+            RaisePropertyChanged("InboxButtonLabel");
+        }
+
+        private void ReconcileInboxFromWorkLogs()
+        {
+            try
+            {
+                TfsCheckinInboxStore.ReconcileReported(GetImportedChangesetIds());
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.Warn("TFS_INBOX", "reconcile failed: " + ex.Message);
+            }
+        }
+
+        private void RememberImportInboxDecision()
+        {
+            if (ImportDialog == null)
+                return;
+            var selected = new List<int>();
+            var skipped = new List<int>();
+            foreach (var row in ImportDialog.Candidates)
+            {
+                if (row == null || row.ChangesetId <= 0)
+                    continue;
+                if (row.IsImportSelected)
+                    selected.Add(row.ChangesetId);
+                else
+                    skipped.Add(row.ChangesetId);
+            }
+            TfsCheckinInboxStore.ApplyImportDecision(selected, skipped);
+            RefreshInboxBadge();
+        }
+
+        private void WriteFromInbox(IList<TfsCheckinInboxRecord> records)
+        {
+            if (records == null || records.Count == 0)
+                return;
+
+            var valid = new List<TfsCheckinInboxRecord>();
+            foreach (var record in records)
+            {
+                if (record != null && record.ChangesetId > 0)
+                    valid.Add(record);
+            }
+            if (valid.Count == 0)
+                return;
+
+            var mappedParts = new List<WorkLogListItemViewModel>();
+            var wantedIds = new List<int>();
+            foreach (var record in valid)
+            {
+                var candidate = new TfsChangesetCandidateViewModel();
+                candidate.ApplySourceInfo(null, record.ToChangesetItem(), false);
+                candidate.RemoteComputerName = record.PcName;
+                candidate.CollectionUrl = record.CollectionUrl;
+
+                var importRow = TfsImportCandidateRow.FromCandidate(candidate, false);
+                var ctx = BuildSessionContextForInbox(record);
+                var mapped = WorkLogDraftMapper.FromImportRow(importRow, ctx);
+                if (mapped == null)
+                    continue;
+                ApplyInboxRecordMetadata(mapped, record);
+                mappedParts.Add(mapped);
+                if (mapped.ChangesetId > 0 && !wantedIds.Contains(mapped.ChangesetId))
+                    wantedIds.Add(mapped.ChangesetId);
+            }
+
+            if (mappedParts.Count == 0)
+                return;
+
+            var existing = WorkLogTfsImportCoordinator.FindDraftWithSameChangesets(Items, wantedIds);
+            if (existing != null)
+            {
+                CloseInbox();
+                _tfsImport.ClearEditQueue();
+                OpenEdit(existing, startInEditMode: true);
+                if (EditDialog != null)
+                    EditDialog.DiscardOnCancel = existing.DbLogId <= 0;
+                return;
+            }
+
+            // 다중 선택: Site/PC가 이미 붙은 mappedParts를 합친다.
+            // FromImportRowsMerged로 다시 만들면 보관함 SiteCode가 빠진다.
+            WorkLogListItemViewModel target = mappedParts.Count == 1
+                ? mappedParts[0]
+                : WorkLogDraftMapper.MergeMappedParts(
+                    mappedParts,
+                    BuildSessionContextForInbox(valid[0]));
+
+            if (target == null)
+                return;
+
+            ApplyInboxRecordsMetadata(target, valid);
+            Items.Add(target);
+            RebuildDateGroups();
+            RaisePropertyChanged("HasItems");
+            RaisePropertyChanged("IsEmpty");
+            RaisePropertyChanged("TotalCount");
+            CloseInbox();
+            _tfsImport.ClearEditQueue();
+            OpenEdit(target, startInEditMode: true);
+            if (EditDialog != null)
+                EditDialog.DiscardOnCancel = target.DbLogId <= 0;
+        }
+
+        private void ApplyInboxRecordMetadata(WorkLogListItemViewModel item, TfsCheckinInboxRecord record)
+        {
+            if (item == null || record == null)
+                return;
+
+            string site = TfsCheckinInboxStore.ResolveSiteCode(record);
+            if (!string.IsNullOrWhiteSpace(site)
+                && !string.Equals(site, WorkLogSiteCodes.All, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(site, TfsCheckinInboxStore.OtherSite, StringComparison.OrdinalIgnoreCase))
+            {
+                item.SiteCode = site.Trim().ToUpperInvariant();
+            }
+            else
+            {
+                EnsureItemSiteCode(item);
+            }
+
+            if (!string.IsNullOrWhiteSpace(record.PcName))
+                item.Pc = record.PcName.Trim();
+        }
+
+        private void ApplyInboxRecordsMetadata(
+            WorkLogListItemViewModel target,
+            IList<TfsCheckinInboxRecord> records)
+        {
+            if (target == null || records == null || records.Count == 0)
+                return;
+
+            if (string.IsNullOrWhiteSpace(target.SiteCode)
+                || string.Equals(target.SiteCode, WorkLogSiteCodes.All, StringComparison.OrdinalIgnoreCase))
+            {
+                string site = null;
+                foreach (var record in records)
+                {
+                    if (record == null)
+                        continue;
+                    string resolved = TfsCheckinInboxStore.ResolveSiteCode(record);
+                    if (string.IsNullOrWhiteSpace(resolved)
+                        || string.Equals(resolved, WorkLogSiteCodes.All, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(resolved, TfsCheckinInboxStore.OtherSite, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    site = resolved.Trim().ToUpperInvariant();
+                    break;
+                }
+                if (!string.IsNullOrWhiteSpace(site))
+                    target.SiteCode = site;
+                else
+                    EnsureItemSiteCode(target);
+            }
+
+            if (string.IsNullOrWhiteSpace(target.Pc))
+            {
+                var pcs = new List<string>();
+                foreach (var record in records)
+                {
+                    if (record == null || string.IsNullOrWhiteSpace(record.PcName))
+                        continue;
+                    string pc = record.PcName.Trim();
+                    bool dup = false;
+                    foreach (var x in pcs)
+                    {
+                        if (string.Equals(x, pc, StringComparison.OrdinalIgnoreCase))
+                        {
+                            dup = true;
+                            break;
+                        }
+                    }
+                    if (!dup)
+                        pcs.Add(pc);
+                }
+                if (pcs.Count > 0)
+                    target.Pc = string.Join(", ", pcs);
+            }
+        }
+
+        private WorkSessionContext BuildSessionContextForInbox(TfsCheckinInboxRecord record)
+        {
+            var ctx = new WorkSessionContext();
+            var source = _lastSessionContext
+                ?? (_sessionContextFactory != null ? _sessionContextFactory() : null);
+            if (source != null)
+            {
+                ctx.ClientLocalIp = source.ClientLocalIp;
+                ctx.CurrentUserId = source.CurrentUserId;
+                ctx.CurrentUserName = source.CurrentUserName;
+                ctx.SessionStartedAt = source.SessionStartedAt;
+                ctx.SessionEndedAt = source.SessionEndedAt;
+            }
+            if (record != null)
+            {
+                if (!string.IsNullOrWhiteSpace(record.PcName))
+                    ctx.RemoteComputerName = record.PcName.Trim();
+            }
+            WorkLogTfsImportCoordinator.EnsureSessionHasWorkHubUser(ctx);
+            return ctx;
         }
 
         private void ConfirmImport()
@@ -1169,6 +1765,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                     _tfsImport.MarkPromptHandledIfNeeded(apply, "worklog_import_confirmed");
                 }
 
+                RememberImportInboxDecision();
                 CloseImport();
                 StartImportEditQueue(apply.ItemsToEdit);
             }
@@ -1214,8 +1811,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             {
                 // 가져오기 직후 미저장: 취소/닫기 = 목록 반영 철회
                 EditDialog.DiscardOnCancel = !_editSession.Persisted;
-                if (_tfsImport.ImportEditTotal > 1)
-                    EditDialog.ImportProgressText = "그룹" + _tfsImport.ImportEditIndex;
+                BindImportGroupTabs();
             }
         }
 
@@ -1251,6 +1847,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 RaisePropertyChanged("FilterPcSelection");
             }
 
+            RefreshPcFilterAliases();
             RefreshEditDialogPcOptions();
         }
 
@@ -1281,15 +1878,37 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 sitePcs = null;
             }
 
-            if (sitePcs != null)
+                if (sitePcs != null)
             {
                 foreach (var dto in sitePcs)
                 {
-                    string ip = ResolvePcFilterChipValue(dto);
-                    if (string.IsNullOrWhiteSpace(ip) || !seen.Add(ip))
+                    string chip = ResolvePcFilterChipValue(dto);
+                    if (string.IsNullOrWhiteSpace(chip) || !seen.Add(chip))
                         continue;
-                    ips.Add(ip);
+                    ips.Add(chip);
                 }
+            }
+
+            try
+            {
+                IList<PcMapDto> maps = _directory.GetPcMapsBySite(site);
+                if (maps != null)
+                {
+                    foreach (var map in maps)
+                    {
+                        if (map == null)
+                            continue;
+                        string chip = !string.IsNullOrWhiteSpace(map.PcName)
+                            ? map.PcName.Trim()
+                            : map.PcIp;
+                        if (string.IsNullOrWhiteSpace(chip) || !seen.Add(chip))
+                            continue;
+                        ips.Add(chip);
+                    }
+                }
+            }
+            catch
+            {
             }
 
             // Fallback: gallery remote PCs for current site (if config empty)
@@ -1317,19 +1936,21 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             return ips;
         }
 
-        /// <summary>필터 칩: Host IP 우선, 없으면 점유키(IpAddress).</summary>
+        /// <summary>필터 칩: PC명 우선, 없으면 Host IP·점유키.</summary>
         private static string ResolvePcFilterChipValue(RemotePcDto dto)
         {
             if (dto == null)
                 return null;
+            if (!string.IsNullOrWhiteSpace(dto.PcName))
+                return dto.PcName.Trim();
             if (LooksLikeIpAddress(dto.HostAddress))
                 return dto.HostAddress.Trim();
             if (LooksLikeIpAddress(dto.IpAddress))
                 return dto.IpAddress.Trim();
+            if (!string.IsNullOrWhiteSpace(dto.HostAddress))
+                return dto.HostAddress.Trim();
             if (!string.IsNullOrWhiteSpace(dto.IpAddress))
                 return dto.IpAddress.Trim();
-            if (!string.IsNullOrWhiteSpace(dto.PcName))
-                return dto.PcName.Trim();
             return null;
         }
 
@@ -1417,6 +2038,65 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             return parts.All(p => int.TryParse(p, out n) && n >= 0 && n <= 255);
         }
 
+        private async Task RefreshTeamFilterOptionsAsync()
+        {
+            if (TeamFilterOptions == null)
+                return;
+
+            int gen = ++_teamOptionsGeneration;
+            IList<string> names = null;
+            try
+            {
+                names = await _persistence.GetDistinctTeamNamesAsync().ConfigureAwait(true);
+            }
+            catch
+            {
+                names = null;
+            }
+            if (gen != _teamOptionsGeneration)
+                return;
+
+            string keep = FilterTeam;
+            _suppressTeamFilterChanged = true;
+            try
+            {
+                TeamFilterOptions.Clear();
+                TeamFilterOptions.Add(WorkLogFilterLabels.All);
+                if (names != null)
+                {
+                    foreach (string name in names)
+                        AddTeamFilterOption(name);
+                }
+                AddTeamFilterOption(OccupancyNameStore.TryGetAffiliation());
+                if (!IsFilterAll(keep))
+                    AddTeamFilterOption(keep);
+
+                if (!WorkLogTeamNames.EqualsKey(_filterTeam, keep)
+                    && !string.Equals(_filterTeam, keep, StringComparison.Ordinal))
+                {
+                    _filterTeam = string.IsNullOrWhiteSpace(keep) ? WorkLogFilterLabels.All : keep;
+                    RaisePropertyChanged("FilterTeam");
+                }
+            }
+            finally
+            {
+                _suppressTeamFilterChanged = false;
+            }
+
+            RaisePropertyChanged("HasTeamFilter");
+            RaiseFilterSummaryChanged();
+        }
+
+        private void AddTeamFilterOption(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name) || TeamFilterOptions == null)
+                return;
+            string team = name.Trim();
+            if (TeamFilterOptions.Any(n => WorkLogTeamNames.EqualsKey(n, team)))
+                return;
+            TeamFilterOptions.Add(team);
+        }
+
         private System.Collections.Generic.IEnumerable<WorkLogListItemViewModel> GetFilteredItems()
         {
             DateTime? from = null;
@@ -1436,11 +2116,20 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                         || (item.TicketContents ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
                         || (item.TfsComment ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
                         || (item.AuthorDisplayName ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
+                        || (item.TeamName ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
                         || (item.PersonInCharge ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
                         || (item.MenuName ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
                         || (item.Comment ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
                         || (item.ListCommentFullText ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
+                        || (item.Pc ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
+                        || (item.LocalPcIp ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
+                        || (item.SiteCode ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
+                        || (item.AuthorName ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
+                        || (item.TfsAuthor ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
+                        || (item.ListPersonText ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
+                        || (item.ListDeployText ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
                         || item.ChangesetId.ToString().IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
+                        || ItemMatchesPcFilter(item, _searchPcAliases, q)
                         || (item.Groups != null && item.Groups.Any(g =>
                             g != null
                             && ((g.ProjectName ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
@@ -1471,10 +2160,11 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                     return false;
 
                 if (!string.IsNullOrWhiteSpace(FilterPc)
-                    && FilterPc != WorkLogFieldMasters.Unselected
-                    && !string.Equals(item.Pc, FilterPc, StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(item.LocalPcIp, FilterPc, StringComparison.OrdinalIgnoreCase))
-                    return false;
+                    && FilterPc != WorkLogFieldMasters.Unselected)
+                {
+                    if (!ItemMatchesPcFilter(item, _pcFilterAliases, FilterPc))
+                        return false;
+                }
 
                 // 담당자는 상세 수기 입력 → 필터 제외, 검색으로만 처리
 
@@ -1521,15 +2211,26 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                         return false;
                 }
 
+                if (!string.IsNullOrWhiteSpace(FilterTeam)
+                    && !string.Equals(FilterTeam, WorkLogFilterLabels.All, StringComparison.Ordinal))
+                {
+                    if (!ItemMatchesTeam(item, FilterTeam))
+                        return false;
+                }
+
+                // 목록에는 저장(작성 완료)만. 임시저장은 보관함 재개용으로만 유지.
+                if (!item.IsCompleted)
+                    return false;
+
                 return true;
             });
         }
 
         private void RebuildDateGroups()
         {
-            // Items = 현재 DB 페이지 결과(이미 필터·페이징 적용). 클라이언트 Skip/Take 없음.
+            // DB 페이지 + 클라이언트 소속 매칭(TEAM_NM 미기록·작성자 문자열 폴백). Skip/Take 없음.
             DateGroups.Clear();
-            var pageItems = Items
+            var pageItems = GetFilteredItems()
                 .Where(i => i != null)
                 .OrderByDescending(i => i.SortCheckedInAt)
                 .ThenByDescending(i => i.DbLogId)
@@ -1660,11 +2361,13 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             RaisePropertyChanged("IsTypeFilterActive");
             RaisePropertyChanged("IsCategoryFilterActive");
             RaisePropertyChanged("IsDeployFilterActive");
+            RaisePropertyChanged("IsTeamFilterActive");
             RaisePropertyChanged("IsPcFilterActive");
             RaisePropertyChanged("IsDateFilterActive");
             RaisePropertyChanged("TypeFilterPillLabel");
             RaisePropertyChanged("CategoryFilterPillLabel");
             RaisePropertyChanged("DeployFilterPillLabel");
+            RaisePropertyChanged("TeamFilterPillLabel");
             RaisePropertyChanged("PcFilterPillLabel");
             RaisePropertyChanged("DateFilterPillLabel");
             RaisePropertyChanged("FilterDateSummary");
@@ -1774,7 +2477,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 to = WorkLogPersistenceService.ParseFilterDateOrNull(FilterToText);
             }
 
-            return _persistence.BuildListQuery(
+            var query = _persistence.BuildListQuery(
                 _pageIndex,
                 PageSize,
                 SearchText,
@@ -1784,7 +2487,38 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 FilterPc,
                 FilterType,
                 FilterCategory,
-                FilterDeploy);
+                FilterDeploy,
+                FilterTeam);
+
+            RefreshPcFilterAliases();
+            if (_pcFilterAliases != null && _pcFilterAliases.Count > 0)
+                query.PcAliases = _pcFilterAliases;
+
+            try
+            {
+                _searchPcAliases = string.IsNullOrWhiteSpace(SearchText)
+                    ? new List<string>()
+                    : (_directory.ResolvePcAliasesContaining(FilterSite, SearchText) ?? new List<string>());
+            }
+            catch
+            {
+                _searchPcAliases = new List<string>();
+            }
+            if (_searchPcAliases.Count > 0)
+                query.SearchAliases = _searchPcAliases;
+
+            if (!string.IsNullOrWhiteSpace(query.TeamName)
+                && WorkLogTeamNames.EqualsKey(query.TeamName, OccupancyNameStore.TryGetAffiliation()))
+            {
+                string occ = OccupancyNameStore.TryGet();
+                if (!string.IsNullOrWhiteSpace(occ))
+                    query.OccupancyAuthorName = occ;
+                string ip = WorkHubUserProfile.LocalIp;
+                if (!string.IsNullOrWhiteSpace(ip))
+                    query.OccupancyLocalPcIp = ip;
+            }
+
+            return query;
         }
 
         /// <summary>Type 컬럼(TYPE_NM)만 매칭.</summary>
@@ -1811,6 +2545,67 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             return string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// TEAM_NM, 작성자/담당자 문자열, 점유 소속 오버레이까지 포함해 소속 칩과 맞춘다.
+        /// </summary>
+        private static bool ItemMatchesTeam(WorkLogListItemViewModel item, string filter)
+        {
+            if (item == null || string.IsNullOrWhiteSpace(filter))
+                return true;
+            if (WorkLogTeamNames.EqualsKey(item.TeamName, filter)
+                || WorkLogTeamNames.ContainsKey(item.TeamName, filter)
+                || WorkLogTeamNames.ContainsKey(item.AuthorName, filter)
+                || WorkLogTeamNames.ContainsKey(item.PersonInCharge, filter)
+                || WorkLogTeamNames.ContainsKey(item.TfsAuthor, filter)
+                || WorkLogTeamNames.ContainsKey(item.ListPersonText, filter)
+                || WorkLogTeamNames.ContainsKey(item.AuthorDisplayName, filter))
+                return true;
+
+            if (!WorkLogTeamNames.EqualsKey(OccupancyNameStore.TryGetAffiliation(), filter))
+                return false;
+            if (!item.IsOwnedByCurrentUser)
+                return false;
+            return string.IsNullOrWhiteSpace(item.TeamName)
+                || WorkLogTeamNames.EqualsKey(item.TeamName, filter);
+        }
+
+        private void RefreshPcFilterAliases()
+        {
+            try
+            {
+                _pcFilterAliases = _directory.ResolvePcAliases(FilterSite, FilterPc) ?? new List<string>();
+            }
+            catch
+            {
+                _pcFilterAliases = new List<string>();
+                if (!string.IsNullOrWhiteSpace(FilterPc))
+                    _pcFilterAliases.Add(FilterPc.Trim());
+            }
+        }
+
+        private static bool ItemMatchesPcFilter(
+            WorkLogListItemViewModel item,
+            IList<string> aliases,
+            string filter)
+        {
+            if (item == null)
+                return false;
+            if (aliases != null)
+            {
+                for (int i = 0; i < aliases.Count; i++)
+                {
+                    string a = aliases[i];
+                    if (string.IsNullOrWhiteSpace(a))
+                        continue;
+                    if (string.Equals(item.Pc, a, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(item.LocalPcIp, a, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+            }
+            return string.Equals(item.Pc, filter, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(item.LocalPcIp, filter, StringComparison.OrdinalIgnoreCase);
+        }
+
         private async Task LoadPageFromDbAsync()
         {
             if (!_persistence.IsConfigured)
@@ -1825,6 +2620,17 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             IsLoading = true;
             try
             {
+                if (!_didFillMissingTeam)
+                {
+                    string occName = OccupancyNameStore.TryGet();
+                    string occTeam = OccupancyNameStore.TryGetAffiliation();
+                    if (!string.IsNullOrWhiteSpace(occName) && !string.IsNullOrWhiteSpace(occTeam))
+                    {
+                        _didFillMissingTeam = true;
+                        await OccupancyNamePrompt.StampTeamOnLocalLogsAsync().ConfigureAwait(true);
+                    }
+                }
+
                 var page = await _persistence.GetPageAsync(BuildListQuery()).ConfigureAwait(true);
                 if (gen != _pageLoadGeneration)
                     return;
@@ -1863,6 +2669,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
 
                 RebuildDateGroups();
                 RefreshPersonOptions();
+                var ignoredTeams = RefreshTeamFilterOptionsAsync();
             }
             catch (Exception ex)
             {
@@ -1943,6 +2750,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             _filterType = WorkLogFilterLabels.All;
             _filterCategory = WorkLogFilterLabels.All;
             _filterDeploy = WorkLogFilterLabels.All;
+            _filterTeam = WorkLogFilterLabels.All;
             _filterSite = string.IsNullOrWhiteSpace(_activeSiteCode)
                 ? WorkLogSiteCodes.All
                 : _activeSiteCode;
@@ -1957,8 +2765,10 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             RaisePropertyChanged("FilterType");
             RaisePropertyChanged("FilterCategory");
             RaisePropertyChanged("FilterDeploy");
+            RaisePropertyChanged("FilterTeam");
             RaisePropertyChanged("FilterSite");
             RaisePropertyChanged("HasPcFilter");
+            RaisePropertyChanged("HasTeamFilter");
             RaisePropertyChanged("SiteHeaderText");
             RaisePropertyChanged("SiteDisplayName");
             RaisePropertyChanged("HeaderSiteName");
@@ -2034,13 +2844,14 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             var blank = new WorkLogListItemViewModel
             {
                 Id = "wl-new-" + Guid.NewGuid().ToString("N").Substring(0, 8),
-                SiteCode = ResolveSiteCodeForWrite(),
+                SiteCode = null,
                 WriteStatus = WorkLogWriteStatus.Draft,
                 LastModifiedAt = DateTime.Now,
                 CheckedInAt = null,
-                Pc = ctx != null ? ctx.ResolvePc() : string.Empty,
+                Pc = string.Empty,
                 PersonInCharge = string.Empty,
-                AuthorName = string.Empty,
+                AuthorName = WorkHubUserProfile.OccupancyName,
+                TeamName = OccupancyNameStore.TryGetAffiliation(),
                 LocalPcIp = localIp,
                 StartDate = ctx != null ? ctx.SessionStartedAt : null,
                 EndDate = ctx != null ? ctx.SessionEndedAt : null,
@@ -2082,12 +2893,14 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 EditDialog.CloseRequested -= OnEditCloseRequested;
                 EditDialog.ApplyRequested -= OnEditApplyRequested;
                 EditDialog.DeleteRequested -= OnEditDeleteRequested;
+                EditDialog.ImportGroupSelected -= OnImportGroupSelected;
                 EditDialog.PropertyChanged -= OnEditDialogPropertyChanged;
             }
             EditDialog = vm;
             EditDialog.CloseRequested += OnEditCloseRequested;
             EditDialog.ApplyRequested += OnEditApplyRequested;
             EditDialog.DeleteRequested += OnEditDeleteRequested;
+            EditDialog.ImportGroupSelected += OnImportGroupSelected;
             EditDialog.PropertyChanged += OnEditDialogPropertyChanged;
             IsEditOpen = true;
             DetailTree = vm != null ? vm.Tree : null;
@@ -2135,7 +2948,6 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                     Title = "업무기록 삭제",
                     Message = "업무기록을 삭제하시겠습니까?",
                     Detail = "티켓: " + ticket,
-                    DedupKey = "WorkLogDelete:" + item.DbLogId + ":" + (item.Id ?? string.Empty),
                     Buttons = new[]
                     {
                         new PopupButtonDefinition("삭제", PopupResultType.Primary, isDefault: true),
@@ -2172,6 +2984,8 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 }
             }
 
+            _tfsImport.MarkSlot(item, ImportGroupSlotStatus.Deleted);
+
             if (ReferenceEquals(_editSession.EditingItem, item) || IsEditOpen)
                 CloseEdit(advanceImportQueue: true);
 
@@ -2185,6 +2999,37 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             RaisePropertyChanged("IsEmpty");
             RaisePropertyChanged("TotalCount");
             DiagnosticLogger.Info("WORKLOG_DB", "deleted LogId=" + item.DbLogId + " Ticket=" + ticket);
+            await ShowNoticeAsync(
+                "업무기록 삭제",
+                "삭제되었습니다.",
+                PopupIconKind.Success).ConfigureAwait(true);
+        }
+
+        private async Task ShowNoticeAsync(string title, string message, PopupIconKind icon)
+        {
+            if (_popup != null)
+            {
+                await _popup.ShowResultAsync(new PopupRequest
+                {
+                    Kind = PopupKind.Result,
+                    Icon = icon,
+                    Title = title ?? string.Empty,
+                    Message = message ?? string.Empty,
+                    Buttons = new[]
+                    {
+                        new PopupButtonDefinition("확인", PopupResultType.Primary, isDefault: true, isCancel: true)
+                    }
+                }).ConfigureAwait(true);
+                return;
+            }
+
+            MessageBox.Show(
+                message ?? string.Empty,
+                title ?? string.Empty,
+                MessageBoxButton.OK,
+                icon == PopupIconKind.Error || icon == PopupIconKind.Warning
+                    ? MessageBoxImage.Warning
+                    : MessageBoxImage.Information);
         }
 
         private async Task ShowDeleteNoticeAsync(string message, string detail)
@@ -2268,10 +3113,22 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             if (EditDialog != null)
                 EditDialog.DiscardOnCancel = false;
             DetailTree = EditDialog.Tree;
+            _tfsImport.MarkSlot(
+                editingItem,
+                wantComplete ? ImportGroupSlotStatus.Saved : ImportGroupSlotStatus.Draft);
 
-            // 작성 완료(저장) 후: 가져오기 큐가 있으면 다음 기록 화면으로
             if (wantComplete)
+            {
+                await ShowNoticeAsync("업무기록 저장", "저장되었습니다.", PopupIconKind.Success)
+                    .ConfigureAwait(true);
                 CloseEdit(advanceImportQueue: true);
+            }
+            else
+            {
+                RebuildDateGroups();
+                await ShowNoticeAsync("임시저장", "임시저장되었습니다.", PopupIconKind.Success)
+                    .ConfigureAwait(true);
+            }
         }
 
         private async Task LoadFromDbAsync()
@@ -2302,6 +3159,8 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
 
             RefreshPcOptions();
             await LoadPageFromDbAsync().ConfigureAwait(true);
+            ReconcileInboxFromWorkLogs();
+            RefreshInboxBadge();
             var q = BuildListQuery();
             DiagnosticLogger.Info("WORKLOG_DB",
                 "pageLoaded=" + Items.Count
@@ -2329,6 +3188,11 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             if (result.Success)
             {
                 item.DbLogId = result.LogId;
+                if (item.IsCompleted)
+                {
+                    TfsCheckinInboxStore.MarkReported(item.GetEffectiveChangesetIds());
+                    RefreshInboxBadge();
+                }
                 return true;
             }
 
@@ -2343,9 +3207,83 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             HasTicketConnectMessage = !string.IsNullOrWhiteSpace(message);
         }
 
-        private void OnEditCloseRequested()
+        private async void OnEditCloseRequested()
         {
+            if (_tfsImport.HasUnfinishedImportGroups)
+            {
+                await StashUnfinishedImportGroupsAsync().ConfigureAwait(true);
+                CloseEdit(advanceImportQueue: false);
+                _tfsImport.ClearSession();
+                return;
+            }
+
             CloseEdit(advanceImportQueue: true);
+        }
+
+        private async Task StashUnfinishedImportGroupsAsync()
+        {
+            if (EditDialog != null && _editSession.EditingItem != null)
+                EditDialog.ApplyUiStateTo(_editSession.EditingItem);
+
+            var unfinished = _tfsImport.CollectUnfinishedSlots();
+            var savedLabels = new List<string>();
+            foreach (var slot in unfinished)
+            {
+                if (slot == null || slot.Item == null)
+                    continue;
+                if (slot.Status == ImportGroupSlotStatus.Draft)
+                {
+                    savedLabels.Add(slot.Label);
+                    continue;
+                }
+                if (slot.Status != ImportGroupSlotStatus.Pending)
+                    continue;
+
+                var item = slot.Item;
+                item.WriteStatus = WorkLogWriteStatus.Draft;
+                if (ReferenceEquals(_editSession.EditingItem, item) && EditDialog != null)
+                    EditDialog.WriteStatus = WorkLogWriteStatus.Draft;
+
+                bool ok = await PersistItemAsync(item).ConfigureAwait(true);
+                if (ok)
+                {
+                    slot.Status = ImportGroupSlotStatus.Draft;
+                    savedLabels.Add(slot.Label);
+                    if (ReferenceEquals(_editSession.EditingItem, item))
+                    {
+                        _editSession.MarkPersisted();
+                        if (EditDialog != null)
+                            EditDialog.DiscardOnCancel = false;
+                    }
+                }
+            }
+
+            AfterListDiscardOrRestore();
+            if (savedLabels.Count == 0)
+                return;
+
+            string names = string.Join(", ", savedLabels);
+            await ShowNoticeAsync(
+                "업무일지 보관함",
+                names + " 일지가 보관함에 저장되었습니다.",
+                PopupIconKind.Success).ConfigureAwait(true);
+        }
+
+        private void BindImportGroupTabs()
+        {
+            if (EditDialog == null)
+                return;
+            EditDialog.ImportGroupSlots = _tfsImport.ImportGroups;
+        }
+
+        private void OnImportGroupSelected(ImportGroupSlot slot)
+        {
+            if (slot == null || !slot.IsVisible || slot.IsCurrent)
+                return;
+            if (EditDialog != null && _editSession.EditingItem != null)
+                EditDialog.ApplyUiStateTo(_editSession.EditingItem);
+            _tfsImport.ActivateSlot(slot);
+            OpenImportQueuedEdit(slot.Item);
         }
 
         private void CloseEdit(bool advanceImportQueue = false)
@@ -2355,6 +3293,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 EditDialog.CloseRequested -= OnEditCloseRequested;
                 EditDialog.ApplyRequested -= OnEditApplyRequested;
                 EditDialog.DeleteRequested -= OnEditDeleteRequested;
+                EditDialog.ImportGroupSelected -= OnImportGroupSelected;
                 EditDialog.PropertyChanged -= OnEditDialogPropertyChanged;
             }
             IsEditOpen = false;
@@ -2382,7 +3321,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
 
             if (advanceImportQueue)
             {
-                if (discarded)
+                if (discarded && !_tfsImport.HasImportGroups)
                 {
                     // 이어서 열려던 미저장 가져오기 건도 목록에서 철회
                     _tfsImport.DiscardRemainingQueueItems(Items, AfterListDiscardOrRestore);

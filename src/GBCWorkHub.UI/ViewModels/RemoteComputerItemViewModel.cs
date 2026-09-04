@@ -11,6 +11,11 @@ namespace GBCWorkHub.UI.ViewModels
     {
         private string _pcName;
         private string _ipAddress;
+        private string _hostAddress;
+        private string _groupName;
+        private string _pcDomain;
+        private string _pcNote;
+        private string _pcComment;
         private string _siteCode;
         private string _statusCode = RemotePcDbStatuses.Available;
         private string _accessUserId;
@@ -29,7 +34,11 @@ namespace GBCWorkHub.UI.ViewModels
             set
             {
                 if (SetProperty(ref _pcName, value))
+                {
                     RaisePropertyChanged("DisplayTitle");
+                    RaisePropertyChanged("DisplaySubtitle");
+                    RaisePropertyChanged("HasDisplaySubtitle");
+                }
             }
         }
 
@@ -39,8 +48,121 @@ namespace GBCWorkHub.UI.ViewModels
             set
             {
                 if (SetProperty(ref _ipAddress, value))
+                {
                     RaisePropertyChanged("DisplaySubtitle");
+                    RaisePropertyChanged("HasDisplaySubtitle");
+                }
             }
+        }
+
+        public string HostAddress
+        {
+            get { return _hostAddress; }
+            set
+            {
+                if (SetProperty(ref _hostAddress, value))
+                {
+                    RaisePropertyChanged("DisplaySubtitle");
+                    RaisePropertyChanged("HasDisplaySubtitle");
+                }
+            }
+        }
+
+        public string GroupName
+        {
+            get { return _groupName; }
+            set { SetProperty(ref _groupName, value); }
+        }
+
+        /// <summary>원격 Windows 로그인(엑셀 ID). 예: dxbcmc\bcarep.admin</summary>
+        public string PcDomain
+        {
+            get { return _pcDomain; }
+            set
+            {
+                if (SetProperty(ref _pcDomain, value))
+                {
+                    RaisePropertyChanged("HasPcDomain");
+                    RaisePropertyChanged("HasMultiplePcDomains");
+                    RaisePropertyChanged("HasSinglePcDomain");
+                    RaisePropertyChanged("PcDomainDisplay");
+                }
+            }
+        }
+
+        /// <summary>카드/목록용. 1개면 한 줄, 2개 이상이면 줄바꿈.</summary>
+        public string PcDomainDisplay
+        {
+            get
+            {
+                System.Collections.Generic.List<string> list = GetPcDomainParts();
+                if (list == null || list.Count == 0)
+                    return null;
+                if (list.Count == 1)
+                    return list[0];
+                return string.Join("\n", list.ToArray());
+            }
+        }
+
+        public bool HasPcDomain
+        {
+            get { return !string.IsNullOrWhiteSpace(PcDomainDisplay); }
+        }
+
+        public bool HasMultiplePcDomains
+        {
+            get
+            {
+                System.Collections.Generic.List<string> list = GetPcDomainParts();
+                return list != null && list.Count > 1;
+            }
+        }
+
+        public bool HasSinglePcDomain
+        {
+            get
+            {
+                System.Collections.Generic.List<string> list = GetPcDomainParts();
+                return list != null && list.Count == 1;
+            }
+        }
+
+        private System.Collections.Generic.List<string> GetPcDomainParts()
+        {
+            if (string.IsNullOrWhiteSpace(PcDomain))
+                return null;
+            string[] parts = PcDomain.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            var list = new System.Collections.Generic.List<string>();
+            for (int i = 0; i < parts.Length; i++)
+            {
+                string t = parts[i].Trim();
+                if (t.Length > 0)
+                    list.Add(t);
+            }
+            return list.Count == 0 ? null : list;
+        }
+
+        /// <summary>엑셀 ID/Password 섹션([ID]/[Password]).</summary>
+        public string PcNote
+        {
+            get { return _pcNote; }
+            set
+            {
+                if (SetProperty(ref _pcNote, value))
+                    RaisePropertyChanged("HasPcNote");
+            }
+        }
+
+        public bool HasPcNote
+        {
+            get { return !string.IsNullOrWhiteSpace(PcNote); }
+        }
+
+        /// <summary>접속 코멘트(사용자 수정 가능).</summary>
+        public string PcComment
+        {
+            get { return _pcComment; }
+            set { SetProperty(ref _pcComment, value); }
         }
 
         public string SiteCode
@@ -161,7 +283,41 @@ namespace GBCWorkHub.UI.ViewModels
 
         public string DisplaySubtitle
         {
-            get { return IpAddress ?? "-"; }
+            get
+            {
+                if (string.IsNullOrWhiteSpace(IpAddress) && string.IsNullOrWhiteSpace(HostAddress))
+                    return string.Empty;
+                string ip = !string.IsNullOrWhiteSpace(IpAddress) ? IpAddress.Trim() : string.Empty;
+                if (!string.IsNullOrWhiteSpace(PcName)
+                    && string.Equals(ip, PcName.Trim(), StringComparison.OrdinalIgnoreCase))
+                    ip = string.Empty;
+                if (!LooksLikeIpv4(ip) && LooksLikeIpv4(HostAddress))
+                    ip = HostAddress.Trim();
+                if (!LooksLikeIpv4(ip))
+                    return string.Empty;
+                return ip;
+            }
+        }
+
+        public bool HasDisplaySubtitle
+        {
+            get { return !string.IsNullOrWhiteSpace(DisplaySubtitle); }
+        }
+
+        private static bool LooksLikeIpv4(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+            string[] parts = value.Trim().Split('.');
+            if (parts.Length != 4)
+                return false;
+            for (int i = 0; i < parts.Length; i++)
+            {
+                int n;
+                if (!int.TryParse(parts[i], out n) || n < 0 || n > 255)
+                    return false;
+            }
+            return true;
         }
 
         public string StatusDisplayName
@@ -193,6 +349,8 @@ namespace GBCWorkHub.UI.ViewModels
         {
             get
             {
+                if (OccupancyNameStore.IsLocalOccupant(AccessUserId, AccessPcName))
+                    return true;
                 if (string.IsNullOrWhiteSpace(AccessUserId) || string.IsNullOrWhiteSpace(CurrentLocalUser))
                     return false;
                 return string.Equals(AccessUserId.Trim(), CurrentLocalUser.Trim(), StringComparison.OrdinalIgnoreCase);
@@ -244,7 +402,7 @@ namespace GBCWorkHub.UI.ViewModels
                 if (IsInUse && IsOwnedByCurrentUser)
                     return "사용 중";
                 if (IsOwnedByOtherUser)
-                    return "다른 사용자가 사용 중";
+                    return "점유 가져가기";
                 if (IsCheckRequired)
                     return "상태 확인";
                 return StatusDisplayName;
@@ -255,7 +413,7 @@ namespace GBCWorkHub.UI.ViewModels
         {
             get
             {
-                if (CanConnect || IsCheckRequired)
+                if (CanConnect || IsCheckRequired || IsOwnedByOtherUser)
                     return true;
                 return false;
             }
@@ -267,7 +425,7 @@ namespace GBCWorkHub.UI.ViewModels
             {
                 if (IsAvailable || string.IsNullOrWhiteSpace(AccessUserId))
                     return "사용자 없음";
-                return "사용자: " + FormatUserId(AccessUserId);
+                return "사용자: " + OccupancyNameStore.ToDisplayName(AccessUserId, AccessPcName);
             }
         }
 
@@ -280,7 +438,7 @@ namespace GBCWorkHub.UI.ViewModels
                     return string.Empty;
                 if (string.IsNullOrWhiteSpace(AccessUserId))
                     return string.Empty;
-                return FormatUserId(AccessUserId);
+                return OccupancyNameStore.ToDisplayName(AccessUserId, AccessPcName);
             }
         }
 
@@ -318,7 +476,7 @@ namespace GBCWorkHub.UI.ViewModels
             {
                 if (!AccessStartAt.HasValue)
                     return IsAvailable ? "" : "시작: -";
-                return "시작: " + AccessStartAt.Value.ToString("HH:mm");
+                return "시작: " + KoreaTime.Format(AccessStartAt, "HH:mm");
             }
         }
 
@@ -352,22 +510,12 @@ namespace GBCWorkHub.UI.ViewModels
 
         public static string FormatUserId(string userId)
         {
-            if (string.IsNullOrWhiteSpace(userId))
-                return "-";
+            return OccupancyNameStore.ToDisplayName(userId, null);
+        }
 
-            string raw = userId.Trim();
-            int slash = raw.LastIndexOf('\\');
-            if (slash >= 0 && slash < raw.Length - 1)
-                raw = raw.Substring(slash + 1);
-
-            if (raw.Length <= 3)
-                return raw;
-
-            // domain\user 형태에서 user 일부 마스킹
-            if (raw.Length <= 6)
-                return raw.Substring(0, 2) + "***";
-
-            return raw.Substring(0, 3) + "***" + raw.Substring(raw.Length - 1);
+        public static string FormatUserId(string userId, string accessPcName)
+        {
+            return OccupancyNameStore.ToDisplayName(userId, accessPcName);
         }
 
         public void ApplyFromDb(RemotePcStatus status, string currentLocalUser)
@@ -376,11 +524,12 @@ namespace GBCWorkHub.UI.ViewModels
             if (status == null)
                 return;
 
-            if (!string.IsNullOrWhiteSpace(status.RemotePcName))
-                PcName = status.RemotePcName;
-            if (!string.IsNullOrWhiteSpace(status.RemoteAccessIpAddress))
-                IpAddress = status.RemoteAccessIpAddress;
-            if (!string.IsNullOrWhiteSpace(status.SiteCode))
+            // 점유 행은 상태만 반영. PC명·점유키·사이트를 덮으면 다른 PC 카드로 잘못 매핑됨.
+            if (string.IsNullOrWhiteSpace(PcName) && !string.IsNullOrWhiteSpace(status.RemotePcName))
+                PcName = status.RemotePcName.Trim();
+            if (string.IsNullOrWhiteSpace(IpAddress) && !string.IsNullOrWhiteSpace(status.RemoteAccessIpAddress))
+                IpAddress = status.RemoteAccessIpAddress.Trim();
+            if (string.IsNullOrWhiteSpace(SiteCode) && !string.IsNullOrWhiteSpace(status.SiteCode))
                 SiteCode = status.SiteCode.Trim().ToUpperInvariant();
 
             StatusCode = string.IsNullOrWhiteSpace(status.AccessStatusCode)
@@ -389,9 +538,9 @@ namespace GBCWorkHub.UI.ViewModels
             AccessUserId = status.AccessUserId;
             AccessPcName = status.AccessPcName;
             SessionToken = status.SessionToken;
-            AccessStartAt = status.AccessStartDateTime;
-            RemoteAccessAt = status.RemoteAccessDateTime;
-            UpdatedAt = status.UpdatedDateTime;
+            AccessStartAt = KoreaTime.FromOccupancyDb(status.AccessStartDateTime);
+            RemoteAccessAt = KoreaTime.FromOccupancyDb(status.RemoteAccessDateTime);
+            UpdatedAt = KoreaTime.FromOccupancyDb(status.UpdatedDateTime);
         }
 
         public void ApplyLocalInUse(string userId, string clientPc, string sessionToken)
@@ -401,8 +550,8 @@ namespace GBCWorkHub.UI.ViewModels
             AccessUserId = userId;
             AccessPcName = clientPc;
             SessionToken = sessionToken;
-            AccessStartAt = DateTime.Now;
-            RemoteAccessAt = DateTime.Now;
+            AccessStartAt = KoreaTime.Now;
+            RemoteAccessAt = KoreaTime.Now;
         }
 
         public void ApplyLocalAvailable()
@@ -433,6 +582,11 @@ namespace GBCWorkHub.UI.ViewModels
             {
                 PcName = dto != null ? dto.PcName : null,
                 IpAddress = dto != null ? dto.IpAddress : null,
+                HostAddress = dto != null ? dto.HostAddress : null,
+                GroupName = dto != null ? dto.GroupName : null,
+                PcDomain = dto != null ? dto.PcDomain : null,
+                PcNote = dto != null ? dto.PcNote : null,
+                PcComment = dto != null ? dto.PcComment : null,
                 SiteCode = dto != null ? dto.HospitalCode : null,
                 CurrentLocalUser = currentLocalUser,
                 StatusCode = RemotePcDbStatuses.Available

@@ -30,6 +30,10 @@ namespace GBCWorkHub.UI.Tests
             Test8_EmptyBackup_OnlyClearsOwnValue_UserNewValueKept();
             Test9_LegacyPrefixesUnchanged_BackwardCompatible();
             Test10_CmcRetryLoop_UserCopyMidLoop_NeverOverwritten();
+            Test11_ExplicitRetry_DiscardsInboundTfsThenWritesSync();
+            Test12_CredentialsPrepare_RestoresPasswordFromOutboundToken();
+            Test13_CredentialsPrepare_KeepsUserPassword();
+            Test14_CredentialsPrepare_KeepsPasswordCopiedOverToken();
 
             Console.WriteLine();
             Console.WriteLine("Passed={0} Failed={1}", _passed, _failed);
@@ -126,10 +130,15 @@ namespace GBCWorkHub.UI.Tests
                 ClipboardWriteOutcome.SkippedForeignInboundPresent, refresh.Outcome);
             Assert("T5 payload untouched", TfsPayloadPrefix + "{\"success\":true}", fake.Text);
 
-            // 마무리 경로도 payload를 건드리면 안 된다.
+            // 마무리 경로도 미수집 TFS 응답을 건드리면 안 된다.
             bool ended = mgr.TryEndActiveSyncRequestLease();
-            Assert("T5 end did not act (not exact match)", false, ended);
+            Assert("T5 end did not act (inbound TFS kept)", false, ended);
             Assert("T5 payload still untouched after end", TfsPayloadPrefix + "{\"success\":true}", fake.Text);
+
+            bool remembered = mgr.TryRestoreRememberedBackupIfEmptyOrProtocol();
+            Assert("T5 remembered restore skipped inbound TFS", false, remembered);
+            Assert("T5 payload still untouched after remembered restore",
+                TfsPayloadPrefix + "{\"success\":true}", fake.Text);
         }
 
         // 6) ACK lease 1 후 ACK lease 2 시작 -> lease 1의 지연 복원이 lease 2를 덮지 않음
@@ -152,26 +161,44 @@ namespace GBCWorkHub.UI.Tests
             Assert("T6 restored original A (backup carried through chain)", "A", fake.Text);
         }
 
-        // 7) 취소/timeout/exception -> 기대: 현재 값이 자신이 쓴 request일 때만 복원 또는 Clear
+        // 7) 취소/timeout/exception -> prefix면 복원/정리, 없으면 유지
         private static void Test7_CancelTimeoutException_OnlyRestoresIfExactMatch()
         {
-            // 7a: 정확히 일치 -> 복원됨
+            // 7a: 우리 프로토콜이 남아 있음 -> 복원
             var fakeA = new FakeClipboardAccessor { Text = "A" };
             var mgrA = NewManager(fakeA);
             string text = SyncPrefix + "{\"requestId\":\"r1\"}";
             mgrA.BeginSyncRequest("r1", text, IsBlockingForeignPayload);
             bool endedExact = mgrA.TryEndActiveSyncRequestLease();
-            Assert("T7a end exact match acted", true, endedExact);
+            Assert("T7a end prefix acted", true, endedExact);
             Assert("T7a restored A", "A", fakeA.Text);
 
-            // 7b: 취소 시점에 이미 다른 값(다른 세션 메시지 등) -> 손대지 않음
+            // 7b: 다른 GBCWORKHUB* 잔여물도 prefix이므로 정리(복원)
             var fakeB = new FakeClipboardAccessor { Text = "A" };
             var mgrB = NewManager(fakeB);
             mgrB.BeginSyncRequest("r1", text, IsBlockingForeignPayload);
             fakeB.Text = "GBCWORKHUB_ACK::other-session";
             bool endedForeign = mgrB.TryEndActiveSyncRequestLease();
-            Assert("T7b end did not act on foreign message", false, endedForeign);
-            Assert("T7b foreign message untouched", "GBCWORKHUB_ACK::other-session", fakeB.Text);
+            Assert("T7b end acted on leftover prefix", true, endedForeign);
+            Assert("T7b restored A over leftover protocol", "A", fakeB.Text);
+
+            // 7c: 사용자가 일반 텍스트를 복사 -> 유지
+            var fakeC = new FakeClipboardAccessor { Text = "A" };
+            var mgrC = NewManager(fakeC);
+            mgrC.BeginSyncRequest("r1", text, IsBlockingForeignPayload);
+            fakeC.Text = "user pasted this";
+            bool endedUser = mgrC.TryEndActiveSyncRequestLease();
+            Assert("T7c end did not act on user text", false, endedUser);
+            Assert("T7c user text kept", "user pasted this", fakeC.Text);
+
+            // 7d: 클립보드가 비었으면 백업 복원 (RDP 종료 후 비움)
+            var fakeD = new FakeClipboardAccessor { Text = "A" };
+            var mgrD = NewManager(fakeD);
+            mgrD.BeginSyncRequest("r1", text, IsBlockingForeignPayload);
+            fakeD.Text = null;
+            bool endedEmpty = mgrD.TryEndActiveSyncRequestLease();
+            Assert("T7d end restored empty clipboard", true, endedEmpty);
+            Assert("T7d restored A after empty", "A", fakeD.Text);
         }
 
         // 8) 백업이 비어 있던 경우 -> 기대: 자신이 쓴 값일 때만 Clear, 사용자 새 값은 유지
@@ -237,6 +264,66 @@ namespace GBCWorkHub.UI.Tests
                 Assert("T10 post-copy tick " + i + " displaced", ClipboardWriteOutcome.Displaced, r.Outcome);
                 Assert("T10 post-copy tick " + i + " clipboard untouched", "userMidLoop", fake.Text);
             }
+        }
+
+        // 11) 사용자 다시 시도: 남은 TFS payload를 치운 뒤 새 SYNC_REQUEST 기록
+        private static void Test11_ExplicitRetry_DiscardsInboundTfsThenWritesSync()
+        {
+            var fake = new FakeClipboardAccessor { Text = "A" };
+            var mgr = NewManager(fake);
+            string syncText = SyncPrefix + "{\"requestId\":\"r2\"}";
+
+            mgr.BeginSyncRequest("r1", SyncPrefix + "{\"requestId\":\"r1\"}", IsBlockingForeignPayload);
+            fake.Text = TfsPayloadPrefix + "{\"success\":true}";
+
+            bool discarded = mgr.TryDiscardInboundPayloadForRetry();
+            Assert("T11 discarded inbound", true, discarded);
+            Assert("T11 restored user backup A", "A", fake.Text);
+
+            var begin = mgr.BeginSyncRequest("r2", syncText, IsBlockingForeignPayload);
+            Assert("T11 new SYNC written", ClipboardWriteOutcome.Written, begin.Outcome);
+            Assert("T11 clipboard is new SYNC", syncText, fake.Text);
+        }
+
+        // 12) 비밀번호를 먼저 복사 → TOKEN이 올라감 → 로그인 전 정리 시 비밀번호 복원
+        private static void Test12_CredentialsPrepare_RestoresPasswordFromOutboundToken()
+        {
+            var fake = new FakeClipboardAccessor { Text = "secret-password" };
+            var mgr = NewManager(fake);
+            string token = TfsClipboardAckService.SessionTokenAnnouncePrefix + "{\"sessionToken\":\"abc\"}";
+
+            var write = mgr.WriteTransientAck("abc", token);
+            Assert("T12 token written", ClipboardWriteOutcome.Written, write.Outcome);
+            Assert("T12 clipboard is token", token, fake.Text);
+
+            bool acted = mgr.TryReleaseClipboardForUserCredentials();
+            Assert("T12 restored", true, acted);
+            Assert("T12 password back", "secret-password", fake.Text);
+        }
+
+        // 13) 클립보드가 이미 비밀번호면 그대로 둔다
+        private static void Test13_CredentialsPrepare_KeepsUserPassword()
+        {
+            var fake = new FakeClipboardAccessor { Text = "secret-password" };
+            var mgr = NewManager(fake);
+
+            bool acted = mgr.TryReleaseClipboardForUserCredentials();
+            Assert("T13 did not rewrite", false, acted);
+            Assert("T13 password kept", "secret-password", fake.Text);
+        }
+
+        // 14) TOKEN 올린 뒤 사용자가 비밀번호를 복사 → 정리해도 비밀번호 유지 (덮지 않음)
+        private static void Test14_CredentialsPrepare_KeepsPasswordCopiedOverToken()
+        {
+            var fake = new FakeClipboardAccessor { Text = "old" };
+            var mgr = NewManager(fake);
+            string token = TfsClipboardAckService.SessionTokenAnnouncePrefix + "{\"sessionToken\":\"abc\"}";
+            mgr.WriteTransientAck("abc", token);
+            fake.Text = "secret-password";
+
+            bool acted = mgr.TryReleaseClipboardForUserCredentials();
+            Assert("T14 did not overwrite password", false, acted);
+            Assert("T14 password kept", "secret-password", fake.Text);
         }
 
         private static void Assert(string name, object expected, object actual)

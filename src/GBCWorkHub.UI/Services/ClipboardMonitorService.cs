@@ -142,6 +142,11 @@ namespace GBCWorkHub.UI.Services
             {
                 if (string.IsNullOrWhiteSpace(text))
                 {
+                    if (TfsClipboardAckService.TryHandleClipboardEmptiedByRdpclip())
+                    {
+                        DiagnosticLogger.Info("ClipboardMonitor", "rdpclip empty -> restored user clipboard");
+                        return;
+                    }
                     DiagnosticLogger.Info("Decision", "IGNORE_NON_GBC_CLIPBOARD (empty/null)");
                     return;
                 }

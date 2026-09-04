@@ -3,6 +3,7 @@
                     xmlns:conv="clr-namespace:GBCWorkHub.UI.Converters">
 
     <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
+    <conv:StringEqualsConverter x:Key="StringEquals" />
 
     <SolidColorBrush x:Key="RemoteAvailableBrush" Color="#16A34A" />
     <SolidColorBrush x:Key="RemoteConnectingBrush" Color="#F59E0B" />
@@ -41,7 +42,48 @@
                             <Setter TargetName="Accent" Property="Background" Value="#4F67D8" />
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#99FFFFFF" />
+                            <Setter TargetName="Bd" Property="Background" Value="#C8D8EA" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 갤러리 사이드바: 사이트별 사용 가능 수 → 클릭 시 해당 사이트 이동 -->
+    <Style x:Key="SiteShortcutSidebarButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="12,10" />
+        <Setter Property="Margin" Value="8,2" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                            CornerRadius="10" Padding="{TemplateBinding Padding}">
+                        <Grid>
+                            <Border x:Name="Accent" Width="3" HorizontalAlignment="Left"
+                                    Background="Transparent" CornerRadius="2" Margin="-8,0,0,0" />
+                            <ContentPresenter />
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#CCE8F0FF" />
+                            <Setter TargetName="Accent" Property="Background" Value="#4F67D8" />
+                        </DataTrigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#C8D8EA" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                            <Setter Property="Cursor" Value="Arrow" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -69,11 +111,12 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#E8FFFFFF" />
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="#FFFFFFFF" />
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource WlGlassButtonHoverBg}" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource WlGlassButtonHoverBorder}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.45" />
+                            <Setter Property="Opacity" Value="0.4" />
+                            <Setter Property="Cursor" Value="Arrow" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -87,14 +130,23 @@
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Padding" Value="8" />
         <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="HorizontalAlignment" Value="Left" />
-        <Setter Property="VerticalAlignment" Value="Top" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Stretch" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="Background" Value="#66FFFFFF" />
                 <Setter Property="CornerRadius" Value="16" />
             </Trigger>
+            <MultiDataTrigger>
+                <MultiDataTrigger.Conditions>
+                    <Condition Binding="{Binding IsSelected}" Value="True" />
+                    <Condition Binding="{Binding IsInUse}" Value="False" />
+                    <Condition Binding="{Binding IsConnecting}" Value="False" />
+                </MultiDataTrigger.Conditions>
+                <Setter Property="Background" Value="#331E293B" />
+                <Setter Property="CornerRadius" Value="16" />
+            </MultiDataTrigger>
         </Style.Triggers>
     </Style>
 
@@ -129,7 +181,8 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.45" />
+                            <Setter Property="Opacity" Value="0.4" />
+                            <Setter Property="Cursor" Value="Arrow" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -162,8 +215,8 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#E8FFFFFF" />
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="#FFFFFFFF" />
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource WlGlassButtonHoverBg}" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource WlGlassButtonHoverBorder}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="#D9E8FF" />
@@ -176,6 +229,29 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <Style x:Key="RemoteUsageHistoryRowStyle" TargetType="Border">
+        <Setter Property="Background" Value="#B8FFFFFF" />
+        <Setter Property="BorderBrush" Value="#D9FFFFFF" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="12,10" />
+        <Setter Property="Margin" Value="0,0,0,6" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <Style x:Key="RemoteUsageHistoryColHeader" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Foreground" Value="#94A3B8" />
+        <Setter Property="Margin" Value="0,0,0,6" />
+    </Style>
+
+    <Style x:Key="RemoteUsageHistoryColText" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="Foreground" Value="#1E293B" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
     <Style x:Key="FieldLabel" TargetType="TextBlock">

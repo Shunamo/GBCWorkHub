@@ -2,12 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using GBCWorkHub.UI.Models.Popup;
 using GBCWorkHub.UI.Services;
 using GBCWorkHub.UI.ViewModels;
 using GBCWorkHub.UI.ViewModels.Popup;
 using GBCWorkHub.UI.Views.Popup;
+
+using GBCWorkHub.UI;
 
 namespace GBCWorkHub.UI.Services.Popup
 {
@@ -19,6 +22,7 @@ namespace GBCWorkHub.UI.Services.Popup
         event Action ProgressCancelled;
 
         Task<PopupResult> ShowConfirmAsync(PopupRequest request);
+        Task<PopupResult> ShowPromptAsync(PopupRequest request);
         Task ShowProgressAsync(PopupRequest request);
         Task UpdateProgressAsync(string stepText);
         Task CloseProgressAsync();
@@ -44,6 +48,15 @@ namespace GBCWorkHub.UI.Services.Popup
             if (request == null)
                 request = new PopupRequest();
             request.Kind = PopupKind.Confirm;
+            return ShowDialogAsync(request);
+        }
+
+        public Task<PopupResult> ShowPromptAsync(PopupRequest request)
+        {
+            if (request == null)
+                request = new PopupRequest();
+            request.Kind = PopupKind.Prompt;
+            request.ShowInput = true;
             return ShowDialogAsync(request);
         }
 
@@ -171,8 +184,11 @@ namespace GBCWorkHub.UI.Services.Popup
             _vm.ButtonCommand = new RelayCommand<object>(p =>
             {
                 var btn = p as PopupButtonDefinition;
-                if (btn != null)
-                    CloseHost(PopupResult.From(btn.ResultType, btn.Text));
+                if (btn == null)
+                    return;
+                if (btn.ResultType == PopupResultType.Primary && !_vm.TryAcceptInput())
+                    return;
+                CloseHost(PopupResult.From(btn.ResultType, btn.Text, _vm.InputText, _vm.AffiliationText));
             });
             _vm.CancelProgressCommand = new RelayCommand(() =>
             {
@@ -190,60 +206,30 @@ namespace GBCWorkHub.UI.Services.Popup
 
             _host = new PopupHostWindow
             {
-                Owner = Owner ?? (Application.Current != null ? Application.Current.MainWindow : null),
                 DataContext = _vm,
-                ShowInTaskbar = false
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch
             };
-            FitOverlayToOwner(_host);
             _host.PreviewKeyDown += Host_PreviewKeyDown;
-            _host.Closed += Host_Closed;
             _openDedupKey = request.DedupKey;
             _progressOpen = request.Kind == PopupKind.Progress;
 
-            if (modal)
-                _host.ShowDialog();
-            else
-                _host.Show();
+            var layer = FindOverlayLayer();
+            if (layer == null)
+                throw new InvalidOperationException("Popup overlay host is missing.");
+
+            layer.Children.Clear();
+            layer.Children.Add(_host);
+            layer.Visibility = Visibility.Visible;
+            _host.Focus();
         }
 
-        /// <summary>딤 오버레이가 Owner 창 전체를 덮도록 위치/크기 맞춤.</summary>
-        private static void FitOverlayToOwner(Window host)
+        private Panel FindOverlayLayer()
         {
-            if (host == null)
-                return;
-
-            var owner = host.Owner;
-            if (owner == null || !owner.IsLoaded)
-            {
-                host.WindowStartupLocation = WindowStartupLocation.CenterScreen;
-                host.WindowState = WindowState.Maximized;
-                return;
-            }
-
-            host.WindowStartupLocation = WindowStartupLocation.Manual;
-            host.WindowState = WindowState.Normal;
-
-            try
-            {
-                Point screenTopLeft = owner.PointToScreen(new Point(0, 0));
-                var source = PresentationSource.FromVisual(owner);
-                if (source != null && source.CompositionTarget != null)
-                {
-                    var toDip = source.CompositionTarget.TransformFromDevice;
-                    screenTopLeft = toDip.Transform(screenTopLeft);
-                }
-
-                host.Left = screenTopLeft.X;
-                host.Top = screenTopLeft.Y;
-                host.Width = Math.Max(owner.ActualWidth, 1);
-                host.Height = Math.Max(owner.ActualHeight, 1);
-            }
-            catch
-            {
-                host.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-                host.Width = Math.Max(owner.ActualWidth, 400);
-                host.Height = Math.Max(owner.ActualHeight, 300);
-            }
+            var main = Owner as MainWindow;
+            if (main == null && Application.Current != null)
+                main = Application.Current.MainWindow as MainWindow;
+            return main != null ? main.PopupLayer : null;
         }
 
         private void Host_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -283,7 +269,12 @@ namespace GBCWorkHub.UI.Services.Popup
                 var def = FindDefaultButton();
                 if (def != null)
                 {
-                    CloseHost(PopupResult.From(def.ResultType, def.Text));
+                    if (def.ResultType == PopupResultType.Primary && !_vm.TryAcceptInput())
+                    {
+                        e.Handled = true;
+                        return;
+                    }
+                    CloseHost(PopupResult.From(def.ResultType, def.Text, _vm.InputText, _vm.AffiliationText));
                     e.Handled = true;
                 }
             }
@@ -313,13 +304,6 @@ namespace GBCWorkHub.UI.Services.Popup
             return null;
         }
 
-        private void Host_Closed(object sender, EventArgs e)
-        {
-            if (!_resultSet && _tcs != null)
-                _tcs.TrySetResult(PopupResult.From(PopupResultType.Closed));
-            CleanupHostRefs();
-        }
-
         private void CloseHost(PopupResult result)
         {
             var host = _host;
@@ -335,12 +319,17 @@ namespace GBCWorkHub.UI.Services.Popup
                 try
                 {
                     host.PreviewKeyDown -= Host_PreviewKeyDown;
-                    host.Closed -= Host_Closed;
-                    host.Close();
                 }
                 catch
                 {
                 }
+            }
+
+            var layer = FindOverlayLayer();
+            if (layer != null)
+            {
+                layer.Children.Clear();
+                layer.Visibility = Visibility.Collapsed;
             }
 
             CleanupHostRefs();

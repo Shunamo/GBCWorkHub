@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Input;
+using GBCWorkHub.BIZ;
 using GBCWorkHub.DTO.WorkLog;
 using GBCWorkHub.UI.Services;
 
@@ -238,6 +239,8 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         public string TfsAuthor { get; set; }
         /// <summary>화면 표시용 작성자명 (한 번만 표시).</summary>
         public string AuthorName { get; set; }
+        /// <summary>작성자 소속. 예: 진료지원.</summary>
+        public string TeamName { get; set; }
         public DateTime? CheckedInAt { get; set; }
 
         /// <summary>페이로드 changedFileCount (files 배열이 비어 있어도 건수 표시용).</summary>
@@ -368,11 +371,9 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                     ? StartDate.Value.ToString("yyyy-MM-dd")
                     : (CheckedInAt.HasValue ? CheckedInAt.Value.ToString("yyyy-MM-dd") : "-");
                 return ListMenuSummary
-                    + " · "
-                    + (string.IsNullOrWhiteSpace(PersonInCharge)
-                        ? AuthorDisplayName
-                        : WorkLogDraftMapper.FormatPersonDisplay(PersonInCharge))
-                    + " · "
+                    + OccupancyNameStore.NameTeamSeparator
+                    + ListPersonText
+                    + OccupancyNameStore.NameTeamSeparator
                     + start;
             }
         }
@@ -405,7 +406,8 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             {
                 return !string.IsNullOrWhiteSpace(PersonInCharge)
                     || !string.IsNullOrWhiteSpace(AuthorName)
-                    || !string.IsNullOrWhiteSpace(TfsAuthor);
+                    || !string.IsNullOrWhiteSpace(TfsAuthor)
+                    || !string.IsNullOrWhiteSpace(TeamName);
             }
         }
 
@@ -413,13 +415,24 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         {
             get
             {
+                string person;
                 if (!string.IsNullOrWhiteSpace(PersonInCharge))
-                    return WorkLogDraftMapper.FormatPersonDisplay(PersonInCharge);
-                if (!string.IsNullOrWhiteSpace(AuthorName))
-                    return AuthorName.Trim();
-                if (!string.IsNullOrWhiteSpace(TfsAuthor))
-                    return TfsAuthor.Trim();
-                return string.Empty;
+                    person = WorkLogDraftMapper.FormatPersonDisplay(PersonInCharge);
+                else if (!string.IsNullOrWhiteSpace(AuthorName))
+                    person = AuthorName.Trim();
+                else if (!string.IsNullOrWhiteSpace(TfsAuthor))
+                    person = TfsAuthor.Trim();
+                else
+                    person = null;
+
+                string team = string.IsNullOrWhiteSpace(TeamName) ? null : TeamName.Trim();
+                if (string.IsNullOrWhiteSpace(person))
+                    return team ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(team))
+                    return person;
+                if (person.IndexOf(team, StringComparison.OrdinalIgnoreCase) >= 0)
+                    return person;
+                return person + OccupancyNameStore.NameTeamSeparator + team;
             }
         }
 
@@ -1239,23 +1252,24 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         {
             get
             {
+                string name = null;
                 if (!string.IsNullOrWhiteSpace(AuthorName))
-                    return AuthorName.Trim();
-                if (!string.IsNullOrWhiteSpace(TfsAuthor))
-                    return TfsAuthor.Trim();
-                return "알 수 없음";
+                    name = AuthorName.Trim();
+                else if (!string.IsNullOrWhiteSpace(TfsAuthor))
+                    name = TfsAuthor.Trim();
+                string display = OccupancyNameStore.FormatDisplayName(name, TeamName);
+                return string.IsNullOrWhiteSpace(display) ? "알 수 없음" : display;
             }
         }
 
-        /// <summary>이 PC의 로컬 IP와 LocalPcIp가 일치하는지 (작성 완료 후 수정 권한).</summary>
+        /// <summary>점유명이 AuthorName과 같거나, 이 PC LocalPcIp가 기록된 경우 본인.</summary>
         public bool IsOwnedByCurrentUser
         {
-            get { return WorkHubUserProfile.Matches(LocalPcIp); }
+            get { return WorkHubUserProfile.OwnsRecord(AuthorName, LocalPcIp); }
         }
 
         /// <summary>
-        /// 수정 가능: 이 PC LocalPcIp가 기록된 경우만.
-        /// LocalPcIp 미기록이어도 열어 두지 않음 — 기존에 체크인 합치기로 IP를 채운 뒤 가능.
+        /// 수정 가능: 점유명 또는 이 PC IP.
         /// </summary>
         public bool CanEditByCurrentUser
         {
@@ -1557,7 +1571,29 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                     return FileName;
                 return OriginalPath ?? string.Empty;
             }
-            set { SetProperty(ref _changeDetailText, value); }
+            set
+            {
+                if (SetProperty(ref _changeDetailText, value))
+                {
+                    RaisePropertyChanged("TreeTitle");
+                    RaisePropertyChanged("IsPlaceholderTitle");
+                }
+            }
+        }
+
+        public string TreeTitle
+        {
+            get
+            {
+                return IsPlaceholderTitle
+                    ? WorkLogFieldMasters.TreePlaceholderSource
+                    : ChangeDetailText;
+            }
+        }
+
+        public bool IsPlaceholderTitle
+        {
+            get { return string.IsNullOrWhiteSpace(ChangeDetailText); }
         }
 
         public bool HasTfsOrigin

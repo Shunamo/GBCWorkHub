@@ -27,7 +27,10 @@ namespace GBCWorkHub.BIZ
 
         public List<RemotePcDto> GetRemotePcListBySite(string siteCode)
         {
-            return _dac.GetRemotePcListBySite(siteCode);
+            List<RemotePcDto> list = _dac.GetRemotePcListBySite(siteCode);
+            if (list != null && list.Count > 0)
+                new DirectoryBiz().ApplyPcTeams(siteCode, list);
+            return list;
         }
 
         public RemoteConnectionResultDto ConnectRdp(RemotePcDto pc)

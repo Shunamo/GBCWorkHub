@@ -20,7 +20,7 @@ namespace GBCWorkHub.DTO.WorkLog
     /// <summary>작성상태 UI 라벨. DB 저장값은 DRAFT/COMPLETED.</summary>
     public static class WorkLogWriteStatusLabels
     {
-        public const string Draft = "작성 중";
+        public const string Draft = "임시저장";
         public const string Completed = "작성 완료";
     }
 

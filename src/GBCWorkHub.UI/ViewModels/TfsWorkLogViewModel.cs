@@ -215,9 +215,9 @@ namespace GBCWorkHub.UI.ViewModels
                 _sessionContext.SessionEndedAt = tmp;
 
             if (string.IsNullOrWhiteSpace(_sessionContext.CurrentUserId))
-                _sessionContext.CurrentUserId = Environment.UserDomainName + "\\" + Environment.UserName;
+                _sessionContext.CurrentUserId = RemotePcShareBiz.LocalUserAccount;
             if (string.IsNullOrWhiteSpace(_sessionContext.CurrentUserName))
-                _sessionContext.CurrentUserName = Environment.UserName;
+                _sessionContext.CurrentUserName = RemotePcShareBiz.LocalUserAccount;
         }
 
         private void RefreshParsePreview()
@@ -269,9 +269,9 @@ namespace GBCWorkHub.UI.ViewModels
                 ctx.SessionEndedAt = tmp;
 
             if (string.IsNullOrWhiteSpace(ctx.CurrentUserId))
-                ctx.CurrentUserId = Environment.UserDomainName + "\\" + Environment.UserName;
+                ctx.CurrentUserId = RemotePcShareBiz.LocalUserAccount;
             if (string.IsNullOrWhiteSpace(ctx.CurrentUserName))
-                ctx.CurrentUserName = Environment.UserName;
+                ctx.CurrentUserName = RemotePcShareBiz.LocalUserAccount;
 
             return ctx;
         }
@@ -301,11 +301,11 @@ namespace GBCWorkHub.UI.ViewModels
 
             if (!_workLogBiz.IsConfigured)
             {
-                StatusMessage = "DB 미설정 — XSUP.MSDWHTFS 저장 불가 (메모리 저장 위장 안 함)";
-                DiagnosticLogger.Error("TFS_SAVE_FAILED", "DB 미설정");
+                StatusMessage = "이 경로는 폐기됨 — 체크인 보관함에서 업무기록으로 저장하세요";
+                DiagnosticLogger.Error("TFS_SAVE_FAILED", "MSDWHTFS retired");
                 await ShowPopupAsync(
                     "TFS 저장",
-                    "Oracle 연결이 설정되지 않아 TFS 업무기록을 저장할 수 없습니다.\nApp.config의 GbcWorkHubDb와 XSUP.MSDWHTFS 테이블(DDL)을 확인하세요.",
+                    "MSDWHTFS는 사용하지 않습니다.\n체크인 보관함에서 업무기록으로 저장하세요.",
                     PopupIconKind.Warning).ConfigureAwait(true);
                 return;
             }

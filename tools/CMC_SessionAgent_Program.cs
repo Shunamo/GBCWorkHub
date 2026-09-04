@@ -985,14 +985,14 @@ namespace GBCWorkHub.SessionAgent
         private static string FormatIsoDate(string raw)
         {
             if (string.IsNullOrWhiteSpace(raw))
-                return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                return DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
 
             DateTime dt;
             if (DateTime.TryParse(raw, CultureInfo.InvariantCulture,
                 DateTimeStyles.RoundtripKind, out dt))
-                return dt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+                return dt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
 
-            return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            return DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
         }
 
         private static string GetTfvcApiRoot(string collectionUrl)

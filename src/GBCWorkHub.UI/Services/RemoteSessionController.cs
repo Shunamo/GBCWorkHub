@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Threading;
 using GBCWorkHub.BIZ;
 using GBCWorkHub.BIZ.DevSession;
@@ -42,21 +43,33 @@ namespace GBCWorkHub.UI.Services
         private int _cmcReserveInFlight;
         private int _cmcSessionLostInFlight;
         private int _activeSessionGeneration;
-        /// <summary>PMP 브라우저를 연 시점의 토큰. 원격 SessionAgent가 WorkHub 접속으로 인식하게 클립보드에 미리 올린다.</summary>
+        /// <summary>PMP 브라우저를 연 시점의 토큰. 웹 RDP가 붙은 뒤에 SESSION_TOKEN을 올린다.</summary>
         private string _pendingCmcSessionToken;
-        private const int CmcSessionTokenHoldMs = 120000;
+        /// <summary>
+        /// 원격 세션이 붙은 뒤 TOKEN 유지 시간. 로그인 전에 올리면 비밀번호 붙여넣기가 깨진다.
+        /// </summary>
+        private const int SessionTokenHoldAfterReadyMs = TfsClipboardAckService.SessionTokenHoldAfterReadyMs;
         private string _activeSessionToken;
         private string _activeComputerName;
         private string _activeIpAddress;
         private DispatcherTimer _pollTimer;
+        private System.Timers.Timer _occupancyWatch;
+        private int _occupancyWatchInFlight;
         private bool _pollInFlight;
         private DateTime _userSessionStartedAt;
         private int _userSessionReleaseGate;
+        private string _pendingTakeoverShareKey;
+        private int _takeoverNoticeInFlight;
 
         public bool IsTracking { get { return _tracker != null && _tracker.IsTracking; } }
         public string ActiveIpAddress { get { return _activeIpAddress; } }
         public string ActiveComputerName { get { return _activeComputerName; } }
         public string ActiveSessionToken { get { return _activeSessionToken; } }
+
+        public void AllowTakeoverOnce(string shareKey)
+        {
+            _pendingTakeoverShareKey = string.IsNullOrWhiteSpace(shareKey) ? null : shareKey.Trim();
+        }
         public bool IsShareConfigured { get { return _share.IsConfigured; } }
         public string ShareLastError { get { return _share.LastConnectionError; } }
 
@@ -150,11 +163,15 @@ namespace GBCWorkHub.UI.Services
             string clientPc = RemotePcShareBiz.LocalClientPc;
             string accessIp = RemotePcShareBiz.LocalAccessIp;
             bool usePublishedRdp = !string.IsNullOrWhiteSpace(publishedRdpPath);
+            bool forceTakeover = ConsumeTakeoverFlag(remoteIp);
+            string siteCode = !string.IsNullOrWhiteSpace(pc.HospitalCode) ? pc.HospitalCode.Trim() : _ui.SelectedSiteCode;
 
             bool reserved;
             try
             {
-                reserved = await _share.TryReserveAsync(remoteIp, sessionToken, computerName).ConfigureAwait(true);
+                reserved = await _share.TryReserveAsync(
+                    remoteIp, sessionToken, computerName, forceTakeover,
+                    OccupancyNameStore.TryGetAffiliation(), siteCode).ConfigureAwait(true);
             }
             catch (Exception ex)
             {
@@ -208,22 +225,18 @@ namespace GBCWorkHub.UI.Services
             _activeSessionToken = sessionToken;
             _activeComputerName = computerName;
             _activeIpAddress = remoteIp;
-            _userSessionStartedAt = DateTime.Now;
+            _userSessionStartedAt = KoreaTime.Now;
             Interlocked.Exchange(ref _userSessionReleaseGate, 0);
+            StartOccupancyWatch();
             _ui.SetSessionTokenDisplay(sessionToken);
             _ui.SetLocalAccessIp(accessIp ?? "-");
 
             _ui.UpdateGalleryLocalInUse(remoteIp, userAccount, clientPc, sessionToken);
 
-            // 이전 TFS 가져오기 SYNC_REQUEST가 남아 있으면 원격이 일반 접속을
-            // 임시 재접속으로 오인함 → 일반 UserSession 시작 전 제거
+            // 이전 TFS 가져오기 SYNC_REQUEST / 잔여 프로토콜이 있으면
+            // 비밀번호 붙여넣기가 GBC 문구로 바뀐다. 로그인 전에는 클립보드를 비운다.
             TfsClipboardAckService.TryClearSyncRequestIfPresent();
-
-            // Dev-session two-point tracking: announce SESSION_TOKEN to the remote SessionAgent
-            // before mstsc launches, so its connect-time invocation can capture a baseline
-            // snapshot keyed by this token. Separate message from SYNC_REQUEST above — does not
-            // affect the TFS-sync-reconnect trigger.
-            TfsClipboardAckService.TryAnnounceSessionToken(sessionToken, null, 1500, computerName);
+            TfsClipboardAckService.PrepareClipboardForCredentials();
 
             _ui.RunOnUi(() =>
             {
@@ -235,8 +248,8 @@ namespace GBCWorkHub.UI.Services
                 _ui.SetStatusSource("LOCAL_RESERVE_IN_USE");
                 _ui.SetLastReceiveMessage("DB 선점 완료 — 사용 중");
                 _ui.SetConnectionEndedAt("-");
-                _ui.SetConnectionRequestedAt(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                _ui.SetConnectionConfirmedAt(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                _ui.SetConnectionRequestedAt(KoreaTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                _ui.SetConnectionConfirmedAt(KoreaTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                 _ui.SetRdpSessionConfirmed(true);
                 DiagnosticLogger.Info("ViewModel", "Status " + before + " -> 사용 중 (Reserve) remoteIp=" + remoteIp + " token=" + sessionToken);
             });
@@ -249,6 +262,7 @@ namespace GBCWorkHub.UI.Services
             {
                 await _share.ReleaseAsync(remoteIp, sessionToken, "MSTSC_START_FAILED").ConfigureAwait(true);
                 DiagnosticLogger.Error("MSTSC_START_FAILED", "RemoteIp=" + remoteIp + " SessionToken=" + sessionToken + " " + (message ?? ""));
+                StopOccupancyWatch();
                 _activeSessionToken = null;
                 _ui.UpdateGalleryLocalAvailable(remoteIp);
                 _ui.RunOnUi(() =>
@@ -309,7 +323,7 @@ namespace GBCWorkHub.UI.Services
                 _ui.SetRdpSessionConfirmed(true);
                 _ui.SetConnectionConfirmedAt( _tracker.ConnectionConfirmedAt.HasValue
                     ? _tracker.ConnectionConfirmedAt.Value.ToString("yyyy-MM-dd HH:mm:ss")
-                    : DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                    : KoreaTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
 
                 if (payload != null)
                     _ui.MergeEvents(payload);
@@ -332,6 +346,7 @@ namespace GBCWorkHub.UI.Services
                     DiagnosticLogger.Error("REMOTE_CONNECTION_CONFIRMED", ex.Message);
                 }
             }
+
         }
 
         private void OnRdpEnded(RdpSessionTrackingService.RdpSessionEndInfo info)
@@ -375,7 +390,26 @@ namespace GBCWorkHub.UI.Services
                 + " reason=" + (info.Reason ?? "")
                 + " confirmed=" + info.WasConnectionConfirmed);
 
-            // TFS 재접속: Oracle/TFS 재팝업 금지. Process.Exited에서 클립보드 파싱 안 함.
+            // TFS 재접속 중에는 coordinator가 클립보드 lease를 관리한다.
+            // 여기서 복원하면 접속 직후 SYNC_REQUEST가 지워질 수 있음.
+            if (info.LaunchPurpose != RdpLaunchPurpose.TfsSyncReconnect)
+                TfsClipboardAckService.ScheduleRestoreAfterRemoteDisconnect();
+
+            if (string.Equals(info.Reason, "occupancy_takeover", StringComparison.OrdinalIgnoreCase))
+            {
+                TfsClipboardAckService.ScheduleRestoreAfterRemoteDisconnect();
+                _ui.RunOnUi(() =>
+                {
+                    _ui.ClearSessionRaw();
+                    _ui.SetRdpSessionConfirmed(false);
+                    _ui.SetLastReceiveMessage("점유가 다른 사용자에게 넘어갔습니다.");
+                    _ui.SetStatusSource("OCCUPANCY_TAKEOVER");
+                    PushTrackingUiFields();
+                });
+                return;
+            }
+
+            // TFS 재접속: Oracle/TFS 재팝업 금지. 점유 UI만 AVAILABLE로 복구(DB 재점유 없음).
             if (info.LaunchPurpose == RdpLaunchPurpose.TfsSyncReconnect)
             {
                 if (_ui.TfsSync != null)
@@ -383,8 +417,26 @@ namespace GBCWorkHub.UI.Services
                 _ui.RunOnUi(() =>
                 {
                     _ui.SetLastReceiveMessage("TFS 동기화 재접속 종료");
+                    _ui.SetCurrentStatus("사용 가능");
+                    _ui.SetStatusSource("LOCAL_MSTSC_TFS_SYNC_END");
+                    _ui.SetRdpSessionConfirmed(false);
+                    if (!string.IsNullOrEmpty(remoteIp))
+                        _ui.UpdateGalleryLocalAvailable(remoteIp);
+                    _ui.RecalculateStatusCounts();
                     PushTrackingUiFields();
                 });
+                // 동기화 진행 중이면 갤러리만 맞추고, 클립보드 복원은 coordinator finally에 맡김
+                if (_ui.TfsSync == null || !_ui.TfsSync.IsSyncInFlight)
+                {
+                    TfsClipboardAckService.ScheduleRestoreAfterRemoteDisconnect();
+                    if (!string.IsNullOrEmpty(remoteIp))
+                        await RefreshRemotePcAfterReleaseAsync(remoteIp).ConfigureAwait(true);
+                }
+                else if (!string.IsNullOrEmpty(remoteIp))
+                {
+                    _ui.UpdateGalleryLocalAvailable(remoteIp);
+                    _ui.RecalculateStatusCounts();
+                }
                 return;
             }
 
@@ -448,7 +500,8 @@ namespace GBCWorkHub.UI.Services
             // than the local mstsc-exit handling above).
 
             // 3) TFS 확인 Popup (AURORA / RC 동일 — SessionAgent가 GBCWORKHUB_TFS:: 전달)
-            bool shouldPromptTfs = info.LaunchPurpose == RdpLaunchPurpose.UserSession
+            bool shouldPromptTfs = TfsCheckinFetchSettings.IsEnabled
+                && info.LaunchPurpose == RdpLaunchPurpose.UserSession
                 && !string.IsNullOrEmpty(remoteIp)
                 && (info.WasConnectionConfirmed || hadReservedSession || sessionSeconds >= 5.0);
 
@@ -479,8 +532,8 @@ namespace GBCWorkHub.UI.Services
                         RemoteIp = remoteIp,
                         RemoteComputerName = computerName,
                         ClientLocalIp = RemotePcShareBiz.LocalAccessIp,
-                        CurrentUserId = Environment.UserDomainName + "\\" + Environment.UserName,
-                        CurrentUserName = Environment.UserName,
+                        CurrentUserId = RemotePcShareBiz.LocalUserAccount,
+                        CurrentUserName = RemotePcShareBiz.LocalUserAccount,
                         SessionStartedAt = request.SessionStartedAt,
                         SessionEndedAt = request.SessionEndedAt
                     });
@@ -563,6 +616,7 @@ namespace GBCWorkHub.UI.Services
                     + " mode=local_or_no_token");
             }
 
+            StopOccupancyWatch();
             _activeSessionToken = null;
         }
 
@@ -884,9 +938,10 @@ namespace GBCWorkHub.UI.Services
             _activeComputerName = pcName;
             _userSessionStartedAt = s.AccessStartDateTime
                 ?? s.RemoteAccessDateTime
-                ?? DateTime.Now;
+                ?? KoreaTime.Now;
             Interlocked.Exchange(ref _userSessionReleaseGate, 0);
             _ui.SetSessionTokenDisplay(s.SessionToken);
+            StartOccupancyWatch();
 
             _ui.UpdateGalleryLocalInUse(
                 shareKey,
@@ -968,7 +1023,7 @@ namespace GBCWorkHub.UI.Services
             if (seconds > 30)
                 seconds = 30;
 
-            _pollTimer = new DispatcherTimer(DispatcherPriority.Background)
+            _pollTimer = new DispatcherTimer(DispatcherPriority.Normal)
             {
                 Interval = TimeSpan.FromSeconds(seconds)
             };
@@ -1001,14 +1056,17 @@ namespace GBCWorkHub.UI.Services
 
                 _ui.CentralDbStatus = "DB 연결됨 — XSUP.MSDWHTKD 공유 활성";
 
+                await DetectOccupancyTakeoverAsync(list).ConfigureAwait(true);
+
                 if (!_ui.IsGalleryVisible)
                 {
-                    _ui.SetLastRefreshedAt(DateTime.Now);
+                    _ui.SetLastRefreshedAt(KoreaTime.Now);
                     return;
                 }
 
                 // 폴링마다 사이트 시드 재로드하지 않음 — DB 상태만 병합 (UI 지연/깜빡임 완화)
-                _ui.MergeRemoteComputersFromDb(list, ip => _tracker.IsTracking && string.Equals(ip, _activeIpAddress, StringComparison.OrdinalIgnoreCase));
+                // TFS 재접속은 점유 홀드가 아님 → DB AVAILABLE을 로컬 IN_USE로 덮지 않음
+                _ui.MergeRemoteComputersFromDb(list, IsLocalOccupancyHoldFor);
 
                 if (string.Equals(_ui.SelectedSiteCode, "RC", StringComparison.OrdinalIgnoreCase))
                     _ui.RefreshRcVpnBadges();
@@ -1030,12 +1088,13 @@ namespace GBCWorkHub.UI.Services
 
                 if (match != null)
                 {
-                    // 로컬 추적 중이어도 forceUi면 헤더 갱신. 평소에는 추적 중 덮어쓰지 않음.
-                    bool overwrite = forceUi || !_tracker.IsTracking;
-                    _ui.ApplySharedStatusToUi(match, overwrite, _tracker.IsTracking);
+                    // 로컬 추적 중이어도 forceUi면 헤더 갱신. TFS 재접속은 점유가 아니므로 DB 상태 반영.
+                    bool occupancyTracking = IsLocalOccupancyHoldFor(focusIp);
+                    bool overwrite = forceUi || !occupancyTracking;
+                    _ui.ApplySharedStatusToUi(match, overwrite, occupancyTracking);
                 }
 
-                _ui.SetLastRefreshedAt(DateTime.Now);
+                _ui.SetLastRefreshedAt(KoreaTime.Now);
 
                 if (_ui.RefreshPcListRequested != null && forceUi)
                     await _ui.RefreshPcListRequested().ConfigureAwait(true);
@@ -1051,6 +1110,292 @@ namespace GBCWorkHub.UI.Services
             {
                 _pollInFlight = false;
             }
+        }
+
+        private bool ConsumeTakeoverFlag(string shareKey)
+        {
+            string pending = _pendingTakeoverShareKey;
+            _pendingTakeoverShareKey = null;
+            if (string.IsNullOrWhiteSpace(pending) || string.IsNullOrWhiteSpace(shareKey))
+                return false;
+            return string.Equals(pending.Trim(), shareKey.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        private async Task DetectOccupancyTakeoverAsync(IList<RemotePcStatus> list)
+        {
+            string token = _activeSessionToken;
+            string shareKey = _activeIpAddress;
+            if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(shareKey))
+                return;
+
+            RemotePcStatus match = FindStatusForActiveSession(list, shareKey, _activeComputerName);
+
+            bool stillMine = match != null
+                && string.Equals(match.SessionToken, token, StringComparison.Ordinal)
+                && !string.Equals(match.AccessStatusCode, RemotePcDbStatuses.Available, StringComparison.OrdinalIgnoreCase);
+            if (stillMine)
+                return;
+
+            bool takenByOther = match != null
+                && !string.IsNullOrWhiteSpace(match.SessionToken)
+                && !string.Equals(match.SessionToken, token, StringComparison.Ordinal)
+                && !string.Equals(match.AccessStatusCode, RemotePcDbStatuses.Available, StringComparison.OrdinalIgnoreCase);
+
+            RemotePcUsageLogDto log = null;
+            if (!takenByOther)
+            {
+                try
+                {
+                    log = await _share.GetUsageLogByTokenAsync(token).ConfigureAwait(true);
+                }
+                catch
+                {
+                    log = null;
+                }
+                bool takeoverLog = log != null
+                    && string.Equals(log.EndSource, OccupancyTakeoverMessage.EndSource, StringComparison.OrdinalIgnoreCase);
+                if (!takeoverLog)
+                    return;
+            }
+
+            if (Interlocked.CompareExchange(ref _takeoverNoticeInFlight, 1, 0) != 0)
+                return;
+
+            try
+            {
+                if (!string.Equals(_activeSessionToken, token, StringComparison.Ordinal))
+                    return;
+
+                if (takenByOther && log == null)
+                {
+                    try
+                    {
+                        log = await _share.GetUsageLogByTokenAsync(token).ConfigureAwait(true);
+                    }
+                    catch
+                    {
+                        log = null;
+                    }
+                }
+
+                string notice = log != null ? log.ResultMessage : null;
+                if (string.IsNullOrWhiteSpace(notice) && match != null)
+                {
+                    DateTime at = log != null && log.EndedAt.HasValue ? log.EndedAt.Value : KoreaTime.Now;
+                    notice = OccupancyTakeoverMessage.BuildNotice(
+                        null,
+                        match.AccessUserId,
+                        match.SiteCode,
+                        string.IsNullOrWhiteSpace(match.RemotePcName) ? _activeComputerName : match.RemotePcName,
+                        at);
+                }
+                if (string.IsNullOrWhiteSpace(notice))
+                    notice = "다른 사용자가 이 원격 PC를 점유했습니다.";
+
+                StopOccupancyWatch();
+                _activeSessionToken = null;
+                _pendingCmcSessionToken = null;
+                _cmcMonitor.StopWatching();
+
+                if (_tracker.IsTracking)
+                    _tracker.ForceEnd("occupancy_takeover");
+
+                _activeIpAddress = null;
+                _activeComputerName = null;
+
+                if (match != null)
+                    _ui.UpdateGalleryFromStatus(match);
+                _ui.RunOnUi(() =>
+                {
+                    _ui.SetLastReceiveMessage(notice);
+                    _ui.SetStatusSource("OCCUPANCY_TAKEOVER");
+                    _ui.SetRdpSessionConfirmed(false);
+                    PushTrackingUiFields();
+                });
+
+                await OccupancyTakeoverAlert.ShowAsync("점유가 해제되었습니다", notice).ConfigureAwait(true);
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _takeoverNoticeInFlight, 0);
+            }
+        }
+
+        private void StartOccupancyWatch()
+        {
+            if (_occupancyWatch != null)
+                return;
+            _occupancyWatch = new System.Timers.Timer(1000);
+            _occupancyWatch.AutoReset = true;
+            _occupancyWatch.Elapsed += OccupancyWatchElapsed;
+            _occupancyWatch.Start();
+        }
+
+        private void StopOccupancyWatch()
+        {
+            System.Timers.Timer timer = _occupancyWatch;
+            _occupancyWatch = null;
+            if (timer == null)
+                return;
+            timer.Elapsed -= OccupancyWatchElapsed;
+            timer.Stop();
+            timer.Dispose();
+        }
+
+        private async void OccupancyWatchElapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            if (Interlocked.CompareExchange(ref _occupancyWatchInFlight, 1, 0) != 0)
+                return;
+            try
+            {
+                string token = _activeSessionToken;
+                string key = _activeIpAddress;
+                if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(key) || !_share.IsConfigured)
+                    return;
+
+                RemotePcStatus status = null;
+                try
+                {
+                    status = await _share.GetByRemoteIpAsync(key).ConfigureAwait(false);
+                }
+                catch
+                {
+                    return;
+                }
+
+                if (!string.Equals(_activeSessionToken, token, StringComparison.Ordinal))
+                    return;
+
+                bool stillMine = status != null
+                    && string.Equals(status.SessionToken, token, StringComparison.Ordinal)
+                    && !string.Equals(status.AccessStatusCode, RemotePcDbStatuses.Available, StringComparison.OrdinalIgnoreCase);
+                if (stillMine)
+                    return;
+
+                RemotePcStatus[] list = status != null
+                    ? new RemotePcStatus[] { status }
+                    : new RemotePcStatus[0];
+
+                var app = Application.Current;
+                if (app == null || app.Dispatcher == null)
+                    return;
+                app.Dispatcher.BeginInvoke(new Action(() =>
+                {
+#pragma warning disable CS4014
+                    DetectOccupancyTakeoverAsync(list);
+#pragma warning restore CS4014
+                }), DispatcherPriority.Send);
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _occupancyWatchInFlight, 0);
+            }
+        }
+
+        private static RemotePcStatus FindStatusForActiveSession(
+            IList<RemotePcStatus> list,
+            string shareKey,
+            string pcName)
+        {
+            if (list == null)
+                return null;
+            RemotePcStatus byName = null;
+            for (int i = 0; i < list.Count; i++)
+            {
+                RemotePcStatus item = list[i];
+                if (item == null)
+                    continue;
+                if (!string.IsNullOrWhiteSpace(shareKey)
+                    && (string.Equals(item.RemoteAccessIpAddress, shareKey, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(item.RemotePcName, shareKey, StringComparison.OrdinalIgnoreCase)))
+                    return item;
+                if (byName == null
+                    && !string.IsNullOrWhiteSpace(pcName)
+                    && (string.Equals(item.RemoteAccessIpAddress, pcName, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(item.RemotePcName, pcName, StringComparison.OrdinalIgnoreCase)))
+                    byName = item;
+            }
+            return byName;
+        }
+
+        private static RemotePcStatus FindOccupancyForPc(IList<RemotePcStatus> shared, RemotePcDto pc, IList<RemotePcDto> allPcs)
+        {
+            if (shared == null || pc == null)
+                return null;
+
+            bool shareUnique = CatalogKeyUnique(allPcs, pc, CatalogShareKey);
+            bool hostUnique = CatalogKeyUnique(allPcs, pc, CatalogHostKey);
+
+            RemotePcStatus nameHit = null;
+            RemotePcStatus nameInUse = null;
+            int nameHits = 0;
+            int nameInUseHits = 0;
+            RemotePcStatus keyHit = null;
+            int keyHits = 0;
+
+            for (int i = 0; i < shared.Count; i++)
+            {
+                RemotePcStatus x = shared[i];
+                if (x == null)
+                    continue;
+
+                bool nameMatch = RemotePcStatusMapper.SameKey(x.RemotePcName, pc.PcName)
+                    || RemotePcStatusMapper.SameKey(x.RemoteAccessIpAddress, pc.PcName);
+                if (nameMatch)
+                {
+                    nameHit = x;
+                    nameHits++;
+                    if (!string.Equals(x.AccessStatusCode, RemotePcDbStatuses.Available, StringComparison.OrdinalIgnoreCase))
+                    {
+                        nameInUse = x;
+                        nameInUseHits++;
+                    }
+                }
+
+                bool keyMatch = (shareUnique && RemotePcStatusMapper.SameKey(x.RemoteAccessIpAddress, pc.IpAddress))
+                    || (hostUnique && RemotePcStatusMapper.SameKey(x.RemoteAccessIpAddress, pc.HostAddress));
+                if (keyMatch
+                    && (string.IsNullOrWhiteSpace(x.RemotePcName)
+                        || RemotePcStatusMapper.SameKey(x.RemotePcName, pc.PcName)))
+                {
+                    keyHit = x;
+                    keyHits++;
+                }
+            }
+
+            if (nameInUseHits == 1)
+                return nameInUse;
+            if (nameHits == 1)
+                return nameHit;
+            if (keyHits == 1)
+                return keyHit;
+            return null;
+        }
+
+        private const int CatalogShareKey = 0;
+        private const int CatalogHostKey = 1;
+
+        private static bool CatalogKeyUnique(IList<RemotePcDto> allPcs, RemotePcDto pc, int kind)
+        {
+            if (allPcs == null || pc == null)
+                return false;
+            string key = kind == CatalogHostKey ? pc.HostAddress : pc.IpAddress;
+            if (string.IsNullOrWhiteSpace(key))
+                return false;
+
+            int hits = 0;
+            for (int i = 0; i < allPcs.Count; i++)
+            {
+                RemotePcDto x = allPcs[i];
+                if (x == null)
+                    continue;
+                string other = kind == CatalogHostKey ? x.HostAddress : x.IpAddress;
+                if (RemotePcStatusMapper.SameKey(other, key))
+                    hits++;
+                if (hits > 1)
+                    return false;
+            }
+            return hits == 1;
         }
 
         public async Task ApplySharedStatusToPcListAsync(IList<RemotePcDto> pcs)
@@ -1076,8 +1421,7 @@ namespace GBCWorkHub.UI.Services
                 if (pc == null || string.IsNullOrWhiteSpace(pc.IpAddress))
                     continue;
 
-                var match = shared.FirstOrDefault(x =>
-                    x != null && string.Equals(x.RemoteAccessIpAddress, pc.IpAddress.Trim(), StringComparison.OrdinalIgnoreCase));
+                var match = FindOccupancyForPc(shared, pc, pcs);
                 if (match == null)
                 {
                     pc.SharedStatusText = _ui.IsCentralShareEnabled ? "DB 미등록" : "DB 미연결";
@@ -1089,7 +1433,21 @@ namespace GBCWorkHub.UI.Services
                 pc.SharedClientPc = match.AccessPcName;
             }
 
-            _ui.MergeRemoteComputersFromDb(shared, ip => _tracker.IsTracking && string.Equals(ip, _activeIpAddress, StringComparison.OrdinalIgnoreCase));
+            _ui.MergeRemoteComputersFromDb(shared, IsLocalOccupancyHoldFor);
+        }
+
+        /// <summary>
+        /// 일반 사용자 세션만 갤러리 점유 홀드. TFS 가져오기 재접속은 DB AVAILABLE을 유지한다.
+        /// </summary>
+        private bool IsLocalOccupancyHoldFor(string ip)
+        {
+            if (string.IsNullOrWhiteSpace(ip) || !_tracker.IsTracking)
+                return false;
+            if (_tracker.LaunchPurpose == RdpLaunchPurpose.TfsSyncReconnect)
+                return false;
+            if (_ui.TfsSync != null && _ui.TfsSync.IsSyncInFlight)
+                return false;
+            return string.Equals(ip, _activeIpAddress, StringComparison.OrdinalIgnoreCase);
         }
 
         public async Task ConnectCmcWithPmpAsync(RemoteComputerItemViewModel item)
@@ -1112,11 +1470,11 @@ namespace GBCWorkHub.UI.Services
                 return;
             }
 
+            TfsClipboardAckService.PrepareClipboardForCredentials();
             _pendingCmcSessionToken = RemotePcShareBiz.NewSessionToken();
-            TfsClipboardAckService.TryAnnounceSessionToken(
-                _pendingCmcSessionToken, null, CmcSessionTokenHoldMs, pcLabel);
             DiagnosticLogger.Info("CMC_CONNECT",
-                "SESSION_TOKEN announced for remote agent gate Token=" + TokenPrefix(_pendingCmcSessionToken));
+                "PMP opened; SESSION_TOKEN deferred until web RDP is visible Token="
+                + TokenPrefix(_pendingCmcSessionToken));
 
             _cmcMonitor.StartWatching(shareKey, pcLabel);
 
@@ -1136,8 +1494,8 @@ namespace GBCWorkHub.UI.Services
             await _ui.PopupShowInfoAsync(
                 "CMC / PMP",
                 "PMP Auto Logon 페이지를 열었습니다.\n\n"
-                + "1) 로그인 후 " + pcLabel + " 에 접속하세요.\n"
-                + "2) 웹 RDP(rdp.ma) 창이 보이면 Work Hub가 점유합니다.\n"
+                +                 "1) 로그인 후 접속할 PC의 웹 RDP를 여세요.\n"
+                + "2) 웹 RDP(rdp.ma) 창이 보이면 Work Hub가 그 PC를 점유합니다.\n"
                 + "3) 해당 창을 닫으면 점유가 해제됩니다.\n\n"
                 + "(VPN/목록만 연 상태에서는 점유하지 않습니다.)").ConfigureAwait(true);
         }
@@ -1151,22 +1509,142 @@ namespace GBCWorkHub.UI.Services
                 return;
             }
 
-            DiagnosticLogger.Warn("CMC_PMP",
-                "Wrong PC web RDP expected=" + (expectedPc ?? "-")
+            DiagnosticLogger.Info("CMC_PMP",
+                "Web RDP is not the gallery pick expected=" + (expectedPc ?? "-")
                 + " shareKey=" + (shareKey ?? "-")
                 + " title=" + (windowTitle ?? "-"));
 
-            string preview = windowTitle ?? "-";
-            if (preview.Length > 80)
-                preview = preview.Substring(0, 80);
-
 #pragma warning disable CS4014
-            _ui.PopupShowInfoAsync(
-                "CMC / PMP",
-                "Work Hub에서 선택한 PC는 '" + (expectedPc ?? shareKey) + "' 입니다.\n\n"
-                + "지금 열린 웹 RDP는 다른 PC로 보입니다.\n(" + preview + ")\n\n"
-                + "선택한 PC로 접속해야 점유됩니다. 다른 PC 접속은 점유하지 않습니다.");
+            RetargetCmcOccupancyToWindowAsync(shareKey, expectedPc, windowTitle);
 #pragma warning restore CS4014
+        }
+
+        /// <summary>
+        /// 갤러리에서 고른 PC가 아니어도, PMP에서 연 웹 RDP가 CMC 목록의 PC면 그쪽을 점유.
+        /// </summary>
+        private async Task RetargetCmcOccupancyToWindowAsync(
+            string previousShareKey, string expectedPc, string windowTitle)
+        {
+            RemotePcDto mapped = TryResolveCmcPcFromWindowTitle(windowTitle);
+            if (mapped == null || string.IsNullOrWhiteSpace(mapped.IpAddress))
+            {
+                TfsClipboardAckService.PrepareClipboardForCredentials();
+                string preview = windowTitle ?? "-";
+                if (preview.Length > 80)
+                    preview = preview.Substring(0, 80);
+                DiagnosticLogger.Info("CMC_PMP",
+                    "Unknown web RDP PC — skip occupancy/TOKEN title=" + preview);
+                _ui.RunOnUi(() =>
+                {
+                    _ui.SetLastReceiveMessage("CMC: 목록에 없는 PC — 점유하지 않음");
+                });
+                await _ui.PopupShowInfoAsync(
+                    "CMC / PMP",
+                    "이 웹 RDP는 WorkHub CMC 목록에 없는 PC입니다.\n("
+                    + preview + ")\n\n"
+                    + "점유·TFS 가져오기·세션 종료 처리를 하지 않습니다.\n"
+                    + "갤러리에 있는 PC로 접속하세요.").ConfigureAwait(true);
+                return;
+            }
+
+            string newKey = mapped.IpAddress.Trim();
+            string newName = string.IsNullOrWhiteSpace(mapped.PcName) ? newKey : mapped.PcName.Trim();
+
+            if (!string.IsNullOrWhiteSpace(_activeIpAddress)
+                && !string.Equals(_activeIpAddress, newKey, StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(_activeSessionToken))
+            {
+                string oldKey = _activeIpAddress;
+                string oldToken = _activeSessionToken;
+                DiagnosticLogger.Info("CMC_PMP",
+                    "Retarget occupancy from " + oldKey + " to " + newKey + " Pc=" + newName);
+                await ReleaseUserSessionOccupancyOnceAsync(oldKey, oldToken, 0, RdpLaunchPurpose.UserSession)
+                    .ConfigureAwait(true);
+                await RefreshRemotePcAfterReleaseAsync(oldKey).ConfigureAwait(true);
+                _ui.RunOnUi(() => _ui.UpdateGalleryLocalAvailable(oldKey));
+            }
+
+            _cmcMonitor.StartWatching(newKey, newName);
+            await TryReserveCmcOccupancyAsync(newKey, newName).ConfigureAwait(true);
+
+            _ui.RunOnUi(() =>
+            {
+                _ui.SetLastReceiveMessage("PMP에서 " + newName + " 접속 — 점유");
+            });
+        }
+
+        private RemotePcDto TryResolveCmcPcFromWindowTitle(string windowTitle)
+        {
+            if (string.IsNullOrWhiteSpace(windowTitle))
+                return null;
+
+            List<RemotePcDto> pcs = null;
+            try
+            {
+                pcs = _remotePcBiz.GetRemotePcListBySite("CMC");
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.Warn("CMC_PMP", "GetRemotePcListBySite failed: " + ex.Message);
+                return null;
+            }
+
+            if (pcs == null)
+                return null;
+
+            RemotePcDto best = null;
+            int bestLen = 0;
+            foreach (var dto in pcs)
+            {
+                if (dto == null)
+                    continue;
+                string pcName = string.IsNullOrWhiteSpace(dto.PcName) ? null : dto.PcName.Trim();
+                if (string.IsNullOrWhiteSpace(pcName))
+                    continue;
+                if (windowTitle.IndexOf(pcName, StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+                if (pcName.Length > bestLen)
+                {
+                    best = dto;
+                    bestLen = pcName.Length;
+                }
+            }
+
+            return best;
+        }
+
+        /// <summary>CMC 갤러리(MSDWHTKD)에 등록된 PC만 점유한다. 목록 밖 웹 RDP는 프로토콜을 올리지 않는다.</summary>
+        private bool IsRegisteredCmcPc(string shareKey, string pcName)
+        {
+            List<RemotePcDto> pcs;
+            try
+            {
+                pcs = _remotePcBiz.GetRemotePcListBySite("CMC");
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.Warn("CMC_PMP", "IsRegisteredCmcPc failed: " + ex.Message);
+                return false;
+            }
+
+            if (pcs == null)
+                return false;
+
+            foreach (var dto in pcs)
+            {
+                if (dto == null)
+                    continue;
+                if (!string.IsNullOrWhiteSpace(shareKey)
+                    && !string.IsNullOrWhiteSpace(dto.IpAddress)
+                    && string.Equals(dto.IpAddress.Trim(), shareKey.Trim(), StringComparison.OrdinalIgnoreCase))
+                    return true;
+                if (!string.IsNullOrWhiteSpace(pcName)
+                    && !string.IsNullOrWhiteSpace(dto.PcName)
+                    && string.Equals(dto.PcName.Trim(), pcName.Trim(), StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
         }
 
         private void OnCmcSessionAppeared(string shareKey)
@@ -1255,12 +1733,13 @@ namespace GBCWorkHub.UI.Services
                 string token = _activeSessionToken;
                 string remoteIp = _activeIpAddress;
                 string computerName = string.IsNullOrWhiteSpace(_activeComputerName) ? remoteIp : _activeComputerName;
-                DateTime endedAt = DateTime.Now;
+                DateTime endedAt = KoreaTime.Now;
                 DateTime startedAt = _userSessionStartedAt == default(DateTime) ? endedAt.AddHours(-1) : _userSessionStartedAt;
                 bool hadReservedSession = !string.IsNullOrEmpty(token);
                 double sessionSeconds = (endedAt - startedAt).TotalSeconds;
 
-                bool shouldPromptTfs = hadReservedSession || sessionSeconds >= 5.0;
+                bool shouldPromptTfs = TfsCheckinFetchSettings.IsEnabled
+                    && (hadReservedSession || sessionSeconds >= 5.0);
                 if (shouldPromptTfs && _ui.TfsSync != null)
                 {
                     DiagnosticLogger.Info("CMC_PMP",
@@ -1302,8 +1781,8 @@ namespace GBCWorkHub.UI.Services
                             RemoteIp = remoteIp,
                             RemoteComputerName = computerName,
                             ClientLocalIp = RemotePcShareBiz.LocalAccessIp,
-                            CurrentUserId = Environment.UserDomainName + "\\" + Environment.UserName,
-                            CurrentUserName = Environment.UserName,
+                            CurrentUserId = RemotePcShareBiz.LocalUserAccount,
+                            CurrentUserName = RemotePcShareBiz.LocalUserAccount,
                             SessionStartedAt = request.SessionStartedAt,
                             SessionEndedAt = request.SessionEndedAt
                         });
@@ -1367,6 +1846,14 @@ namespace GBCWorkHub.UI.Services
             if (string.IsNullOrWhiteSpace(shareKey))
                 return;
 
+            if (!IsRegisteredCmcPc(shareKey, pcName))
+            {
+                DiagnosticLogger.Info("CMC_RESERVE_SKIP_UNKNOWN",
+                    "ShareKey=" + shareKey + " Pc=" + (pcName ?? "-"));
+                TfsClipboardAckService.PrepareClipboardForCredentials();
+                return;
+            }
+
             if (Interlocked.CompareExchange(ref _cmcReserveInFlight, 1, 0) != 0)
                 return;
 
@@ -1383,9 +1870,26 @@ namespace GBCWorkHub.UI.Services
                     return;
                 }
 
-                string sessionToken = !string.IsNullOrWhiteSpace(_pendingCmcSessionToken)
-                    ? _pendingCmcSessionToken
-                    : RemotePcShareBiz.NewSessionToken();
+                string sessionToken = _pendingCmcSessionToken;
+                if (string.IsNullOrWhiteSpace(sessionToken))
+                {
+                    sessionToken = RemotePcShareBiz.NewSessionToken();
+                }
+                else
+                {
+                    try
+                    {
+                        var prevLog = await _share.GetUsageLogByTokenAsync(sessionToken).ConfigureAwait(true);
+                        if (prevLog != null
+                            && (prevLog.EndedAt.HasValue
+                                || string.Equals(prevLog.SessionStatus, "ENDED", StringComparison.OrdinalIgnoreCase)))
+                            sessionToken = RemotePcShareBiz.NewSessionToken();
+                    }
+                    catch
+                    {
+                    }
+                }
+                _pendingCmcSessionToken = sessionToken;
                 string computerName = string.IsNullOrWhiteSpace(pcName) ? shareKey : pcName.Trim();
                 string userAccount = RemotePcShareBiz.LocalUserAccount;
                 string clientPc = RemotePcShareBiz.LocalClientPc;
@@ -1393,8 +1897,12 @@ namespace GBCWorkHub.UI.Services
                 bool reserved;
                 try
                 {
-                    reserved = await _share.TryReserveAsync(shareKey, sessionToken, computerName)
-                        .ConfigureAwait(true);
+                reserved = await _share.TryReserveAsync(
+                        shareKey, sessionToken, computerName,
+                        ConsumeTakeoverFlag(shareKey),
+                        OccupancyNameStore.TryGetAffiliation(),
+                        "CMC")
+                    .ConfigureAwait(true);
                 }
                 catch (Exception ex)
                 {
@@ -1425,9 +1933,10 @@ namespace GBCWorkHub.UI.Services
                 _activeSessionToken = sessionToken;
                 _activeComputerName = computerName;
                 _activeIpAddress = shareKey;
-                _userSessionStartedAt = DateTime.Now;
+                _userSessionStartedAt = KoreaTime.Now;
                 Interlocked.Exchange(ref _userSessionReleaseGate, 0);
                 _ui.SetSessionTokenDisplay(sessionToken);
+                StartOccupancyWatch();
 
                 _ui.UpdateGalleryLocalInUse(shareKey, userAccount, clientPc, sessionToken);
 
@@ -1440,13 +1949,14 @@ namespace GBCWorkHub.UI.Services
                     _ui.SetStatusSource("CMC_PMP_SESSION");
                     _ui.SetLastReceiveMessage("CMC 웹 RDP 감지 — DB 점유");
                     _ui.SetConnectionEndedAt("-");
-                    _ui.SetConnectionRequestedAt(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                    _ui.SetConnectionConfirmedAt(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                    _ui.SetConnectionRequestedAt(KoreaTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                    _ui.SetConnectionConfirmedAt(KoreaTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                     _ui.SetRdpSessionConfirmed(true);
                 });
 
                 TfsClipboardAckService.TryAnnounceSessionToken(
-                    sessionToken, null, CmcSessionTokenHoldMs, computerName);
+                    sessionToken, null, SessionTokenHoldAfterReadyMs, computerName, shareKey);
+                PulseSessionTokenWhileConnecting(sessionToken, computerName, shareKey);
                 DiagnosticLogger.Info("CMC_RESERVE",
                     "ShareKey=" + shareKey + " Token=" + sessionToken);
             }
@@ -1454,6 +1964,39 @@ namespace GBCWorkHub.UI.Services
             {
                 Interlocked.Exchange(ref _cmcReserveInFlight, 0);
             }
+        }
+
+        /// <summary>
+        /// 웹 RDP가 붙은 뒤에만 TOKEN을 짧게 반복한다.
+        /// 로그인 전에 올리면 비밀번호가 프로토콜 문구로 덮이거나, 비번 복사가 TOKEN을 지워
+        /// 원격 Agent가 WorkHub 세션으로 못 본다.
+        /// </summary>
+        private void PulseSessionTokenWhileConnecting(string sessionToken, string computerName, string remoteIp)
+        {
+            if (string.IsNullOrWhiteSpace(sessionToken))
+                return;
+
+            string token = sessionToken.Trim();
+            string pc = computerName;
+            string ip = remoteIp;
+            var ignored = Task.Run(async () =>
+            {
+                try
+                {
+                    for (int i = 0; i < 2; i++)
+                    {
+                        await Task.Delay(8000).ConfigureAwait(false);
+                        if (!string.Equals(_activeSessionToken, token, StringComparison.Ordinal))
+                            return;
+                        TfsClipboardAckService.TryAnnounceSessionToken(
+                            token, null, SessionTokenHoldAfterReadyMs, pc, ip);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticLogger.Warn("SESSION_TOKEN_PULSE", ex.Message);
+                }
+            });
         }
 
         /// <summary>내가 점유한 채 mstsc만 사라진 경우 DB 점유 해제.</summary>
@@ -1678,7 +2221,7 @@ namespace GBCWorkHub.UI.Services
         {
             bool tracking = _tracker.IsTracking;
             string trackedName = _tracker.RemoteComputerName ?? TrackedComputerName;
-            bool nameMatches = string.Equals(computerKey, trackedName, StringComparison.OrdinalIgnoreCase)
+            bool nameMatches = RdpStatusBiz.ComputerNamesLooselyMatch(computerKey, trackedName)
                 || string.Equals(computerKey, _tracker.TargetIp, StringComparison.OrdinalIgnoreCase);
             bool isConfirm = RdpSessionTrackingService.IsConnectionConfirmPayload(payload) && nameMatches;
             if (isConfirm && tracking)
@@ -1709,6 +2252,11 @@ namespace GBCWorkHub.UI.Services
         public bool IsLocalSessionAliveFor(RemoteComputerItemViewModel item)
         {
             if (item == null) return false;
+            // TFS 가져오기 재접속은 점유 세션이 아님
+            if (_tracker.LaunchPurpose == RdpLaunchPurpose.TfsSyncReconnect)
+                return false;
+            if (_ui != null && _ui.TfsSync != null && _ui.TfsSync.IsSyncInFlight)
+                return false;
             bool stillTracked = _tracker.IsTracking
                 && string.Equals(_tracker.TargetIp, item.IpAddress, StringComparison.OrdinalIgnoreCase);
             bool mstscIp = !string.IsNullOrWhiteSpace(item.IpAddress)
@@ -1723,6 +2271,7 @@ namespace GBCWorkHub.UI.Services
             return _tracker.LaunchPurpose == RdpLaunchPurpose.TfsSyncReconnect
                 || (_ui != null && _ui.TfsSync != null && _ui.TfsSync.IsSyncInFlight);
         }
+
         public string GetAppCloseWarning()
         {
             return null;
@@ -1777,6 +2326,7 @@ namespace GBCWorkHub.UI.Services
                 _pollTimer.Stop();
                 _pollTimer = null;
             }
+            StopOccupancyWatch();
             if (_eventsWired)
             {
                 _tracker.RdpStarted -= OnRdpStarted;

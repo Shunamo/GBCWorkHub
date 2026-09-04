@@ -9,6 +9,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogStyles.xaml" />
                 <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogGlassStyles.xaml" />
+                <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogEditGlassOverrides.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
@@ -27,42 +28,81 @@
                 Visibility="{Binding UseGlassmorphism, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
 
             <!--
-              TFS 가져오기: PopupHost와 같은 딤 + 중앙 글래스 카드
+              TFS 가져오기: 업무상세와 같은 글래스 카드
             -->
             <Grid Panel.ZIndex="20"
                   Visibility="{Binding IsImportOpen, Converter={StaticResource BoolToVis}}"
-                  Background="#990F172A">
-                <!-- 여백 안쪽에서만 크기 잡음 → 창모드에서도 라운드가 잘리지 않음 -->
-                <Grid Margin="32,28">
-                    <Border HorizontalAlignment="Center" VerticalAlignment="Center"
-                            Background="Transparent"
-                            CornerRadius="14"
-                            MinWidth="720"
-                            MaxWidth="1200"
-                            MinHeight="480"
-                            MaxHeight="860"
-                            Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Grid}}"
-                            Height="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Grid}}">
-                        <Border.Effect>
-                            <DropShadowEffect BlurRadius="28" ShadowDepth="6" Opacity="0.18" Color="#3B5070" />
-                        </Border.Effect>
-                        <Border x:Name="ImportCardBorder"
-                                Style="{StaticResource GlassSurfaceStyle}"
-                                Effect="{x:Null}"
-                                Padding="0"
-                                CornerRadius="14"
-                                ClipToBounds="True"
-                                SizeChanged="ImportCardBorder_SizeChanged"
-                                Loaded="ImportCardBorder_SizeChanged">
-                            <wl:TfsImportDialog Background="Transparent"
-                                                DataContext="{Binding ImportDialog}" />
-                        </Border>
+                  Background="#660F172A"
+                  MouseLeftButtonDown="ImportOverlay_MouseLeftButtonDown">
+                <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Background="Transparent"
+                        CornerRadius="16"
+                        Margin="24"
+                        MouseLeftButtonDown="OverlayCard_MouseLeftButtonDown">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="MinWidth" Value="400" />
+                            <Setter Property="MaxWidth" Value="520" />
+                            <Setter Property="MinHeight" Value="0" />
+                            <Setter Property="MaxHeight" Value="720" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ImportDialog.HasCandidates}" Value="True">
+                                    <Setter Property="Width" Value="860" />
+                                    <Setter Property="MinWidth" Value="720" />
+                                    <Setter Property="MaxWidth" Value="980" />
+                                    <Setter Property="Height" Value="560" />
+                                    <Setter Property="MinHeight" Value="420" />
+                                    <Setter Property="MaxHeight" Value="720" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="32" ShadowDepth="8" Opacity="0.16" Color="#2F4466" />
+                    </Border.Effect>
+                    <Border x:Name="ImportCardBorder"
+                            CornerRadius="16"
+                            ClipToBounds="True"
+                            SizeChanged="ImportCardBorder_SizeChanged"
+                            Loaded="ImportCardBorder_SizeChanged">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="{StaticResource EditGlassFill}" />
+                                <Setter Property="BorderBrush" Value="#D9FFFFFF" />
+                                <Setter Property="BorderThickness" Value="1.5" />
+                                <Setter Property="Padding" Value="20" />
+                                <Setter Property="Effect" Value="{x:Null}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ImportDialog.HasCandidates}" Value="True">
+                                        <Setter Property="Background" Value="#A6FFFFFF" />
+                                        <Setter Property="BorderBrush" Value="#F2FFFFFF" />
+                                        <Setter Property="Padding" Value="0" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <wl:TfsImportDialog Background="Transparent"
+                                            DataContext="{Binding ImportDialog}" />
                     </Border>
-                </Grid>
+                </Border>
+            </Grid>
+
+            <Grid Panel.ZIndex="21"
+                  Visibility="{Binding IsInboxOpen, Converter={StaticResource BoolToVis}}"
+                  Background="#660F172A"
+                  MouseLeftButtonDown="InboxOverlay_MouseLeftButtonDown">
+                <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Width="800" MaxWidth="920" MinWidth="560"
+                        Height="560" MaxHeight="680" Margin="24"
+                        Background="Transparent"
+                        MouseLeftButtonDown="OverlayCard_MouseLeftButtonDown">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="32" ShadowDepth="8" Opacity="0.16" Color="#2F4466" />
+                    </Border.Effect>
+                    <wl:TfsCheckinInboxView />
+                </Border>
             </Grid>
         </Grid>
-
-        <!-- 상세: Glass면 목록과 같은 atmosphere(전체) + 앱 헤더 아래 콘텐츠 여백 -->
         <Grid Visibility="{Binding IsEditOpen, Converter={StaticResource BoolToVis}}">
             <Grid.Style>
                 <Style TargetType="Grid">

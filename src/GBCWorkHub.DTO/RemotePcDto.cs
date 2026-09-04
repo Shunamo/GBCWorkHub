@@ -16,6 +16,14 @@ namespace GBCWorkHub.DTO
         public string IpAddress { get; set; }
         /// <summary>접속용 Host (정규화된 IP/호스트). 필터 칩에 우선 사용.</summary>
         public string HostAddress { get; set; }
+        /// <summary>갤러리 그룹. 예: 진료지원, 진료간호. App.config {SITE}.{PcName}.Group</summary>
+        public string GroupName { get; set; }
+        /// <summary>원격 Windows 로그인(엑셀 ID / PC 도메인). 예: dxbcmc\bcarep.admin</summary>
+        public string PcDomain { get; set; }
+        /// <summary>엑셀 ID/Password 섹션([ID]/[Password]).</summary>
+        public string PcNote { get; set; }
+        /// <summary>접속 코멘트(사용자 수정 가능).</summary>
+        public string PcComment { get; set; }
         public int RdpPort { get; set; } = 3389;
         public Enums.RemotePcStatus Status { get; set; } = Enums.RemotePcStatus.Unknown;
         public string CurrentUser { get; set; }

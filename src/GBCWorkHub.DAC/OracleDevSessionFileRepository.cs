@@ -146,6 +146,7 @@ namespace GBCWorkHub.DAC
         {
             var conn = new OracleConnection(_connectionString);
             conn.Open();
+            OracleKoreaSession.Apply(conn);
             return conn;
         }
 

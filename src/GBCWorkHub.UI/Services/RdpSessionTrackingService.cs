@@ -612,7 +612,7 @@ namespace GBCWorkHub.UI.Services
                 if (payload == null)
                     return;
                 if (!string.IsNullOrWhiteSpace(RemoteComputerName)
-                    && !string.Equals(payload.ComputerName, RemoteComputerName, StringComparison.OrdinalIgnoreCase)
+                    && !RdpStatusBiz.ComputerNamesLooselyMatch(payload.ComputerName, RemoteComputerName)
                     && !string.Equals(payload.ComputerName, TargetIp, StringComparison.OrdinalIgnoreCase))
                     return;
                 if (!IsConnectionConfirmPayload(payload))

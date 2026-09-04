@@ -8,17 +8,18 @@
 
       Usage:
         FontSize="{StaticResource FontSize.Base}"
-        FontFamily="{StaticResource AppFontFamily}"
+        FontFamily="{DynamicResource AppFontFamily}"
     -->
 
     <FontFamily x:Key="AppFontFamily">Segoe UI, Malgun Gothic</FontFamily>
 
-    <!-- fontSize (px): xs sm base md lg xl xxl xxxl -->
-    <sys:Double x:Key="FontSize.Xs">10</sys:Double>
-    <sys:Double x:Key="FontSize.Sm">11</sys:Double>
-    <sys:Double x:Key="FontSize.Base">12</sys:Double>
-    <sys:Double x:Key="FontSize.Md">13</sys:Double>
-    <sys:Double x:Key="FontSize.Lg">14</sys:Double>
+    <!-- fontSize (px): xs sm base md lg xl xxl xxxl
+         Pretendard는 맑은 고딕보다 작게 보여 Base를 13으로 둔다. -->
+    <sys:Double x:Key="FontSize.Xs">11</sys:Double>
+    <sys:Double x:Key="FontSize.Sm">12</sys:Double>
+    <sys:Double x:Key="FontSize.Base">13</sys:Double>
+    <sys:Double x:Key="FontSize.Md">14</sys:Double>
+    <sys:Double x:Key="FontSize.Lg">15</sys:Double>
     <sys:Double x:Key="FontSize.Xl">16</sys:Double>
     <sys:Double x:Key="FontSize.Xxl">18</sys:Double>
     <sys:Double x:Key="FontSize.Xxxl">20</sys:Double>

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using GBCWorkHub.BIZ;
 using GBCWorkHub.DTO;
+using GBCWorkHub.UI.Services.TfsSync;
 
 namespace GBCWorkHub.UI.ViewModels
 {
@@ -207,7 +208,7 @@ namespace GBCWorkHub.UI.ViewModels
                 CollectionUrl = payload.CollectionUrl;
                 ServerPath = payload.ServerPath;
                 QueryMode = payload.QueryMode ?? "RECENT_COUNT";
-                RemoteComputerName = payload.RemoteComputerName;
+                RemoteComputerName = payload.ResolveComputerName();
                 SourceClientName = payload.SourceClientName;
                 SessionToken = payload.SessionToken;
                 SessionStartAt = payload.SessionStartAt;
@@ -222,12 +223,22 @@ namespace GBCWorkHub.UI.ViewModels
             AuthorId = item.AuthorId;
             AuthorDisplay = BuildAuthorDisplay(item.AuthorName, item.AuthorId);
             OriginalComment = item.Comment ?? string.Empty;
-            CheckedInAtDisplay = item.CheckedInAt ?? "-";
-            DateTime parsed;
-            if (!string.IsNullOrWhiteSpace(item.CheckedInAt) && DateTime.TryParse(item.CheckedInAt, out parsed))
-                CheckedInAt = parsed;
+            string site = TfsCheckinInboxStore.InferSiteCode(RemoteComputerName, CollectionUrl);
+            DateTime? korea = KoreaTime.ParseToKorea(item.CheckedInAt, site);
+            if (korea.HasValue)
+            {
+                CheckedInAt = korea.Value;
+                CheckedInAtDisplay = korea.Value.ToString("yyyy-MM-dd HH:mm");
+            }
             else
-                CheckedInAt = null;
+            {
+                CheckedInAtDisplay = item.CheckedInAt ?? "-";
+                DateTime parsed;
+                if (!string.IsNullOrWhiteSpace(item.CheckedInAt) && DateTime.TryParse(item.CheckedInAt, out parsed))
+                    CheckedInAt = KoreaTime.ToKorea(parsed);
+                else
+                    CheckedInAt = null;
+            }
 
             ChangedFileCount = item.ChangedFileCount.HasValue
                 ? item.ChangedFileCount.Value
@@ -270,7 +281,7 @@ namespace GBCWorkHub.UI.ViewModels
                 AuthorName = AuthorName,
                 AuthorId = AuthorId,
                 CheckedInAt = CheckedInAt.HasValue
-                    ? CheckedInAt.Value.ToString("o")
+                    ? KoreaTime.ToRoundTripUtc(CheckedInAt.Value)
                     : CheckedInAtDisplay,
                 Comment = OriginalComment,
                 ChangedFileCount = ChangedFileCount,

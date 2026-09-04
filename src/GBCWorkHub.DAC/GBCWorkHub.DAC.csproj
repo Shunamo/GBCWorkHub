@@ -52,10 +52,13 @@
     <Compile Include="RemotePcDac.cs" />
     <Compile Include="IRemotePcRepository.cs" />
     <Compile Include="OracleRemotePcRepository.cs" />
+    <Compile Include="OracleKoreaSession.cs" />
     <Compile Include="ITfsWorkLogRepository.cs" />
     <Compile Include="OracleTfsWorkLogRepository.cs" />
     <Compile Include="IWorkLogRepository.cs" />
     <Compile Include="OracleWorkLogRepository.cs" />
+    <Compile Include="IDirectoryRepository.cs" />
+    <Compile Include="OracleDirectoryRepository.cs" />
     <Compile Include="OracleDevSessionFileRepository.cs" />
     <Compile Include="WorkHubFileLogger.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

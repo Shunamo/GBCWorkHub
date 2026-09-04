@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v2
+
+      - name: NuGet restore
+        run: nuget restore GBCWorkHub.sln
+
+      - name: Build (Debug)
+        run: msbuild GBCWorkHub.sln /p:Configuration=Debug /p:Platform="Any CPU" /m /v:minimal
+
+      - name: Test BIZ
+        run: |
+          $exe = "src\GBCWorkHub.BIZ.Tests\bin\Debug\GBCWorkHub.BIZ.Tests.exe"
+          & $exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Test UI
+        run: |
+          $exe = "src\GBCWorkHub.UI.Tests\bin\Debug\GBCWorkHub.UI.Tests.exe"
+          & $exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

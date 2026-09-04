@@ -41,5 +41,36 @@ namespace GBCWorkHub.DTO
                 return "TFS 내역 확인 중";
             return string.IsNullOrEmpty(code) ? "-" : code;
         }
+
+        public static bool SameKey(string a, string b)
+        {
+            if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b))
+                return false;
+            return string.Equals(a.Trim(), b.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// 점유 행이 이 갤러리 PC의 것인지. 이름·점유키가 다른 PC를 가리키면 false.
+        /// </summary>
+        public static bool StatusFitsPc(RemotePcStatus status, string pcName, string shareKey, string hostAddress)
+        {
+            if (status == null)
+                return false;
+
+            string occName = status.RemotePcName;
+            string occKey = status.RemoteAccessIpAddress;
+
+            if (SameKey(occName, pcName) || SameKey(occKey, pcName))
+                return true;
+
+            if (SameKey(occKey, shareKey)
+                && (string.IsNullOrWhiteSpace(occName) || SameKey(occName, pcName)))
+                return true;
+
+            if (SameKey(occKey, hostAddress) && SameKey(occName, pcName))
+                return true;
+
+            return false;
+        }
     }
 }

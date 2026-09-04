@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using GBCWorkHub.BIZ;
 using GBCWorkHub.BIZ.WorkLog;
 using GBCWorkHub.DTO.WorkLog;
 using GBCWorkHub.UI.Services;
@@ -64,6 +65,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 if (!string.IsNullOrEmpty(t))
                     cleaned.Add(t);
             }
+            cleaned.Sort(CompareNumericTicket);
             return string.Join(", ", cleaned);
         }
 
@@ -73,18 +75,22 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             return FormatPersonDisplay(personInCharge);
         }
 
-        /// <summary>순수 숫자 티켓 여부 (11541 등). 내부/티켓파악불가/ABC-12 는 false.</summary>
+        /// <summary>순수 숫자 티켓 여부 (11541 또는 11541, 11550). 내부/티켓파악불가/ABC-12 는 false.</summary>
         public static bool IsNumericTicket(string ticketNo)
         {
-            if (string.IsNullOrWhiteSpace(ticketNo))
+            var parts = SplitMultiValues(ticketNo);
+            if (parts.Count == 0)
                 return false;
-            string t = StripTicketPrefix(ticketNo);
-            if (t.Length == 0)
-                return false;
-            for (int i = 0; i < t.Length; i++)
+            foreach (var part in parts)
             {
-                if (!char.IsDigit(t[i]))
+                string t = StripTicketPrefix(part);
+                if (t.Length == 0)
                     return false;
+                for (int i = 0; i < t.Length; i++)
+                {
+                    if (!char.IsDigit(t[i]))
+                        return false;
+                }
             }
             return true;
         }
@@ -110,6 +116,22 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 t = t.Substring(2).Trim();
             }
             return t.Trim('[', ']').Trim();
+        }
+
+        private static int CompareNumericTicket(string a, string b)
+        {
+            int ia;
+            int ib;
+            if (int.TryParse(a, out ia) && int.TryParse(b, out ib))
+                return ia.CompareTo(ib);
+            return string.CompareOrdinal(a, b);
+        }
+
+        private static string PreferRemotePc(string draftPc, string candidatePc)
+        {
+            if (!string.IsNullOrWhiteSpace(candidatePc))
+                return candidatePc.Trim();
+            return draftPc ?? string.Empty;
         }
 
         /// <summary>줄바꿈·콤마·슬래시 등으로 나뉜 복수 값을 순서 유지·중복 제거.</summary>
@@ -156,6 +178,8 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
 
             var draft = Parser.Parse(candidate.ToChangesetItem(), sessionContext ?? new WorkSessionContext());
             var item = FromDraft(draft, candidate);
+            if (item != null && candidate != null && !string.IsNullOrWhiteSpace(candidate.RemoteComputerName))
+                item.Pc = candidate.RemoteComputerName.Trim();
             ApplyWorkHubAuthor(item, sessionContext);
             return item;
         }
@@ -172,7 +196,11 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             var draft = Parser.Parse(changeset, sessionContext ?? new WorkSessionContext(), true);
             var item = FromDraft(draft, row.Source);
             if (item != null)
+            {
                 item.PayloadChangedFileCount = row.IncludedFileCount;
+                if (row.Source != null && !string.IsNullOrWhiteSpace(row.Source.RemoteComputerName))
+                    item.Pc = row.Source.RemoteComputerName.Trim();
+            }
             ApplyWorkHubAuthor(item, sessionContext);
             return item;
         }
@@ -191,11 +219,12 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 NeedsTicketReview = string.IsNullOrWhiteSpace(draft.TicketNo),
                 TicketContents = draft.TicketContents ?? string.Empty,
                 MenuName = draft.MenuName ?? string.Empty,
-                Pc = draft.Pc ?? (candidate != null ? candidate.RemoteComputerName : string.Empty),
+                Pc = PreferRemotePc(draft.Pc, candidate != null ? candidate.RemoteComputerName : null),
                 PersonInCharge = draft.PersonInCharge ?? string.Empty,
                 AuthorName = !string.IsNullOrWhiteSpace(draft.TfsAuthorName)
                     ? draft.TfsAuthorName
                     : (draft.TfsAuthorId ?? (candidate != null ? candidate.AuthorName : string.Empty)),
+                TeamName = OccupancyNameStore.TryGetAffiliation(),
                 StartDate = draft.StartDate,
                 EndDate = draft.EndDate,
                 DeploymentStatus = draft.DeploymentStatus ?? string.Empty,
@@ -340,6 +369,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 TfsComment = source.TfsComment,
                 TfsAuthor = source.TfsAuthor,
                 AuthorName = source.AuthorName,
+                TeamName = source.TeamName,
                 CheckedInAt = source.CheckedInAt,
                 PayloadChangedFileCount = source.PayloadChangedFileCount,
                 NeedsTicketReview = source.NeedsTicketReview
@@ -388,6 +418,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             target.TfsComment = baseline.TfsComment;
             target.TfsAuthor = baseline.TfsAuthor;
             target.AuthorName = baseline.AuthorName;
+            target.TeamName = baseline.TeamName;
             target.CheckedInAt = baseline.CheckedInAt;
             target.PayloadChangedFileCount = baseline.PayloadChangedFileCount;
             target.NeedsTicketReview = baseline.NeedsTicketReview;
@@ -503,6 +534,9 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             if (string.IsNullOrWhiteSpace(existing.AuthorName)
                 && !string.IsNullOrWhiteSpace(incoming.AuthorName))
                 existing.AuthorName = incoming.AuthorName;
+            if (string.IsNullOrWhiteSpace(existing.TeamName)
+                && !string.IsNullOrWhiteSpace(incoming.TeamName))
+                existing.TeamName = incoming.TeamName;
 
             // 업무 작성 기간: 시작일은 보존, 종료일만 확장
             if (!existing.StartDate.HasValue)
@@ -633,6 +667,96 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             return sb.ToString().Trim();
         }
 
+        public static string MergeTicketNumbers(IEnumerable<WorkLogListItemViewModel> items)
+        {
+            var nums = new List<string>();
+            if (items != null)
+            {
+                foreach (var item in items)
+                {
+                    if (item == null)
+                        continue;
+                    foreach (string part in SplitMultiValues(item.TicketNo))
+                    {
+                        string t = StripTicketPrefix(part);
+                        if (string.IsNullOrEmpty(t))
+                            continue;
+                        bool dup = false;
+                        foreach (var x in nums)
+                        {
+                            if (string.Equals(x, t, StringComparison.OrdinalIgnoreCase))
+                            {
+                                dup = true;
+                                break;
+                            }
+                        }
+                        if (!dup)
+                            nums.Add(t);
+                    }
+                }
+            }
+            nums.Sort(CompareNumericTicket);
+            return string.Join(", ", nums);
+        }
+
+        private static string MergePcNames(IEnumerable<WorkLogListItemViewModel> items)
+        {
+            var names = new List<string>();
+            if (items == null)
+                return string.Empty;
+            foreach (var item in items)
+            {
+                if (item == null || string.IsNullOrWhiteSpace(item.Pc))
+                    continue;
+                string pc = item.Pc.Trim();
+                bool dup = false;
+                foreach (var x in names)
+                {
+                    if (string.Equals(x, pc, StringComparison.OrdinalIgnoreCase))
+                    {
+                        dup = true;
+                        break;
+                    }
+                }
+                if (!dup)
+                    names.Add(pc);
+            }
+            return string.Join(", ", names);
+        }
+
+        /// <summary>동일 사이트면 그 값, 섞여 있으면 첫 비어 있지 않은 사이트.</summary>
+        private static string MergeSiteCodes(IEnumerable<WorkLogListItemViewModel> items)
+        {
+            if (items == null)
+                return string.Empty;
+            string first = null;
+            foreach (var item in items)
+            {
+                if (item == null || string.IsNullOrWhiteSpace(item.SiteCode))
+                    continue;
+                string site = item.SiteCode.Trim().ToUpperInvariant();
+                if (string.Equals(site, WorkLogSiteCodes.All, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (first == null)
+                    first = site;
+                else if (!string.Equals(first, site, StringComparison.OrdinalIgnoreCase))
+                    return first;
+            }
+            return first ?? string.Empty;
+        }
+
+        /// <summary>이미 매핑된 여러 건을 하나의 업무기록으로 합칩니다 (보관함 다중 일지작성).</summary>
+        public static WorkLogListItemViewModel MergeMappedParts(
+            IList<WorkLogListItemViewModel> mapped,
+            WorkSessionContext sessionContext)
+        {
+            if (mapped == null || mapped.Count == 0)
+                return null;
+            if (mapped.Count == 1)
+                return mapped[0];
+            return MergeMappedItems(mapped, sessionContext);
+        }
+
         private static string FirstNonEmpty(params string[] values)
         {
             if (values == null)
@@ -652,18 +776,38 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             var primary = mapped[0];
             primary.Id = "merge-" + Guid.NewGuid().ToString("N").Substring(0, 10);
 
+            var collected = new List<WorkLogSourceEditItem>();
+            int fileCount = 0;
+            foreach (var part in mapped)
+            {
+                if (part == null)
+                    continue;
+                fileCount += part.PayloadChangedFileCount > 0
+                    ? part.PayloadChangedFileCount
+                    : (part.Sources != null ? part.Sources.Count : 0);
+                if (part.Sources == null)
+                    continue;
+                foreach (var s in part.Sources)
+                {
+                    if (s != null)
+                        collected.Add(s);
+                }
+            }
+
+            primary.Sources.Clear();
+            foreach (var s in collected)
+                primary.Sources.Add(s);
+
             var comments = new List<string>();
             var tfsAuthors = new List<string>();
             var changesetIds = new List<int>();
-            int fileCount = 0;
             DateTime? earliest = null;
             DateTime? latest = null;
 
-            primary.Sources.Clear();
             foreach (var part in mapped)
             {
-                foreach (var s in part.Sources)
-                    primary.Sources.Add(s);
+                if (part == null)
+                    continue;
 
                 if (part.ChangesetId > 0 && !changesetIds.Contains(part.ChangesetId))
                     changesetIds.Add(part.ChangesetId);
@@ -683,10 +827,6 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                     && !tfsAuthors.Any(a => string.Equals(a, part.TfsAuthor.Trim(), StringComparison.OrdinalIgnoreCase)))
                     tfsAuthors.Add(part.TfsAuthor.Trim());
 
-                fileCount += part.PayloadChangedFileCount > 0
-                    ? part.PayloadChangedFileCount
-                    : part.Sources.Count;
-
                 if (part.CheckedInAt.HasValue)
                 {
                     if (!earliest.HasValue || part.CheckedInAt.Value < earliest.Value)
@@ -695,14 +835,14 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                         latest = part.CheckedInAt;
                 }
 
-                if (string.IsNullOrWhiteSpace(primary.TicketNo) && !string.IsNullOrWhiteSpace(part.TicketNo))
-                {
-                    primary.TicketNo = part.TicketNo;
-                    primary.NeedsTicketReview = part.NeedsTicketReview;
-                }
                 if (string.IsNullOrWhiteSpace(primary.Pc) && !string.IsNullOrWhiteSpace(part.Pc))
                     primary.Pc = part.Pc;
             }
+
+            primary.TicketNo = MergeTicketNumbers(mapped);
+            primary.NeedsTicketReview = string.IsNullOrWhiteSpace(primary.TicketNo);
+            primary.Pc = MergePcNames(mapped);
+            primary.SiteCode = MergeSiteCodes(mapped);
 
             string mergedComment = string.Join(Environment.NewLine + Environment.NewLine, comments);
             primary.SourceChangesetIds = changesetIds;
@@ -729,6 +869,15 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         {
             if (item == null)
                 return;
+
+            string occupancy = OccupancyNameStore.TryGet();
+            if (!string.IsNullOrWhiteSpace(occupancy))
+                item.AuthorName = occupancy.Trim();
+            else if (string.IsNullOrWhiteSpace(item.AuthorName))
+                item.AuthorName = WorkHubUserProfile.OccupancyName;
+
+            if (string.IsNullOrWhiteSpace(item.TeamName))
+                item.TeamName = OccupancyNameStore.TryGetAffiliation();
 
             string localIp = sessionContext != null
                 ? sessionContext.ResolveAuthorLocalIp()
@@ -851,6 +1000,53 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             }
 
             date = parsed.Date;
+            return true;
+        }
+
+        /// <summary>숫자만 받아 HH:mm 형태로 자동 삽입. 최대 4자리.</summary>
+        public static string MaskTimeInput(string raw)
+        {
+            if (string.IsNullOrEmpty(raw))
+                return string.Empty;
+
+            var digits = new StringBuilder(4);
+            foreach (char c in raw)
+            {
+                if (char.IsDigit(c))
+                {
+                    digits.Append(c);
+                    if (digits.Length >= 4)
+                        break;
+                }
+            }
+
+            string d = digits.ToString();
+            if (d.Length <= 2)
+                return d;
+            return d.Substring(0, 2) + ":" + d.Substring(2);
+        }
+
+        public static bool TryParseTimeText(string text, out TimeSpan? time, out string error)
+        {
+            time = null;
+            error = null;
+            if (string.IsNullOrWhiteSpace(text))
+                return true;
+
+            string trimmed = text.Trim();
+            DateTime parsed;
+            if (!DateTime.TryParseExact(
+                trimmed,
+                "HH:mm",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out parsed))
+            {
+                error = "시간을 HH:mm 형식으로 입력해 주세요.";
+                return false;
+            }
+
+            time = parsed.TimeOfDay;
             return true;
         }
     }

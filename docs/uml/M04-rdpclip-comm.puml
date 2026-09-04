@@ -1,0 +1,26 @@
+@startuml GBCWorkHub_M04_Rdpclip
+skinparam shadowing false
+skinparam packageStyle rectangle
+left to right direction
+title Communication - RDP Clipboard Channel
+
+package "Local PC" {
+  [GBC WorkHub] as Hub
+}
+
+package "RDP Clipboard Redirect" {
+  [rdpclip] as Clip
+}
+
+package "Remote PC" {
+  [SessionAgent] as Agent
+  database TFS
+}
+
+Hub -right-> Clip : SESSION_TOKEN / SYNC_REQUEST
+Clip -right-> Agent
+Agent -left-> Clip : STATUS / TFS JSON / ACK
+Clip -left-> Hub
+Agent -down-> TFS
+
+@enduml

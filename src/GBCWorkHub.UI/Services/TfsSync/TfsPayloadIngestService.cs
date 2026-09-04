@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Configuration;
-using System.Globalization;
 using System.Linq;
 using GBCWorkHub.BIZ;
 using GBCWorkHub.DTO;
@@ -141,6 +140,10 @@ namespace GBCWorkHub.UI.Services.TfsSync
             result.AuthorFilterSkipped = skipAuthor;
 
             var sourceItems = payload.Changesets ?? new List<TfsChangesetItem>();
+            string siteCode = TfsCheckinInboxStore.InferSiteCode(
+                payload.ResolveComputerName(), payload.CollectionUrl);
+            foreach (var item in sourceItems)
+                NormalizeCheckedInAtToKorea(item, siteCode);
             string authorKey = ResolveAuthorFilterKey(payload);
             var authorMatched = new List<TfsChangesetItem>();
 
@@ -171,7 +174,7 @@ namespace GBCWorkHub.UI.Services.TfsSync
             if (result.IsRecentFallback)
             {
                 int beforeToday = authorMatched.Count;
-                authorMatched = authorMatched.Where(IsCheckedInTodayLocal).ToList();
+                authorMatched = authorMatched.Where(item => IsCheckedInTodayKorea(item, siteCode)).ToList();
                 DiagnosticLogger.Info("TFS_TODAY_FILTER", FormatContext(result)
                     + " before=" + beforeToday + " after=" + authorMatched.Count);
             }
@@ -195,6 +198,15 @@ namespace GBCWorkHub.UI.Services.TfsSync
             }
             result.AlreadyImportedExcludedCount = alreadyImportedExcluded;
             result.NewUnimportedCount = toApply.Count;
+
+            try
+            {
+                TfsCheckinInboxStore.UpsertFetched(authorMatched, payload, excludeImportedChangesetIds);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.Warn("TFS_INBOX", "upsert fetched failed: " + ex.Message);
+            }
 
             int beforeCount = tfsVm != null ? tfsVm.Candidates.Count : 0;
             int added = 0;
@@ -318,7 +330,7 @@ namespace GBCWorkHub.UI.Services.TfsSync
             if (activeRequest != null
                 && !string.IsNullOrWhiteSpace(activeRequest.RemoteComputerName)
                 && !string.IsNullOrWhiteSpace(pc)
-                && !string.Equals(pc, activeRequest.RemoteComputerName, StringComparison.OrdinalIgnoreCase))
+                && !RdpStatusBiz.ComputerNamesLooselyMatch(pc, activeRequest.RemoteComputerName))
             {
                 result.ErrorMessage = "computerName mismatch local=" + activeRequest.RemoteComputerName
                     + " remote=" + pc;
@@ -344,30 +356,49 @@ namespace GBCWorkHub.UI.Services.TfsSync
 
         private static string ResolveAuthorFilterKey(TfsRecentChangesetsPayload payload)
         {
-            if (payload != null && !string.IsNullOrWhiteSpace(payload.AuthorizedUserId))
-                return NormalizeUserId(payload.AuthorizedUserId);
+            string fromPayload = payload != null
+                ? NormalizeUserId(payload.AuthorizedUserId)
+                : string.Empty;
+            if (!string.IsNullOrWhiteSpace(fromPayload) && !IsOccupancyIdentity(fromPayload))
+                return fromPayload;
             return NormalizeUserId(Environment.UserDomainName + "\\" + Environment.UserName);
         }
 
-        /// <summary>로컬 오늘 체크인만 (오늘 폴백 안전망).</summary>
+        private static bool IsOccupancyIdentity(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+            string occupancy = OccupancyNameStore.TryGet();
+            if (!string.IsNullOrWhiteSpace(occupancy)
+                && string.Equals(value.Trim(), occupancy, StringComparison.OrdinalIgnoreCase))
+                return true;
+            string display = OccupancyNameStore.DisplayName;
+            return !string.IsNullOrWhiteSpace(display)
+                && string.Equals(value.Trim(), display, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>한국 날짜 기준 오늘 체크인만 (오늘 폴백 안전망).</summary>
         public static bool IsCheckedInTodayLocal(TfsChangesetItem item)
+        {
+            return IsCheckedInTodayKorea(item, null);
+        }
+
+        public static bool IsCheckedInTodayKorea(TfsChangesetItem item, string siteCode)
         {
             if (item == null || string.IsNullOrWhiteSpace(item.CheckedInAt))
                 return false;
+            DateTime? korea = KoreaTime.ParseToKorea(item.CheckedInAt, siteCode);
+            return korea.HasValue && korea.Value.Date == KoreaTime.Today;
+        }
 
-            DateTime dt;
-            if (!DateTime.TryParse(item.CheckedInAt, CultureInfo.InvariantCulture,
-                    DateTimeStyles.RoundtripKind, out dt)
-                && !DateTime.TryParse(item.CheckedInAt, CultureInfo.CurrentCulture,
-                    DateTimeStyles.AssumeLocal, out dt))
-                return false;
-
-            DateTime local = dt.Kind == DateTimeKind.Utc
-                ? dt.ToLocalTime()
-                : (dt.Kind == DateTimeKind.Unspecified
-                    ? DateTime.SpecifyKind(dt, DateTimeKind.Local)
-                    : dt.ToLocalTime());
-            return local.Date == DateTime.Today;
+        private static void NormalizeCheckedInAtToKorea(TfsChangesetItem item, string siteCode)
+        {
+            if (item == null || string.IsNullOrWhiteSpace(item.CheckedInAt))
+                return;
+            DateTime? korea = KoreaTime.ParseToKorea(item.CheckedInAt, siteCode);
+            if (!korea.HasValue)
+                return;
+            item.CheckedInAt = KoreaTime.ToRoundTripUtc(korea.Value);
         }
 
         public static bool IsAuthorMatch(TfsChangesetItem item, string filterKey)

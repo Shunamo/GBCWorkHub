@@ -13,6 +13,14 @@ namespace GBCWorkHub.UI.ViewModels.Popup
         private PopupIconKind _icon;
         private PopupKind _kind;
         private bool _showCancelOnProgress;
+        private bool _showInput;
+        private string _inputText;
+        private bool _showAffiliationInput;
+        private bool _requireAffiliation;
+        private string _affiliationText;
+        private string _inputError;
+        private string _infoIp;
+        private string _infoWindowsAccount;
         private ObservableCollection<PopupButtonDefinition> _buttons =
             new ObservableCollection<PopupButtonDefinition>();
 
@@ -69,6 +77,106 @@ namespace GBCWorkHub.UI.ViewModels.Popup
             set { SetProperty(ref _showCancelOnProgress, value); }
         }
 
+        public bool ShowInput
+        {
+            get { return _showInput; }
+            set
+            {
+                if (SetProperty(ref _showInput, value))
+                {
+                    RaisePropertyChanged("HasPromptInfo");
+                    RaisePropertyChanged("HasInputSection");
+                }
+            }
+        }
+
+        public string InputText
+        {
+            get { return _inputText; }
+            set
+            {
+                if (SetProperty(ref _inputText, value))
+                    InputError = null;
+            }
+        }
+
+        public bool ShowAffiliationInput
+        {
+            get { return _showAffiliationInput; }
+            set { SetProperty(ref _showAffiliationInput, value); }
+        }
+
+        public bool RequireAffiliation
+        {
+            get { return _requireAffiliation; }
+            set { SetProperty(ref _requireAffiliation, value); }
+        }
+
+        public string AffiliationText
+        {
+            get { return _affiliationText; }
+            set
+            {
+                if (SetProperty(ref _affiliationText, value))
+                    InputError = null;
+            }
+        }
+
+        public string InputError
+        {
+            get { return _inputError; }
+            set
+            {
+                if (SetProperty(ref _inputError, value))
+                    RaisePropertyChanged("HasInputError");
+            }
+        }
+
+        public bool HasInputError
+        {
+            get { return !string.IsNullOrWhiteSpace(InputError); }
+        }
+
+        public string InfoIp
+        {
+            get { return _infoIp; }
+            set
+            {
+                if (SetProperty(ref _infoIp, value))
+                {
+                    RaisePropertyChanged("HasPromptInfo");
+                    RaisePropertyChanged("HasInputSection");
+                }
+            }
+        }
+
+        public string InfoWindowsAccount
+        {
+            get { return _infoWindowsAccount; }
+            set
+            {
+                if (SetProperty(ref _infoWindowsAccount, value))
+                {
+                    RaisePropertyChanged("HasPromptInfo");
+                    RaisePropertyChanged("HasInputSection");
+                }
+            }
+        }
+
+        public bool HasPromptInfo
+        {
+            get
+            {
+                return !string.IsNullOrWhiteSpace(InfoIp)
+                    || !string.IsNullOrWhiteSpace(InfoWindowsAccount);
+            }
+        }
+
+        public bool HasInputSection
+        {
+            get { return ShowInput || HasPromptInfo; }
+        }
+
         public ObservableCollection<PopupButtonDefinition> Buttons
         {
             get { return _buttons; }
@@ -100,6 +208,30 @@ namespace GBCWorkHub.UI.ViewModels.Popup
             }
         }
 
+        public bool TryAcceptInput()
+        {
+            if (!ShowInput)
+                return true;
+            if (ShowAffiliationInput)
+            {
+                string affiliation = AffiliationText != null ? AffiliationText.Trim() : string.Empty;
+                if (RequireAffiliation && string.IsNullOrWhiteSpace(affiliation))
+                {
+                    InputError = "소속을 입력해 주세요.";
+                    return false;
+                }
+                AffiliationText = affiliation;
+            }
+            string name = InputText != null ? InputText.Trim() : string.Empty;
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                InputError = "사용자명을 입력해 주세요.";
+                return false;
+            }
+            InputText = name;
+            return true;
+        }
+
         public ICommand ButtonCommand { get; set; }
         public ICommand CancelProgressCommand { get; set; }
 
@@ -115,6 +247,14 @@ namespace GBCWorkHub.UI.ViewModels.Popup
             Icon = request.Icon;
             Kind = request.Kind;
             ShowCancelOnProgress = request.ShowCancelOnProgress;
+            ShowInput = request.ShowInput || request.Kind == PopupKind.Prompt;
+            InputText = request.InputText ?? string.Empty;
+            ShowAffiliationInput = request.ShowAffiliationInput;
+            RequireAffiliation = request.RequireAffiliation;
+            AffiliationText = request.AffiliationText ?? string.Empty;
+            InputError = null;
+            InfoIp = request.InfoIp ?? string.Empty;
+            InfoWindowsAccount = request.InfoWindowsAccount ?? string.Empty;
 
             Buttons.Clear();
             if (request.Buttons != null)
@@ -124,6 +264,12 @@ namespace GBCWorkHub.UI.ViewModels.Popup
                     if (b != null)
                         Buttons.Add(b);
                 }
+            }
+            if (Buttons.Count == 0 && request.Kind != PopupKind.Progress)
+            {
+                Buttons.Add(new PopupButtonDefinition("확인", PopupResultType.Primary, isDefault: true));
+                if (request.Kind == PopupKind.Confirm)
+                    Buttons.Add(new PopupButtonDefinition("취소", PopupResultType.Secondary, isCancel: true));
             }
         }
     }

@@ -41,6 +41,12 @@
     <Compile Include="Enums\RemotePcStatus.cs" />
     <Compile Include="RemoteSiteDto.cs" />
     <Compile Include="RemotePcDto.cs" />
+    <Compile Include="DirectoryUserDto.cs" />
+    <Compile Include="PcMapDto.cs" />
+    <Compile Include="PcAccessNoteParser.cs" />
+    <Compile Include="PcTeamCatalog.cs" />
+    <Compile Include="PcNameNaturalSort.cs" />
+    <Compile Include="KoreaTime.cs" />
     <Compile Include="RemoteConnectionRequestDto.cs" />
     <Compile Include="RemoteConnectionResultDto.cs" />
     <Compile Include="RdpStatusPayload.cs" />
@@ -53,6 +59,7 @@
     <Compile Include="WorkLog\WorkLogDraftModels.cs" />
     <Compile Include="WorkLog\WorkLogRecordDto.cs" />
     <Compile Include="WorkLog\WorkLogListQuery.cs" />
+    <Compile Include="WorkLog\WorkLogTeamNames.cs" />
     <Compile Include="RemotePcDbStatuses.cs" />
     <Compile Include="RemotePcStatus.cs" />
     <Compile Include="RemotePcReserveParams.cs" />

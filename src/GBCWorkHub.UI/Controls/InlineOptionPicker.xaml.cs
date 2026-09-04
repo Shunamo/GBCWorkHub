@@ -70,6 +70,10 @@ namespace GBCWorkHub.UI.Controls
             DependencyProperty.Register("MaxDropDownHeight", typeof(double), typeof(InlineOptionPicker),
                 new PropertyMetadata(280.0));
 
+        public static readonly DependencyProperty UsePopupChipsProperty =
+            DependencyProperty.Register("UsePopupChips", typeof(bool), typeof(InlineOptionPicker),
+                new PropertyMetadata(false, OnSelectedChanged));
+
         public InlineOptionPicker()
         {
             InitializeComponent();
@@ -110,6 +114,12 @@ namespace GBCWorkHub.UI.Controls
         {
             get { return (double)GetValue(MaxDropDownHeightProperty); }
             set { SetValue(MaxDropDownHeightProperty, value); }
+        }
+
+        public bool UsePopupChips
+        {
+            get { return (bool)GetValue(UsePopupChipsProperty); }
+            set { SetValue(UsePopupChipsProperty, value); }
         }
 
         public event EventHandler SelectionCommitted;
@@ -155,7 +165,8 @@ namespace GBCWorkHub.UI.Controls
             if (ItemsSource == null)
                 return;
 
-            bool glass = WorkLogUiOptions.UseGlassmorphism;
+            bool popup = UsePopupChips;
+            bool glass = !popup && WorkLogUiOptions.UseGlassmorphism;
 
             foreach (var item in ItemsSource)
             {
@@ -169,8 +180,21 @@ namespace GBCWorkHub.UI.Controls
                 Thickness borderThickness;
                 CornerRadius radius;
                 Thickness padding;
+                double fontSize;
+                double minHeight;
 
-                if (glass)
+                if (popup)
+                {
+                    fg = GlassFg;
+                    bg = selected ? GlassSelectedBg : GlassIdleBg;
+                    borderBrush = GlassTransparent;
+                    borderThickness = new Thickness(0);
+                    radius = new CornerRadius(8);
+                    padding = new Thickness(12, 6, 12, 6);
+                    fontSize = 12.5;
+                    minHeight = 28;
+                }
+                else if (glass)
                 {
                     fg = isEmptyOption
                         ? (selected ? GlassMutedFg : PlaceholderFg)
@@ -180,6 +204,8 @@ namespace GBCWorkHub.UI.Controls
                     borderThickness = new Thickness(0);
                     radius = new CornerRadius(6);
                     padding = new Thickness(10, 4, 10, 4);
+                    fontSize = 11;
+                    minHeight = 22;
                 }
                 else
                 {
@@ -195,13 +221,15 @@ namespace GBCWorkHub.UI.Controls
                     borderThickness = new Thickness(1);
                     radius = new CornerRadius(14);
                     padding = new Thickness(10, 5, 10, 5);
+                    fontSize = 12.5;
+                    minHeight = 0;
                 }
 
                 var text = new TextBlock
                 {
                     Text = label,
-                    FontSize = glass ? 11 : 12.5,
-                    FontWeight = selected || glass ? FontWeights.SemiBold : FontWeights.Normal,
+                    FontSize = fontSize,
+                    FontWeight = selected || glass || popup ? FontWeights.SemiBold : FontWeights.Normal,
                     FontStyle = FontStyles.Normal,
                     Foreground = fg,
                     VerticalAlignment = VerticalAlignment.Center,
@@ -213,7 +241,7 @@ namespace GBCWorkHub.UI.Controls
                     Orientation = Orientation.Horizontal,
                     IsHitTestVisible = false
                 };
-                if (selected && !glass)
+                if (selected && !glass && !popup)
                 {
                     var check = new Image
                     {
@@ -237,7 +265,7 @@ namespace GBCWorkHub.UI.Controls
                     CornerRadius = radius,
                     Padding = padding,
                     Margin = new Thickness(0, 0, 6, 6),
-                    MinHeight = glass ? 22 : 0,
+                    MinHeight = minHeight,
                     Cursor = Cursors.Hand,
                     Child = content,
                     Tag = item,
@@ -250,14 +278,18 @@ namespace GBCWorkHub.UI.Controls
                 {
                     if (isSelected)
                         return;
-                    if (glass)
+                    if (popup)
+                        border.Background = GlassHoverBg;
+                    else if (glass)
                         border.Background = GlassHoverBg;
                     else
                         border.Background = empty ? PlaceholderSelectedBg : HoverBg;
                 };
                 border.MouseLeave += (s, ev) =>
                 {
-                    if (glass)
+                    if (popup)
+                        border.Background = isSelected ? GlassSelectedBg : GlassIdleBg;
+                    else if (glass)
                         border.Background = isSelected ? GlassSelectedBg : GlassIdleBg;
                     else if (empty)
                         border.Background = isSelected ? PlaceholderSelectedBg : PlaceholderBg;

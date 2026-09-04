@@ -1,19 +1,30 @@
 using System;
+using System.Configuration;
 using System.IO;
 using System.Text;
 using System.Windows;
 using System.Windows.Markup;
 using System.Windows.Threading;
+using GBCWorkHub.DTO;
+using GBCWorkHub.UI.Services;
 
 namespace GBCWorkHub.UI
 {
     public partial class App : Application
     {
+        static App()
+        {
+            BundledConfig.EnsureExtracted();
+            BundledFonts.EnsureExtracted();
+        }
+
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
             DispatcherUnhandledException += App_DispatcherUnhandledException;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+            BundledFonts.ApplyTo(this);
+            LoadSiteTimeZones();
 
             try
             {
@@ -82,6 +93,23 @@ namespace GBCWorkHub.UI
             }
             catch
             {
+            }
+        }
+
+        private static void LoadSiteTimeZones()
+        {
+            string[] sites = { "CMC", "MNGHA", "RC", "AURORA" };
+            foreach (string site in sites)
+            {
+                try
+                {
+                    string raw = ConfigurationManager.AppSettings["SiteTimeZone." + site];
+                    if (!string.IsNullOrWhiteSpace(raw))
+                        KoreaTime.RegisterSiteTimeZone(site, raw.Trim());
+                }
+                catch
+                {
+                }
             }
         }
     }

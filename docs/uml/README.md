@@ -54,6 +54,7 @@ java -jar docs\uml\plantuml.jar -tpng -o docs\uml\png docs\uml\*.puml
 | `M01-occupancy-comm.puml` | 점유 협업 |
 | `M02-tfs-comm.puml` | TFS sync 협업 |
 | `M03-cmc-comm.puml` | CMC 점유 협업 |
+| `M04-rdpclip-comm.puml` | rdpclip 채널 (Local / Remote) |
 
 ## FigJam에 들어간 것
 

@@ -226,20 +226,20 @@ namespace GBCWorkHub.SessionAgent
         private static string FormatTfsDate(JToken token)
         {
             if (token == null || token.Type == JTokenType.Null)
-                return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                return DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
 
             DateTime dt;
             if (token.Type == JTokenType.Date)
             {
                 dt = token.Value<DateTime>();
-                return dt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+                return dt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ");
             }
 
             string raw = token.ToString();
             if (DateTime.TryParse(raw, null, System.Globalization.DateTimeStyles.RoundtripKind, out dt))
-                return dt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+                return dt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ");
 
-            return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            return DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
         }
 
         private static string GetString(HttpClient client, string url)
