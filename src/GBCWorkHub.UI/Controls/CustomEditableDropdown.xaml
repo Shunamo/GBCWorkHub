@@ -7,9 +7,9 @@
              HorizontalAlignment="Stretch"
              ClipToBounds="True">
     <Grid MinWidth="0" ClipToBounds="True">
-        <Border x:Name="PART_RootBorder" Background="#FFFFFF" BorderBrush="#D8DEE8"
-                BorderThickness="1" CornerRadius="8" MinHeight="36" MinWidth="0"
-                HorizontalAlignment="Stretch" ClipToBounds="True">
+        <Border x:Name="PART_RootBorder" Background="#CCFFFFFF" BorderBrush="#F2FFFFFF"
+                BorderThickness="1.5" CornerRadius="10" MinHeight="36" MinWidth="0"
+                HorizontalAlignment="Stretch" ClipToBounds="True" SnapsToDevicePixels="True">
             <Grid MinWidth="0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" MinWidth="0" />
@@ -43,11 +43,11 @@
         <Popup IsOpen="{Binding IsDropDownOpen, ElementName=Root, Mode=TwoWay}"
                PlacementTarget="{Binding ElementName=PART_RootBorder}" Placement="Bottom"
                StaysOpen="False" AllowsTransparency="True" Closed="Popup_Closed">
-            <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="8"
+            <Border Background="#F2FFFFFF" BorderBrush="#F2FFFFFF" BorderThickness="1.5" CornerRadius="12"
                     Margin="0,4,0,0" MinWidth="{Binding ActualWidth, ElementName=PART_RootBorder}"
                     MaxHeight="{Binding MaxDropDownHeight, ElementName=Root}">
                 <Border.Effect>
-                    <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.12" Color="#000000" />
+                    <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.14" Color="#3B5070" />
                 </Border.Effect>
                 <StackPanel>
                     <TextBlock x:Name="PART_EmptyText" Margin="12,10" Foreground="#94A3B8" FontSize="12"

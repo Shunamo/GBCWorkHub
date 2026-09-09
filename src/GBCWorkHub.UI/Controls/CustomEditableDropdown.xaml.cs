@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
@@ -81,7 +82,28 @@ namespace GBCWorkHub.UI.Controls
 
         private static void OnItemsChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            ((CustomEditableDropdown)d).RefreshEmpty();
+            var c = (CustomEditableDropdown)d;
+
+            var oldNotify = e.OldValue as INotifyCollectionChanged;
+            if (oldNotify != null)
+                oldNotify.CollectionChanged -= c.ItemsSource_CollectionChanged;
+
+            var newNotify = e.NewValue as INotifyCollectionChanged;
+            if (newNotify != null)
+                newNotify.CollectionChanged += c.ItemsSource_CollectionChanged;
+
+            c.RefreshEmpty();
+        }
+
+        /// <summary>
+        /// ItemsSource가 같은 컬렉션 인스턴스를 유지한 채 내용만 Clear/Add로 바뀌는 경우(예: 사이트
+        /// 선택 시 PC 목록 갱신) ItemsSourceProperty 자체는 변경되지 않아 OnItemsChanged가 재호출되지
+        /// 않는다 — 그러면 처음 바인딩 시점(항목 없음)의 "후보 없음" 표시가 계속 남는다. 그래서 컬렉션의
+        /// CollectionChanged를 직접 구독해 내용이 바뀔 때마다 빈 상태 표시를 다시 계산한다.
+        /// </summary>
+        private void ItemsSource_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            RefreshEmpty();
         }
 
         private static void OnTextChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)

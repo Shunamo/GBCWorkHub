@@ -104,13 +104,25 @@
     <Compile Include="Models\Popup\PopupRequest.cs" />
     <Compile Include="Models\Popup\PopupResult.cs" />
     <Compile Include="Converters\BoolToVisibilityConverter.cs" />
+    <Compile Include="Converters\ByteArrayToImageSourceConverter.cs" />
     <Compile Include="Converters\MinWidthToVisibilityConverter.cs" />
     <Compile Include="Converters\StringEqualsConverter.cs" />
     <Compile Include="Converters\StringEqualsMultiConverter.cs" />
+    <Compile Include="Converters\OpenWhenVisibleConverter.cs" />
     <Compile Include="ViewModels\ViewModelBase.cs" />
     <Compile Include="ViewModels\RelayCommand.cs" />
     <Compile Include="ViewModels\RelayCommandGeneric.cs" />
     <Compile Include="ViewModels\MainViewModel.cs" />
+    <Compile Include="ViewModels\AdminViewModel.cs" />
+    <Compile Include="ViewModels\AdminSiteChipItemViewModel.cs" />
+    <Compile Include="ViewModels\AdminPcGroupViewModel.cs" />
+    <Compile Include="ViewModels\AdminPcItemViewModel.cs" />
+    <Compile Include="ViewModels\AdminUserItemViewModel.cs" />
+    <Compile Include="ViewModels\AdminOccupancyItemViewModel.cs" />
+    <Compile Include="ViewModels\AdminOccupancyStatRowViewModel.cs" />
+    <Compile Include="ViewModels\AdminUsageLogItemViewModel.cs" />
+    <Compile Include="ViewModels\AdminUsageLogGroupViewModels.cs" />
+    <Compile Include="ViewModels\AdminWorkLogGroupViewModels.cs" />
     <Compile Include="ViewModels\MyPageViewModel.cs" />
     <Compile Include="ViewModels\RemoteWorkspaceViewModel.cs" />
     <Compile Include="ViewModels\RemoteComputerItemViewModel.cs" />
@@ -162,9 +174,23 @@
     <Compile Include="Views\MyPageView.xaml.cs">
       <DependentUpon>MyPageView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Views\AdminView.xaml.cs">
+      <DependentUpon>AdminView.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Views\WorkLog\WorkLogListView.xaml.cs">
       <DependentUpon>WorkLogListView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Views\Improvement\ImprovementListView.xaml.cs">
+      <DependentUpon>ImprovementListView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\Improvement\ImprovementEditDialog.xaml.cs">
+      <DependentUpon>ImprovementEditDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="ViewModels\Improvement\ImprovementListItemViewModel.cs" />
+    <Compile Include="ViewModels\Improvement\ImprovementCommentItemViewModel.cs" />
+    <Compile Include="ViewModels\Improvement\ImprovementContentBlockViewModel.cs" />
+    <Compile Include="ViewModels\Improvement\ImprovementEditDialogViewModel.cs" />
+    <Compile Include="ViewModels\Improvement\ImprovementListViewModel.cs" />
     <Compile Include="Views\WorkLog\WorkLogListClassicView.xaml.cs">
       <DependentUpon>WorkLogListClassicView.xaml</DependentUpon>
     </Compile>
@@ -290,7 +316,19 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="Views\AdminView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Views\WorkLog\WorkLogListView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\Improvement\ImprovementListView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\Improvement\ImprovementEditDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

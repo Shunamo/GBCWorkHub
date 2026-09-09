@@ -531,6 +531,13 @@
                                 Visibility="{Binding IsListViewMode, Converter={StaticResource BoolToVis}}">
                             <Image Source="{StaticResource DashboardViewIcon}" Width="18" Height="18" />
                         </Button>
+                        <Button Style="{StaticResource HeaderIconButton}" Margin="8,0,0,0"
+                                ToolTip="PC 추가 (관리자)"
+                                Command="{Binding AddRemotePcCommand}"
+                                Visibility="{Binding IsAdmin, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="＋" FontSize="16" FontWeight="SemiBold" Foreground="#15803D"
+                                       VerticalAlignment="Center" />
+                        </Button>
                     </StackPanel>
                     <Border DockPanel.Dock="Right" Background="#A6FFFFFF" BorderBrush="#F2FFFFFF" BorderThickness="1.5"
                             CornerRadius="12" Padding="10,6" Width="280" HorizontalAlignment="Right">
@@ -653,6 +660,7 @@
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <DockPanel Grid.Row="0" LastChildFill="True" Margin="0,0,0,8">
                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
@@ -676,12 +684,43 @@
                                             Visibility="{Binding ShowPcAccessSaveButton, Converter={StaticResource BoolToVis}}">
                                         <TextBlock Text="✕" FontSize="13" Foreground="#64748B" VerticalAlignment="Center" />
                                     </Button>
+                                    <Button Style="{StaticResource HeaderIconButton}"
+                                            Margin="8,0,0,0"
+                                            ToolTip="PC 삭제 (관리자)"
+                                            Command="{Binding DeleteRemotePcCommand}"
+                                            Visibility="{Binding ShowAdminDeletePcButton, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="삭제" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="#C48989" VerticalAlignment="Center" />
+                                    </Button>
                                 </StackPanel>
                                 <TextBlock Text="{Binding RemoteComputerName}" FontSize="15" FontWeight="SemiBold"
                                            Foreground="#1E293B" TextTrimming="CharacterEllipsis"
                                            VerticalAlignment="Center" />
                             </DockPanel>
-                            <StackPanel Grid.Row="1"
+                            <StackPanel Grid.Row="1" Margin="0,0,0,8"
+                                        Visibility="{Binding IsAdmin, Converter={StaticResource BoolToVis}}">
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="IP" Width="40" FontSize="12" FontWeight="SemiBold" Foreground="#64748B"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding AdminEditPcIp}" FontSize="12.5" Foreground="#1E293B"
+                                               VerticalAlignment="Center"
+                                               Visibility="{Binding IsPcAccessReadOnly, Converter={StaticResource BoolToVis}}" />
+                                    <TextBox Text="{Binding AdminEditPcIp, UpdateSourceTrigger=PropertyChanged}"
+                                             MinWidth="140" Padding="4,2" FontSize="12.5"
+                                             Visibility="{Binding IsPcAccessEditing, Converter={StaticResource BoolToVis}}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="소속" Width="40" FontSize="12" FontWeight="SemiBold" Foreground="#64748B"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding AdminEditTeamName}" FontSize="12.5" Foreground="#1E293B"
+                                               VerticalAlignment="Center"
+                                               Visibility="{Binding IsPcAccessReadOnly, Converter={StaticResource BoolToVis}}" />
+                                    <TextBox Text="{Binding AdminEditTeamName, UpdateSourceTrigger=PropertyChanged}"
+                                             MinWidth="140" Padding="4,2" FontSize="12.5"
+                                             Visibility="{Binding IsPcAccessEditing, Converter={StaticResource BoolToVis}}" />
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel Grid.Row="2"
                                         Orientation="Horizontal"
                                         HorizontalAlignment="Left"
                                         VerticalAlignment="Top">

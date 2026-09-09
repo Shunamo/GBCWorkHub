@@ -60,6 +60,8 @@
     <Compile Include="IDirectoryRepository.cs" />
     <Compile Include="OracleDirectoryRepository.cs" />
     <Compile Include="OracleDevSessionFileRepository.cs" />
+    <Compile Include="IImprovementRepository.cs" />
+    <Compile Include="OracleImprovementRepository.cs" />
     <Compile Include="WorkHubFileLogger.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

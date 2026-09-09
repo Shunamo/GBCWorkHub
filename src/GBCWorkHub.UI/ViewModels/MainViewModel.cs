@@ -21,8 +21,10 @@ namespace GBCWorkHub.UI.ViewModels
     {
         private readonly TfsWorkLogViewModel _tfsWorkLog = new TfsWorkLogViewModel();
         private readonly WorkLog.WorkLogListViewModel _workLogList = new WorkLog.WorkLogListViewModel();
+        private readonly Improvement.ImprovementListViewModel _improvement = new Improvement.ImprovementListViewModel();
         private readonly RemoteWorkspaceViewModel _remoteWorkspace;
         private readonly MyPageViewModel _myPage;
+        private readonly AdminViewModel _admin = new AdminViewModel();
 
         private IPopupService _popup;
         private TfsSyncCoordinator _tfsSync;
@@ -36,6 +38,10 @@ namespace GBCWorkHub.UI.ViewModels
         private string _updateBannerText;
         private UpdateManifest _pendingUpdate;
         private CancellationTokenSource _updateCts;
+        private bool _isLogoutMenuOpen;
+        private bool _isLoginGreetingVisible;
+        private string _loginGreetingText = string.Empty;
+        private int _loginGreetingToken;
 
         public MainViewModel()
         {
@@ -58,11 +64,14 @@ namespace GBCWorkHub.UI.ViewModels
 
             WorkLogBackCommand = new RelayCommand(WorkLogBack);
             SelectMainTabCommand = new RelayCommand<string>(SelectMainTab);
+            MeTabCommand = new RelayCommand(() => { var _ = OnMeTabAsync(); });
+            LoginCommand = new RelayCommand(() => { var _ = LoginAsync(); }, () => !IsLoggedIn);
+            LogoutCommand = new RelayCommand(() => { var _ = LogoutAsync(); }, () => IsLoggedIn);
             RefreshCommand = new RelayCommand(() => { var _ = RefreshFromDbAsync(); }, () => !IsRefreshing);
             BackToSitesCommand = new RelayCommand(() => _remoteWorkspace.BackToSitesCommand.Execute(null));
             UpdateCommand = new RelayCommand(() => { var _ = ApplyUpdateAsync(); }, () => IsUpdateAvailable && !IsUpdateBusy);
             DismissUpdateCommand = new RelayCommand(DismissUpdate, () => IsUpdateAvailable && !IsUpdateBusy);
-            _myPage = new MyPageViewModel(_workLogList, OpenFromMyPage, ChangeOccupancyNameAsync);
+            _myPage = new MyPageViewModel(_workLogList, OpenFromMyPage, ChangeOccupancyNameAsync, ChangePasswordAsync);
         }
 
         public RemoteWorkspaceViewModel RemoteWorkspace
@@ -80,6 +89,11 @@ namespace GBCWorkHub.UI.ViewModels
             get { return _workLogList; }
         }
 
+        public Improvement.ImprovementListViewModel Improvement
+        {
+            get { return _improvement; }
+        }
+
         public TfsSyncCoordinator TfsSync
         {
             get { return _tfsSync; }
@@ -90,13 +104,54 @@ namespace GBCWorkHub.UI.ViewModels
             get { return _myPage; }
         }
 
+        public AdminViewModel Admin
+        {
+            get { return _admin; }
+        }
+
+        public bool IsAdminShellVisible
+        {
+            get { return IsLoggedIn && IsAdmin; }
+        }
+
+        /// <summary>관리자 셸에서 업무기록 상세를 열었을 때 오버레이.</summary>
+        public bool IsAdminWorkLogEditVisible
+        {
+            get
+            {
+                return IsAdminShellVisible
+                    && WorkLogList != null
+                    && WorkLogList.IsEditOpen;
+            }
+        }
+
+        /// <summary>관리자 셸에서 개선사항 요청 상세를 열었을 때 — 헤더 뒤로가기 버튼 표시용.</summary>
+        public bool IsAdminImprovementEditVisible
+        {
+            get
+            {
+                return IsAdminShellVisible
+                    && Improvement != null
+                    && Improvement.IsEditOpen;
+            }
+        }
+
+        public bool IsUserShellVisible
+        {
+            get { return !IsAdminShellVisible; }
+        }
+
         public void InitializeUiServices(IPopupService popup)
         {
             _popup = popup;
+            if (_admin != null)
+                _admin.AttachPopup(popup);
             if (_tfsWorkLog != null)
                 _tfsWorkLog.AttachPopup(popup);
             if (_workLogList != null)
                 _workLogList.AttachPopup(popup);
+            if (_improvement != null)
+                _improvement.AttachPopup(popup);
 
             _tfsSync = new TfsSyncCoordinator(
                 popup,
@@ -138,7 +193,9 @@ namespace GBCWorkHub.UI.ViewModels
                 _workLogList,
                 _tfsSync,
                 SelectMainTab,
-                RefreshPendingTfsBadge);
+                RefreshPendingTfsBadge,
+                NotifyIdentityChanged,
+                ShowLoginGreeting);
 
             RefreshPendingTfsBadge();
 
@@ -170,8 +227,35 @@ namespace GBCWorkHub.UI.ViewModels
                     RaisePropertyChanged("HeaderTitle");
                     RaisePropertyChanged("IsWorkLogGlassOverlay");
                     RaisePropertyChanged("IsMainGlassOverlay");
+                    RaisePropertyChanged("IsAdminWorkLogEditVisible");
+                    RaisePropertyChanged("IsHeaderBackVisible");
+                    if (e.PropertyName == "IsEditOpen"
+                        && WorkLogList != null
+                        && !WorkLogList.IsEditOpen
+                        && IsAdminShellVisible
+                        && _admin != null)
+                    {
+                        _admin.RefreshWorkLogsAfterEdit();
+                    }
                 }
             };
+
+            _improvement.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == "IsEditOpen")
+                {
+                    RaisePropertyChanged("HeaderTitle");
+                    RaisePropertyChanged("IsMainGlassOverlay");
+                    RaisePropertyChanged("IsHeaderBackVisible");
+                    RaisePropertyChanged("IsAdminImprovementEditVisible");
+                }
+            };
+
+            if (_admin != null)
+            {
+                _admin.AttachOpenWorkLog(OpenFromAdminWorkLog);
+                _admin.AttachWorkLogList(_workLogList);
+            }
 
             _tfsWorkLog.CandidatesChanged -= OnTfsCandidatesChangedForWorkLog;
             _tfsWorkLog.CandidatesChanged += OnTfsCandidatesChangedForWorkLog;
@@ -219,6 +303,9 @@ namespace GBCWorkHub.UI.ViewModels
 
         public ICommand WorkLogBackCommand { get; private set; }
         public ICommand SelectMainTabCommand { get; private set; }
+        public ICommand MeTabCommand { get; private set; }
+        public ICommand LoginCommand { get; private set; }
+        public ICommand LogoutCommand { get; private set; }
         public ICommand RefreshCommand { get; private set; }
         public ICommand BackToSitesCommand { get; private set; }
         public ICommand UpdateCommand { get; private set; }
@@ -408,6 +495,7 @@ namespace GBCWorkHub.UI.ViewModels
                     RaisePropertyChanged("IsTfsTab");
                     RaisePropertyChanged("IsWorkLogTab");
                     RaisePropertyChanged("IsMeTab");
+                    RaisePropertyChanged("IsImprovementTab");
                     RaisePropertyChanged("IsHeaderBackVisible");
                     RaisePropertyChanged("IsWorkLogGlassUi");
                     RaisePropertyChanged("IsWorkLogGlassOverlay");
@@ -426,27 +514,52 @@ namespace GBCWorkHub.UI.ViewModels
 
         public bool IsRemoteTab
         {
-            get { return string.Equals(SelectedMainTab, "Remote", StringComparison.OrdinalIgnoreCase); }
+            get
+            {
+                return IsUserShellVisible
+                    && string.Equals(SelectedMainTab, "Remote", StringComparison.OrdinalIgnoreCase);
+            }
         }
 
         public bool IsTfsTab
         {
-            get { return string.Equals(SelectedMainTab, "Tfs", StringComparison.OrdinalIgnoreCase); }
+            get
+            {
+                return IsUserShellVisible
+                    && string.Equals(SelectedMainTab, "Tfs", StringComparison.OrdinalIgnoreCase);
+            }
         }
 
         public bool IsWorkLogTab
         {
-            get { return string.Equals(SelectedMainTab, "WorkLog", StringComparison.OrdinalIgnoreCase); }
+            get
+            {
+                return IsUserShellVisible
+                    && string.Equals(SelectedMainTab, "WorkLog", StringComparison.OrdinalIgnoreCase);
+            }
         }
 
         public bool IsMeTab
         {
-            get { return string.Equals(SelectedMainTab, "Me", StringComparison.OrdinalIgnoreCase); }
+            get
+            {
+                return IsUserShellVisible
+                    && string.Equals(SelectedMainTab, "Me", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        public bool IsImprovementTab
+        {
+            get
+            {
+                return IsUserShellVisible
+                    && string.Equals(SelectedMainTab, "Improvement", StringComparison.OrdinalIgnoreCase);
+            }
         }
 
         public bool IsHeaderBackVisible
         {
-            get { return IsWorkLogTab || IsMeTab; }
+            get { return IsWorkLogTab || IsMeTab || IsImprovementTab || IsAdminWorkLogEditVisible || IsAdminImprovementEditVisible; }
         }
 
         public bool IsWorkLogGlassUi
@@ -463,6 +576,10 @@ namespace GBCWorkHub.UI.ViewModels
         {
             get
             {
+                if (IsAdminWorkLogEditVisible
+                    && WorkLogList != null
+                    && WorkLogList.UseGlassmorphism)
+                    return true;
                 return IsWorkLogGlassUi
                     && WorkLogList != null
                     && !WorkLogList.IsImportOpen
@@ -472,7 +589,7 @@ namespace GBCWorkHub.UI.ViewModels
 
         public bool IsMainGlassOverlay
         {
-            get { return IsRemoteTab || IsWorkLogGlassOverlay || IsMeTab; }
+            get { return IsRemoteTab || IsWorkLogGlassOverlay || IsMeTab || IsImprovementTab || IsAdminShellVisible; }
         }
 
         /// <summary>헤더 뒤로가기/가시성 — RemoteWorkspace와 동기.</summary>
@@ -495,8 +612,23 @@ namespace GBCWorkHub.UI.ViewModels
         {
             get
             {
+                if (IsAdminShellVisible)
+                {
+                    if (IsAdminWorkLogEditVisible)
+                        return "업무 기록";
+                    if (IsAdminImprovementEditVisible)
+                        return "개선사항 요청";
+                    return "Admin Page";
+                }
                 if (IsMeTab)
                     return string.Empty;
+                if (IsImprovementTab)
+                {
+                    if (Improvement != null && Improvement.IsEditOpen
+                        && Improvement.EditDialog != null && Improvement.EditDialog.IsNewRecord)
+                        return "개선 요청 작성";
+                    return string.Empty; // 목록/상세는 탭 바에 이미 "개선사항 요청"이 표시되므로 중복 표기하지 않음
+                }
                 if (IsWorkLogTab)
                 {
                     if (WorkLogList != null && WorkLogList.IsEditOpen
@@ -524,6 +656,67 @@ namespace GBCWorkHub.UI.ViewModels
             }
         }
 
+        public bool IsLoggedIn
+        {
+            get { return OccupancyNameStore.HasName; }
+        }
+
+        public bool IsAdmin
+        {
+            get { return OccupancyNameStore.IsAdmin; }
+        }
+
+        /// <summary>탭바 Me 버튼 라벨. 로그아웃 시 "로그인".</summary>
+        public string MeTabLabel
+        {
+            get { return IsLoggedIn ? OccupancyDisplayName : "로그인"; }
+        }
+
+        public bool IsLogoutMenuOpen
+        {
+            get { return _isLogoutMenuOpen; }
+            set { SetProperty(ref _isLogoutMenuOpen, value); }
+        }
+
+        public bool IsLoginGreetingVisible
+        {
+            get { return _isLoginGreetingVisible; }
+            private set { SetProperty(ref _isLoginGreetingVisible, value); }
+        }
+
+        public string LoginGreetingText
+        {
+            get { return _loginGreetingText; }
+            private set { SetProperty(ref _loginGreetingText, value ?? string.Empty); }
+        }
+
+        public void ShowLoginGreeting()
+        {
+            string name = OccupancyDisplayName;
+            if (string.IsNullOrWhiteSpace(name) || string.Equals(name, "나", StringComparison.Ordinal))
+                name = OccupancyNameStore.TryGet() ?? "사용자";
+            LoginGreetingText = "안녕하세요 " + name.Trim() + "님";
+            IsLoginGreetingVisible = true;
+            int token = ++_loginGreetingToken;
+            var ignored = HideLoginGreetingAsync(token);
+        }
+
+        private async Task HideLoginGreetingAsync(int token)
+        {
+            try
+            {
+                await Task.Delay(3000).ConfigureAwait(true);
+            }
+            catch (TaskCanceledException)
+            {
+                return;
+            }
+            if (token != _loginGreetingToken)
+                return;
+            IsLoginGreetingVisible = false;
+            LoginGreetingText = string.Empty;
+        }
+
         /// <summary>원격 종료 후 체크인 가져오기 자동 팝업. 수동 가져오기는 유지.</summary>
         public bool IsCheckinFetchEnabled
         {
@@ -549,11 +742,133 @@ namespace GBCWorkHub.UI.ViewModels
 
         public void NotifyIdentityChanged()
         {
+            RaisePropertyChanged("IsLoggedIn");
+            RaisePropertyChanged("MeTabLabel");
             RaisePropertyChanged("OccupancyDisplayName");
             RaisePropertyChanged("OccupancyInitial");
             RaisePropertyChanged("HeaderTitle");
+            RaisePropertyChanged("IsAdmin");
+            RaisePropertyChanged("IsAdminShellVisible");
+            RaisePropertyChanged("IsAdminWorkLogEditVisible");
+            RaisePropertyChanged("IsAdminImprovementEditVisible");
+            RaisePropertyChanged("IsUserShellVisible");
+            RaisePropertyChanged("IsRemoteTab");
+            RaisePropertyChanged("IsTfsTab");
+            RaisePropertyChanged("IsWorkLogTab");
+            RaisePropertyChanged("IsMeTab");
+            RaisePropertyChanged("IsImprovementTab");
+            RaisePropertyChanged("IsHeaderBackVisible");
+            RaisePropertyChanged("IsMainGlassOverlay");
+            RaisePropertyChanged("IsSitePickerVisible");
+            RaisePropertyChanged("IsGalleryVisible");
+            var login = LoginCommand as RelayCommand;
+            if (login != null)
+                login.RaiseCanExecuteChanged();
+            var logout = LogoutCommand as RelayCommand;
+            if (logout != null)
+                logout.RaiseCanExecuteChanged();
             if (_myPage != null)
                 _myPage.RefreshIdentity();
+            if (_remoteWorkspace != null)
+                _remoteWorkspace.RefreshConnectAuthUi();
+
+            if (IsAdminShellVisible)
+            {
+                IsLogoutMenuOpen = false;
+                IsLoginGreetingVisible = false;
+                _admin.EnterShell();
+            }
+            else
+            {
+                _admin.LeaveShell();
+            }
+        }
+
+        private async Task OnMeTabAsync()
+        {
+            if (!IsLoggedIn)
+            {
+                IsLogoutMenuOpen = false;
+                await LoginAsync().ConfigureAwait(true);
+                return;
+            }
+
+            // 관리자 셸: 기존 헤더 Me 버튼 자리에서 로그아웃 메뉴만 토글
+            if (IsAdminShellVisible)
+            {
+                IsLogoutMenuOpen = !IsLogoutMenuOpen;
+                return;
+            }
+
+            if (IsMeTab)
+            {
+                IsLogoutMenuOpen = !IsLogoutMenuOpen;
+                return;
+            }
+
+            IsLogoutMenuOpen = false;
+            SelectedMainTab = "Me";
+        }
+
+        private async Task LoginAsync()
+        {
+            if (_popup == null || IsLoggedIn)
+                return;
+
+            bool ok = await OccupancyNamePrompt.LoginAsync(_popup).ConfigureAwait(true);
+            if (!ok)
+                return;
+
+            NotifyIdentityChanged();
+            IsLogoutMenuOpen = false;
+            if (IsAdminShellVisible)
+                return;
+            ShowLoginGreeting();
+        }
+
+        private async Task LogoutAsync()
+        {
+            IsLogoutMenuOpen = false;
+            _loginGreetingToken++;
+            IsLoginGreetingVisible = false;
+            LoginGreetingText = string.Empty;
+            OccupancyNameStore.Clear();
+            NotifyIdentityChanged();
+
+            // 갤러리로 복귀 (사이트 PC 목록 선택 해제)
+            SelectedMainTab = "Remote";
+            if (_remoteWorkspace != null)
+            {
+                _remoteWorkspace.BackToSites();
+                try
+                {
+                    // 원격이 이미 끝났으면 DB 점유 정리 시도
+                    await _remoteWorkspace.HandleAppClosingAsync().ConfigureAwait(true);
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticLogger.Warn("AUTH", "Logout release skipped: " + ex.Message);
+                }
+            }
+        }
+
+        private async Task ChangePasswordAsync()
+        {
+            if (_popup == null)
+                return;
+            bool ok = await OccupancyNamePrompt.ChangePasswordAsync(_popup).ConfigureAwait(true);
+            if (!ok || _popup == null)
+                return;
+            await _popup.ShowResultAsync(new PopupRequest
+            {
+                Title = "비밀번호 변경",
+                Message = "비밀번호를 변경했습니다.",
+                Icon = PopupIconKind.Success,
+                Buttons = new[]
+                {
+                    new PopupButtonDefinition("확인", PopupResultType.Primary, isDefault: true)
+                }
+            }).ConfigureAwait(true);
         }
 
         private async Task ChangeOccupancyNameAsync()
@@ -660,6 +975,11 @@ namespace GBCWorkHub.UI.ViewModels
 
         public async Task RefreshFromDbAsync()
         {
+            if (IsAdminShellVisible)
+            {
+                await _admin.ReloadAsync().ConfigureAwait(true);
+                return;
+            }
             if (IsMeTab && _myPage != null)
             {
                 await _myPage.ReloadAsync().ConfigureAwait(true);
@@ -722,8 +1042,24 @@ namespace GBCWorkHub.UI.ViewModels
             {
                 if (WorkLogList.CloseEditCommand != null && WorkLogList.CloseEditCommand.CanExecute(null))
                     WorkLogList.CloseEditCommand.Execute(null);
+                RaisePropertyChanged("IsAdminWorkLogEditVisible");
+                RaisePropertyChanged("IsHeaderBackVisible");
+                RaisePropertyChanged("HeaderTitle");
                 if (IsWorkLogTab)
                     PopWorkLogBackTab();
+                return;
+            }
+            // 개선사항 요청: 업무일지와 동일하게 헤더 뒤로가기 버튼이 작성/상세를 먼저 닫고,
+            // 목록에 있을 때만 원격PC 탭으로 나간다 — 그전에는 이 분기가 없어 상세를 보고 있어도
+            // 헤더 뒤로가기를 누르면 곧장 "원격 PC" 탭으로 튕겨나갔다.
+            if (Improvement != null && Improvement.IsEditOpen)
+            {
+                var editDialog = Improvement.EditDialog;
+                if (editDialog != null && editDialog.CloseCommand != null && editDialog.CloseCommand.CanExecute(null))
+                    editDialog.CloseCommand.Execute(null);
+                RaisePropertyChanged("IsAdminImprovementEditVisible");
+                RaisePropertyChanged("IsHeaderBackVisible");
+                RaisePropertyChanged("HeaderTitle");
                 return;
             }
             if (IsWorkLogTab && PopWorkLogBackTab())
@@ -753,6 +1089,17 @@ namespace GBCWorkHub.UI.ViewModels
                 WorkLogList.EditWorkLogCommand.Execute(item);
         }
 
+        private void OpenFromAdminWorkLog(WorkLog.WorkLogListItemViewModel item)
+        {
+            if (item == null || WorkLogList == null)
+                return;
+            WorkLogList.OpenForAdmin(item);
+            RaisePropertyChanged("IsAdminWorkLogEditVisible");
+            RaisePropertyChanged("IsWorkLogGlassOverlay");
+            RaisePropertyChanged("IsMainGlassOverlay");
+            RaisePropertyChanged("HeaderTitle");
+        }
+
         private bool PopWorkLogBackTab()
         {
             if (string.IsNullOrWhiteSpace(_workLogBackTab))
@@ -768,6 +1115,41 @@ namespace GBCWorkHub.UI.ViewModels
             if (string.Equals(tab, "Tfs", StringComparison.OrdinalIgnoreCase))
                 tab = "WorkLog";
             tab = string.IsNullOrWhiteSpace(tab) ? "Remote" : tab;
+
+            // 미로그인: 원격 PC만 허용. Me → 로그인, 그 외 탭 → 로그인 후 이동.
+            if (!IsLoggedIn)
+            {
+                if (string.Equals(tab, "Remote", StringComparison.OrdinalIgnoreCase))
+                {
+                    ApplyMainTabSelection(tab);
+                    return;
+                }
+                if (string.Equals(tab, "Me", StringComparison.OrdinalIgnoreCase))
+                {
+                    var loginOnly = LoginAsync();
+                    return;
+                }
+                var loginThen = LoginThenSelectAsync(tab);
+                return;
+            }
+
+            ApplyMainTabSelection(tab);
+        }
+
+        private async Task LoginThenSelectAsync(string tab)
+        {
+            if (!IsLoggedIn)
+            {
+                await LoginAsync().ConfigureAwait(true);
+                if (!IsLoggedIn)
+                    return;
+            }
+            ApplyMainTabSelection(tab);
+        }
+
+        private void ApplyMainTabSelection(string tab)
+        {
+            IsLogoutMenuOpen = false;
             if (!string.Equals(tab, "WorkLog", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(tab, _workLogBackTab, StringComparison.OrdinalIgnoreCase))
                 _workLogBackTab = null;

@@ -178,6 +178,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         private bool _isExpanded;
         private bool _isSelected;
         private bool _needsTicketReview;
+        private bool _includeSiteInListMeta;
         private string _ticketNo;
 
         public string Id { get; set; }
@@ -239,6 +240,10 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         public string TfsAuthor { get; set; }
         /// <summary>화면 표시용 작성자명 (한 번만 표시).</summary>
         public string AuthorName { get; set; }
+        /// <summary>MSDWHTKD_USR.USR_ID FK. 옛 기록은 NULL(계정 연결 없음).</summary>
+        public long? AuthorUserId { get; set; }
+        /// <summary>작성자 계정이 이후 삭제됐는지 — 목록 표시용.</summary>
+        public bool IsAuthorDeleted { get; set; }
         /// <summary>작성자 소속. 예: 진료지원.</summary>
         public string TeamName { get; set; }
         public DateTime? CheckedInAt { get; set; }
@@ -416,14 +421,23 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             get
             {
                 string person;
+                bool personIsAuthorAccount = false;
                 if (!string.IsNullOrWhiteSpace(PersonInCharge))
                     person = WorkLogDraftMapper.FormatPersonDisplay(PersonInCharge);
                 else if (!string.IsNullOrWhiteSpace(AuthorName))
+                {
                     person = AuthorName.Trim();
+                    personIsAuthorAccount = true;
+                }
                 else if (!string.IsNullOrWhiteSpace(TfsAuthor))
                     person = TfsAuthor.Trim();
                 else
                     person = null;
+
+                // "(삭제된 계정)"은 실제로 작성자 계정(USR_ID)을 보여주는 경우에만 붙인다 —
+                // PersonInCharge/TfsAuthor는 계정과 무관한 별개의 자유 입력 필드라 대상이 아니다.
+                if (personIsAuthorAccount && IsAuthorDeleted && !string.IsNullOrWhiteSpace(person))
+                    person = person + " (삭제된 계정)";
 
                 string team = string.IsNullOrWhiteSpace(TeamName) ? null : TeamName.Trim();
                 if (string.IsNullOrWhiteSpace(person))
@@ -558,12 +572,14 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             get { return ListCommentFullText; }
         }
 
-        /// <summary>목록 메타 (Menu · 담당자). 날짜는 그룹 헤더/상세에만 표시.</summary>
+        /// <summary>목록 메타 (사이트 · Menu · 담당자). ALL 사이트일 때만 사이트 포함.</summary>
         public string ListMetaCompact
         {
             get
             {
                 var parts = new List<string>();
+                if (IncludeSiteInListMeta && HasListSite)
+                    parts.Add(ListSiteText);
                 if (HasListMenu)
                     parts.Add(ListMenuText);
                 if (HasListPerson)
@@ -575,6 +591,36 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         public bool HasListMetaCompact
         {
             get { return !string.IsNullOrWhiteSpace(ListMetaCompact); }
+        }
+
+        public bool IncludeSiteInListMeta
+        {
+            get { return _includeSiteInListMeta; }
+            set
+            {
+                if (SetProperty(ref _includeSiteInListMeta, value, "IncludeSiteInListMeta"))
+                {
+                    RaisePropertyChanged("ListMetaCompact");
+                    RaisePropertyChanged("HasListMetaCompact");
+                }
+            }
+        }
+
+        public bool HasListSite
+        {
+            get
+            {
+                return !string.IsNullOrWhiteSpace(SiteCode)
+                    && !string.Equals(SiteCode.Trim(), "ALL", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        public string ListSiteText
+        {
+            get
+            {
+                return HasListSite ? SiteCode.Trim().ToUpperInvariant() : string.Empty;
+            }
         }
 
         public int ProjectCount
@@ -1269,19 +1315,19 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         }
 
         /// <summary>
-        /// 수정 가능: 점유명 또는 이 PC IP.
+        /// 수정 가능: 본인 기록 또는 관리자.
         /// </summary>
         public bool CanEditByCurrentUser
         {
-            get { return IsOwnedByCurrentUser; }
+            get { return IsOwnedByCurrentUser || OccupancyNameStore.IsAdmin; }
         }
 
         /// <summary>
-        /// 삭제 가능: 이 PC LocalPcIp가 기록된 경우만 (미기록 = 불가).
+        /// 삭제 가능: 본인 기록 또는 관리자.
         /// </summary>
         public bool CanDeleteByCurrentUser
         {
-            get { return IsOwnedByCurrentUser; }
+            get { return IsOwnedByCurrentUser || OccupancyNameStore.IsAdmin; }
         }
 
         /// <summary>TFS 체크인 작성자 표시(업무 기록 작성자와 별도).</summary>

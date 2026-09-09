@@ -225,19 +225,29 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,0,0,2">
-                    <Image Source="{StaticResource UserCircleIcon}"
-                           Width="28" Height="28" Margin="0,0,8,0" Stretch="Uniform"
-                           VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding OccupancyDisplayName}" FontSize="16" FontWeight="SemiBold"
-                               Foreground="{StaticResource WlGlassInk}" VerticalAlignment="Center" />
-                    <Button Style="{StaticResource GlassToolbarIconButton}"
-                            Width="26" Height="26" Margin="2,0,0,0"
-                            ToolTip="이름 수정"
-                            Command="{Binding ChangeNameCommand}"
-                            VerticalAlignment="Center">
-                        <Image Source="{StaticResource EditFillIcon}" Width="13" Height="13" />
-                    </Button>
+                <StackPanel Orientation="Vertical" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,0,0,2">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Image Source="{StaticResource UserCircleIcon}"
+                               Width="28" Height="28" Margin="0,0,8,0" Stretch="Uniform"
+                               VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding OccupancyDisplayName}" FontSize="16" FontWeight="SemiBold"
+                                   Foreground="{StaticResource WlGlassInk}" VerticalAlignment="Center" />
+                        <Button Style="{StaticResource GlassToolbarIconButton}"
+                                Width="26" Height="26" Margin="2,0,0,0"
+                                ToolTip="이름 수정"
+                                Command="{Binding ChangeNameCommand}"
+                                VerticalAlignment="Center">
+                            <Image Source="{StaticResource EditFillIcon}" Width="13" Height="13" />
+                        </Button>
+                        <Button Style="{StaticResource GlassToolbarIconButton}"
+                                Width="Auto" MinWidth="72" Height="26" Margin="6,0,0,0" Padding="8,0"
+                                ToolTip="비밀번호 재설정"
+                                Command="{Binding ChangePasswordCommand}"
+                                Visibility="{Binding IsLoggedIn, Converter={StaticResource BoolToVis}}"
+                                VerticalAlignment="Center">
+                            <TextBlock Text="비밀번호" FontSize="11" Foreground="#475569" VerticalAlignment="Center" />
+                        </Button>
+                    </StackPanel>
                 </StackPanel>
                 <ItemsControl Grid.Row="1" ItemsSource="{Binding Inbox.Sites}"
                               HorizontalAlignment="Left" VerticalAlignment="Bottom">

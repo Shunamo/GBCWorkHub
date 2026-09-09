@@ -104,6 +104,7 @@
     <Compile Include="RemotePcShareBiz.cs" />
     <Compile Include="OccupancyNameStore.cs" />
     <Compile Include="DirectoryBiz.cs" />
+    <Compile Include="AuthBiz.cs" />
     <Compile Include="OccupancyTakeoverMessage.cs" />
     <Compile Include="LocalNetworkHelper.cs" />
     <Compile Include="RdpStatusBiz.cs" />
@@ -122,6 +123,8 @@
     <Compile Include="DevSession\DevSessionFileBiz.cs" />
     <Compile Include="DevSession\DevSessionReportFormatter.cs" />
     <Compile Include="DevSession\SessionChangeReportDto.cs" />
+    <Compile Include="Improvement\ImprovementOwnership.cs" />
+    <Compile Include="Improvement\ImprovementBiz.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -80,6 +80,22 @@ namespace GBCWorkHub.UI.Services
                     return true;
                 if (raw.StartsWith(occupancy + " ", StringComparison.OrdinalIgnoreCase))
                     return true;
+                if (raw.StartsWith(occupancy + OccupancyNameStore.NameTeamSeparator, StringComparison.OrdinalIgnoreCase))
+                    return true;
+
+                // ADMIN login id vs display name
+                if (AuthBiz.IsAdminLoginId(occupancy)
+                    || string.Equals(occupancy, AuthBiz.AdminDisplayName, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (AuthBiz.IsAdminLoginId(raw)
+                        || string.Equals(raw, AuthBiz.AdminDisplayName, StringComparison.OrdinalIgnoreCase)
+                        || raw.StartsWith(AuthBiz.AdminDisplayName + " ", StringComparison.OrdinalIgnoreCase)
+                        || raw.StartsWith(AuthBiz.AdminDisplayName + OccupancyNameStore.NameTeamSeparator, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+
+                // Logged in: do not treat Windows account / same PC as ownership.
+                return false;
             }
 
             string windows = RemotePcShareBiz.LocalWindowsAccount;
@@ -102,11 +118,13 @@ namespace GBCWorkHub.UI.Services
         }
 
         /// <summary>
-        /// 점유명(또는 소속 포함 표시)·Windows 계정·이 PC IP 중 하나면 본인.
-        /// TFS 작성자명이 점유명과 달라도 LocalPcIp가 이 PC이면 수정/삭제 가능.
+        /// 앱 로그인(점유명)이 있으면 작성자명만으로 본인 판정.
+        /// 로그인 전에는 점유명·로컬 IP(옛 기록)로 판정.
         /// </summary>
         public static bool OwnsRecord(string authorName, string localPcIp)
         {
+            if (OccupancyNameStore.HasName)
+                return MatchesOccupancyName(authorName);
             if (MatchesOccupancyName(authorName))
                 return true;
             return MatchesIp(localPcIp);

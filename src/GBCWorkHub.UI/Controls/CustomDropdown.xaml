@@ -13,14 +13,15 @@
     </UserControl.Resources>
     <StackPanel MinWidth="0" HorizontalAlignment="Stretch">
         <Border x:Name="PART_RootBorder"
-                Background="#FFFFFF"
-                BorderBrush="#D8DEE8"
-                BorderThickness="1"
-                CornerRadius="8"
+                Background="#CCFFFFFF"
+                BorderBrush="#F2FFFFFF"
+                BorderThickness="1.5"
+                CornerRadius="10"
                 MinHeight="36"
                 MinWidth="0"
                 HorizontalAlignment="Stretch"
                 Cursor="Hand"
+                SnapsToDevicePixels="True"
                 MouseLeftButtonUp="RootBorder_MouseLeftButtonUp">
             <Grid Margin="10,6" MinWidth="0">
                 <Grid.ColumnDefinitions>
@@ -57,11 +58,11 @@
                PopupAnimation="Fade"
                Closed="Popup_Closed"
                IsOpen="{Binding IsDropDownOpen, ElementName=Root, Mode=TwoWay}">
-            <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="8"
+            <Border Background="#F2FFFFFF" BorderBrush="#F2FFFFFF" BorderThickness="1.5" CornerRadius="12"
                     Margin="0,4,0,0" MinWidth="{Binding ActualWidth, ElementName=PART_RootBorder}"
                     MaxHeight="{Binding MaxDropDownHeight, ElementName=Root}">
                 <Border.Effect>
-                    <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.12" Color="#000000" />
+                    <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.14" Color="#3B5070" />
                 </Border.Effect>
                 <StackPanel>
                     <TextBox x:Name="PART_SearchBox" Margin="8,8,8,4" Padding="8,6"

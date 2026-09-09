@@ -120,6 +120,26 @@ namespace GBCWorkHub.DAC
             return Task.Run(() => PurgeUsageLogsOlderThanMonthsCore(months));
         }
 
+        public Task<IList<RemotePcUsageLogDto>> GetUsageLogsForAdminAsync(string search, int take)
+        {
+            return Task.Run(() => (IList<RemotePcUsageLogDto>)GetUsageLogsForAdminCore(search, take));
+        }
+
+        public Task<bool> UpdateUsageLogForAdminAsync(
+            long logId,
+            string accessUserId,
+            string sessionStatus,
+            DateTime? endedAt,
+            string resultMessage)
+        {
+            return Task.Run(() => UpdateUsageLogForAdminCore(logId, accessUserId, sessionStatus, endedAt, resultMessage));
+        }
+
+        public Task<bool> DeleteUsageLogForAdminAsync(long logId)
+        {
+            return Task.Run(() => DeleteUsageLogForAdminCore(logId));
+        }
+
         private bool TestConnectionCore()
         {
             if (!EnsureConfigured())
@@ -990,13 +1010,23 @@ namespace GBCWorkHub.DAC
                                 LEFT JOIN " + TableName + @" p
                                   ON p.REMOTE_ACCS_IP_ADDR = h.REMOTE_ACCS_IP_ADDR
                                WHERE (
-                                     (:occ IS NOT NULL AND UPPER(TRIM(h.ACCS_USER_ID)) = UPPER(:occ))
-                                  OR (:win IS NOT NULL AND UPPER(TRIM(h.ACCS_USER_ID)) = UPPER(:win))
-                                  OR (:sam IS NOT NULL AND (
-                                         UPPER(TRIM(h.ACCS_USER_ID)) = UPPER(:sam)
-                                      OR UPPER(TRIM(h.ACCS_USER_ID)) LIKE '%\\' || UPPER(:sam)
+                                     (:occ IS NOT NULL AND (
+                                          UPPER(TRIM(h.ACCS_USER_ID)) = UPPER(:occ)
+                                       OR (
+                                              UPPER(TRIM(:occ)) IN (UPPER('ADMIN'), UPPER(N'관리자'))
+                                          AND UPPER(TRIM(h.ACCS_USER_ID)) IN (UPPER('ADMIN'), UPPER(N'관리자'))
+                                       )
                                      ))
-                                  OR (:pc IS NOT NULL AND UPPER(TRIM(h.ACCS_PC_NM)) = UPPER(:pc))
+                                  OR (
+                                     :occ IS NULL AND (
+                                          (:win IS NOT NULL AND UPPER(TRIM(h.ACCS_USER_ID)) = UPPER(:win))
+                                       OR (:sam IS NOT NULL AND (
+                                              UPPER(TRIM(h.ACCS_USER_ID)) = UPPER(:sam)
+                                           OR UPPER(TRIM(h.ACCS_USER_ID)) LIKE '%\\' || UPPER(:sam)
+                                          ))
+                                       OR (:pc IS NOT NULL AND UPPER(TRIM(h.ACCS_PC_NM)) = UPPER(:pc))
+                                     )
+                                  )
                                )
                                  AND (:fromAt IS NULL OR h.REQUESTED_AT >= :fromAt)
                                  AND (:toAt IS NULL OR h.REQUESTED_AT <= :toAt)
@@ -1135,6 +1165,154 @@ namespace GBCWorkHub.DAC
                 FailConnection(ex);
                 WorkHubFileLogger.Warn("USAGE_LOG_PURGE", "failed: " + ex.Message);
                 return 0;
+            }
+        }
+
+        private List<RemotePcUsageLogDto> GetUsageLogsForAdminCore(string search, int take)
+        {
+            var list = new List<RemotePcUsageLogDto>();
+            if (!EnsureConfigured())
+                return list;
+
+            if (take <= 0)
+                take = 100;
+            if (take > 500)
+                take = 500;
+
+            string q = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
+            string like = q == null ? null : ("%" + q.ToUpperInvariant() + "%");
+
+            try
+            {
+                using (var conn = OpenConnection())
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.BindByName = true;
+                    cmd.CommandText =
+                        @"SELECT * FROM (
+                              SELECT h.LOG_ID, h.SESSION_TOKEN, h.REMOTE_ACCS_IP_ADDR, h.REMOTE_PC_NM,
+                                     h.ACCS_USER_ID, h.ACCS_PC_NM, h.ACCS_IP_ADDR, h.SESSION_STATUS,
+                                     h.REQUESTED_AT, h.CONFIRMED_AT, h.ENDED_AT, h.END_SOURCE,
+                                     h.RESULT_MESSAGE, p.SITE_CD
+                                FROM " + LogTableName + @" h
+                                LEFT JOIN " + TableName + @" p
+                                  ON p.REMOTE_ACCS_IP_ADDR = h.REMOTE_ACCS_IP_ADDR
+                               WHERE (
+                                     :q IS NULL
+                                  OR UPPER(TRIM(h.ACCS_USER_ID)) LIKE :q
+                                  OR UPPER(TRIM(h.REMOTE_PC_NM)) LIKE :q
+                                  OR UPPER(TRIM(h.REMOTE_ACCS_IP_ADDR)) LIKE :q
+                                  OR UPPER(TRIM(h.ACCS_PC_NM)) LIKE :q
+                                  OR UPPER(TRIM(h.ACCS_IP_ADDR)) LIKE :q
+                                  OR UPPER(TRIM(h.SESSION_STATUS)) LIKE :q
+                                  OR UPPER(TRIM(p.SITE_CD)) LIKE :q
+                               )
+                               ORDER BY h.REQUESTED_AT DESC NULLS LAST, h.LOG_ID DESC
+                          ) WHERE ROWNUM <= :take";
+                    cmd.Parameters.Add("q", OracleDbType.Varchar2).Value = BindOptionalText(like);
+                    cmd.Parameters.Add("take", OracleDbType.Int32).Value = take;
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            list.Add(new RemotePcUsageLogDto
+                            {
+                                LogId = Convert.ToInt64(reader.GetValue(0)),
+                                SessionToken = ReadString(reader, 1),
+                                RemoteAccessIpAddress = ReadString(reader, 2),
+                                RemotePcName = ReadString(reader, 3),
+                                AccessUserId = ReadString(reader, 4),
+                                AccessPcName = ReadString(reader, 5),
+                                AccessIpAddress = ReadString(reader, 6),
+                                SessionStatus = ReadString(reader, 7),
+                                RequestedAt = ReadTimestamp(reader, 8),
+                                ConfirmedAt = ReadTimestamp(reader, 9),
+                                EndedAt = ReadTimestamp(reader, 10),
+                                EndSource = ReadString(reader, 11),
+                                ResultMessage = ReadString(reader, 12),
+                                SiteCode = reader.FieldCount > 13 ? ReadString(reader, 13) : null
+                            });
+                        }
+                    }
+                }
+
+                _lastConnectionOk = true;
+            }
+            catch (Exception ex)
+            {
+                FailConnection(ex);
+                WorkHubFileLogger.Warn("USAGE_LOG_ADMIN_SELECT", "failed: " + ex.Message);
+            }
+
+            return list;
+        }
+
+        private bool UpdateUsageLogForAdminCore(
+            long logId,
+            string accessUserId,
+            string sessionStatus,
+            DateTime? endedAt,
+            string resultMessage)
+        {
+            if (logId <= 0 || !EnsureConfigured())
+                return false;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.BindByName = true;
+                    cmd.CommandText =
+                        @"UPDATE " + LogTableName + @"
+                              SET ACCS_USER_ID = NVL(:userId, ACCS_USER_ID),
+                                  SESSION_STATUS = NVL(:sts, SESSION_STATUS),
+                                  ENDED_AT = NVL(:endedAt, ENDED_AT),
+                                  RESULT_MESSAGE = NVL(:msg, RESULT_MESSAGE),
+                                  UPDT_DTM = SYSTIMESTAMP
+                            WHERE LOG_ID = :logId";
+                    cmd.Parameters.Add("userId", OracleDbType.NVarchar2).Value = BindOptionalText(accessUserId);
+                    cmd.Parameters.Add("sts", OracleDbType.Varchar2).Value = BindOptionalText(sessionStatus);
+                    cmd.Parameters.Add("endedAt", OracleDbType.TimeStamp).Value = BindOptionalTime(endedAt);
+                    cmd.Parameters.Add("msg", OracleDbType.NVarchar2).Value = BindOptionalText(resultMessage);
+                    cmd.Parameters.Add("logId", OracleDbType.Int64).Value = logId;
+                    int n = cmd.ExecuteNonQuery();
+                    _lastConnectionOk = true;
+                    return n > 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                FailConnection(ex);
+                WorkHubFileLogger.Warn("USAGE_LOG_ADMIN_UPDATE", "failed: " + ex.Message);
+                return false;
+            }
+        }
+
+        private bool DeleteUsageLogForAdminCore(long logId)
+        {
+            if (logId <= 0 || !EnsureConfigured())
+                return false;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.BindByName = true;
+                    cmd.CommandText = @"DELETE FROM " + LogTableName + " WHERE LOG_ID = :logId";
+                    cmd.Parameters.Add("logId", OracleDbType.Int64).Value = logId;
+                    int n = cmd.ExecuteNonQuery();
+                    _lastConnectionOk = true;
+                    return n > 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                FailConnection(ex);
+                WorkHubFileLogger.Warn("USAGE_LOG_ADMIN_DELETE", "failed: " + ex.Message);
+                return false;
             }
         }
 

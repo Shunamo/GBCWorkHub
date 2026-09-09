@@ -10,6 +10,7 @@
     <conv:BoolToVisibilityConverter x:Key="GlassBoolToVis" />
     <conv:MinWidthToVisibilityConverter x:Key="MinWidthToVis" />
     <conv:StringEqualsMultiConverter x:Key="GlassStringEquals" />
+    <conv:OpenWhenVisibleConverter x:Key="OpenWhenVisible" />
 
     <!--
       Light Glassmorphism:

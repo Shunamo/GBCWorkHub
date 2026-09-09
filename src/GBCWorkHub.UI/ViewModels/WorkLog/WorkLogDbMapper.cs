@@ -54,6 +54,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 TfsComment = item.TfsComment,
                 TfsAuthor = item.TfsAuthor,
                 AuthorName = item.AuthorName,
+                UserId = item.AuthorUserId,
                 TeamName = ResolveTeamName(item),
                 CheckedInAt = item.CheckedInAt,
                 ChangedFileCount = item.PayloadChangedFileCount > 0
@@ -147,6 +148,8 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 TfsComment = dto.TfsComment,
                 TfsAuthor = dto.TfsAuthor,
                 AuthorName = dto.AuthorName,
+                AuthorUserId = dto.UserId,
+                IsAuthorDeleted = dto.IsAuthorDeleted,
                 TeamName = dto.TeamName,
                 CheckedInAt = dto.CheckedInAt,
                 PayloadChangedFileCount = dto.ChangedFileCount,

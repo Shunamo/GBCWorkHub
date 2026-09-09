@@ -116,13 +116,21 @@
                                     </Button>
 
                                     <Popup x:Name="SitePickerPopup"
-                                           IsOpen="{Binding IsSitePickerOpen, Mode=TwoWay}"
                                            PlacementTarget="{Binding ElementName=SiteLabelButton}"
                                            Placement="Bottom" HorizontalOffset="-4" VerticalOffset="6"
                                            AllowsTransparency="True" PopupAnimation="None" StaysOpen="True"
                                            Opened="SitePickerPopup_Opened">
+                                        <Popup.IsOpen>
+                                            <MultiBinding Converter="{StaticResource OpenWhenVisible}" Mode="TwoWay">
+                                                <Binding Path="IsSitePickerOpen" />
+                                                <Binding ElementName="GlassRoot" Path="IsVisible" Mode="OneWay" />
+                                            </MultiBinding>
+                                        </Popup.IsOpen>
                                         <Border x:Name="SiteBubbleHost" Background="Transparent" BorderThickness="0"
                                                 Padding="2,4,0,6" RenderTransformOrigin="0,0" Opacity="0.5">
+                                            <Border.Effect>
+                                                <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.16" Color="#3B5070" />
+                                            </Border.Effect>
                                             <Border.RenderTransform>
                                                 <ScaleTransform x:Name="SiteBubbleScale" ScaleX="0.96" ScaleY="0.96" />
                                             </Border.RenderTransform>
@@ -242,14 +250,22 @@
                                                     </Style>
                                                 </Button.Style>
                                             </Button>
-                                            <Popup IsOpen="{Binding IsTypeMenuOpen, Mode=TwoWay}"
-                                                   PlacementTarget="{Binding ElementName=TypeFilterPill}"
+                                            <Popup PlacementTarget="{Binding ElementName=TypeFilterPill}"
                                                    Placement="Bottom" HorizontalOffset="-4" VerticalOffset="6"
                                                    AllowsTransparency="True" PopupAnimation="None" StaysOpen="True"
                                                    Opened="FilterMenuPopup_Opened">
+                                                <Popup.IsOpen>
+                                                    <MultiBinding Converter="{StaticResource OpenWhenVisible}" Mode="TwoWay">
+                                                        <Binding Path="IsTypeMenuOpen" />
+                                                        <Binding ElementName="GlassRoot" Path="IsVisible" Mode="OneWay" />
+                                                    </MultiBinding>
+                                                </Popup.IsOpen>
                                                 <Border Background="Transparent" BorderThickness="0"
                                                         Padding="2,4,0,2" RenderTransformOrigin="0,0" Opacity="0.5"
                                                         MaxWidth="260">
+                                                    <Border.Effect>
+                                                        <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.16" Color="#3B5070" />
+                                                    </Border.Effect>
                                                     <Border.RenderTransform>
                                                         <ScaleTransform ScaleX="0.96" ScaleY="0.96" />
                                                     </Border.RenderTransform>
@@ -321,14 +337,22 @@
                                                     </Style>
                                                 </Button.Style>
                                             </Button>
-                                            <Popup IsOpen="{Binding IsCategoryMenuOpen, Mode=TwoWay}"
-                                                   PlacementTarget="{Binding ElementName=CategoryFilterPill}"
+                                            <Popup PlacementTarget="{Binding ElementName=CategoryFilterPill}"
                                                    Placement="Bottom" HorizontalOffset="-4" VerticalOffset="6"
                                                    AllowsTransparency="True" PopupAnimation="None" StaysOpen="True"
                                                    Opened="FilterMenuPopup_Opened">
+                                                <Popup.IsOpen>
+                                                    <MultiBinding Converter="{StaticResource OpenWhenVisible}" Mode="TwoWay">
+                                                        <Binding Path="IsCategoryMenuOpen" />
+                                                        <Binding ElementName="GlassRoot" Path="IsVisible" Mode="OneWay" />
+                                                    </MultiBinding>
+                                                </Popup.IsOpen>
                                                 <Border Background="Transparent" BorderThickness="0"
                                                         Padding="2,4,0,2" RenderTransformOrigin="0,0" Opacity="0.5"
                                                         MaxWidth="260">
+                                                    <Border.Effect>
+                                                        <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.16" Color="#3B5070" />
+                                                    </Border.Effect>
                                                     <Border.RenderTransform>
                                                         <ScaleTransform ScaleX="0.96" ScaleY="0.96" />
                                                     </Border.RenderTransform>
@@ -400,15 +424,23 @@
                                                     </Style>
                                                 </Button.Style>
                                             </Button>
-                                            <Popup IsOpen="{Binding IsDeployMenuOpen, Mode=TwoWay}"
-                                                   PlacementTarget="{Binding ElementName=DeployFilterPill}"
+                                            <Popup PlacementTarget="{Binding ElementName=DeployFilterPill}"
                                                    Placement="Bottom" HorizontalOffset="-4" VerticalOffset="6"
                                                    AllowsTransparency="True" PopupAnimation="None" StaysOpen="True"
                                                    Opened="FilterMenuPopup_Opened">
+                                                <Popup.IsOpen>
+                                                    <MultiBinding Converter="{StaticResource OpenWhenVisible}" Mode="TwoWay">
+                                                        <Binding Path="IsDeployMenuOpen" />
+                                                        <Binding ElementName="GlassRoot" Path="IsVisible" Mode="OneWay" />
+                                                    </MultiBinding>
+                                                </Popup.IsOpen>
                                                 <!-- ~3 chips/row so Staging+Production wrap to 2nd line -->
                                                 <Border Background="Transparent" BorderThickness="0"
                                                         Padding="2,4,0,2" RenderTransformOrigin="0,0" Opacity="0.5"
                                                         MaxWidth="178">
+                                                    <Border.Effect>
+                                                        <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.16" Color="#3B5070" />
+                                                    </Border.Effect>
                                                     <Border.RenderTransform>
                                                         <ScaleTransform ScaleX="0.96" ScaleY="0.96" />
                                                     </Border.RenderTransform>
@@ -480,14 +512,22 @@
                                                     </Style>
                                                 </Button.Style>
                                             </Button>
-                                            <Popup IsOpen="{Binding IsTeamMenuOpen, Mode=TwoWay}"
-                                                   PlacementTarget="{Binding ElementName=TeamFilterPill}"
+                                            <Popup PlacementTarget="{Binding ElementName=TeamFilterPill}"
                                                    Placement="Bottom" HorizontalOffset="-4" VerticalOffset="6"
                                                    AllowsTransparency="True" PopupAnimation="None" StaysOpen="True"
                                                    Opened="FilterMenuPopup_Opened">
+                                                <Popup.IsOpen>
+                                                    <MultiBinding Converter="{StaticResource OpenWhenVisible}" Mode="TwoWay">
+                                                        <Binding Path="IsTeamMenuOpen" />
+                                                        <Binding ElementName="GlassRoot" Path="IsVisible" Mode="OneWay" />
+                                                    </MultiBinding>
+                                                </Popup.IsOpen>
                                                 <Border Background="Transparent" BorderThickness="0"
                                                         Padding="2,4,0,2" RenderTransformOrigin="0,0" Opacity="0.5"
                                                         MaxWidth="260">
+                                                    <Border.Effect>
+                                                        <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.16" Color="#3B5070" />
+                                                    </Border.Effect>
                                                     <Border.RenderTransform>
                                                         <ScaleTransform ScaleX="0.96" ScaleY="0.96" />
                                                     </Border.RenderTransform>
@@ -559,14 +599,22 @@
                                                     </Style>
                                                 </Button.Style>
                                             </Button>
-                                            <Popup IsOpen="{Binding IsPcMenuOpen, Mode=TwoWay}"
-                                                   PlacementTarget="{Binding ElementName=PcFilterPill}"
+                                            <Popup PlacementTarget="{Binding ElementName=PcFilterPill}"
                                                    Placement="Bottom" HorizontalOffset="-4" VerticalOffset="6"
                                                    AllowsTransparency="True" PopupAnimation="None" StaysOpen="True"
                                                    Opened="FilterMenuPopup_Opened">
+                                                <Popup.IsOpen>
+                                                    <MultiBinding Converter="{StaticResource OpenWhenVisible}" Mode="TwoWay">
+                                                        <Binding Path="IsPcMenuOpen" />
+                                                        <Binding ElementName="GlassRoot" Path="IsVisible" Mode="OneWay" />
+                                                    </MultiBinding>
+                                                </Popup.IsOpen>
                                                 <Border Background="Transparent" BorderThickness="0"
                                                         Padding="2,4,0,2" RenderTransformOrigin="0,0" Opacity="0.5"
                                                         MaxWidth="260">
+                                                    <Border.Effect>
+                                                        <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.16" Color="#3B5070" />
+                                                    </Border.Effect>
                                                     <Border.RenderTransform>
                                                         <ScaleTransform ScaleX="0.96" ScaleY="0.96" />
                                                     </Border.RenderTransform>
@@ -642,13 +690,21 @@
                                                     </Style>
                                                 </Button.Style>
                                             </Button>
-                                            <Popup IsOpen="{Binding IsDateMenuOpen, Mode=TwoWay}"
-                                                   PlacementTarget="{Binding ElementName=DateFilterPill}"
+                                            <Popup PlacementTarget="{Binding ElementName=DateFilterPill}"
                                                    Placement="Bottom" HorizontalOffset="-4" VerticalOffset="6"
                                                    AllowsTransparency="True" PopupAnimation="None" StaysOpen="True"
                                                    Opened="FilterMenuPopup_Opened">
+                                                <Popup.IsOpen>
+                                                    <MultiBinding Converter="{StaticResource OpenWhenVisible}" Mode="TwoWay">
+                                                        <Binding Path="IsDateMenuOpen" />
+                                                        <Binding ElementName="GlassRoot" Path="IsVisible" Mode="OneWay" />
+                                                    </MultiBinding>
+                                                </Popup.IsOpen>
                                                 <Border Background="Transparent" BorderThickness="0"
                                                         Padding="2,4,0,6" RenderTransformOrigin="0,0" Opacity="0.5">
+                                                    <Border.Effect>
+                                                        <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.16" Color="#3B5070" />
+                                                    </Border.Effect>
                                                     <Border.RenderTransform>
                                                         <ScaleTransform ScaleX="0.96" ScaleY="0.96" />
                                                     </Border.RenderTransform>

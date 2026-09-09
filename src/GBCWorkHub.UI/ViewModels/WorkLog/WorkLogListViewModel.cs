@@ -2659,6 +2659,8 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                     _serverTotalCount = 0;
                 }
 
+                ApplySiteVisibilityToItems();
+
                 int pages = _serverTotalCount <= 0
                     ? 0
                     : (_serverTotalCount + PageSize - 1) / PageSize;
@@ -2682,6 +2684,18 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             {
                 if (gen == _pageLoadGeneration)
                     IsLoading = false;
+            }
+        }
+
+        private void ApplySiteVisibilityToItems()
+        {
+            bool showSite = string.IsNullOrWhiteSpace(FilterSite)
+                || string.Equals(FilterSite, WorkLogSiteCodes.All, StringComparison.OrdinalIgnoreCase);
+            for (int i = 0; i < Items.Count; i++)
+            {
+                WorkLogListItemViewModel item = Items[i];
+                if (item != null)
+                    item.IncludeSiteInListMeta = showSite;
             }
         }
 
@@ -2880,10 +2894,20 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             }
 
             _editSession.Begin(item, _tfsImport.GetBaseline(item.Id));
+            if (OccupancyNameStore.IsAdmin)
+                startInEditMode = true;
             OpenDialog(WorkLogEditDialogViewModel.FromListItem(
                 item, _editSession.IsNew, startInEditMode, PcOptions));
             if (_tfsImport.OpeningFromImportQueue && EditDialog != null)
                 EditDialog.DiscardOnCancel = true;
+        }
+
+        /// <summary>관리자 셸에서 업무기록 상세를 수정 모드로 연다.</summary>
+        public void OpenForAdmin(WorkLogListItemViewModel item)
+        {
+            if (item == null)
+                return;
+            OpenEdit(item, startInEditMode: true);
         }
 
         private void OpenDialog(WorkLogEditDialogViewModel vm)

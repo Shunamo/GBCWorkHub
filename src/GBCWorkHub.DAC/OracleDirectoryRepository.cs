@@ -31,6 +31,10 @@ namespace GBCWorkHub.DAC
         private bool _hasPcMapNote;
         private bool _pcMapCommentProbed;
         private bool _hasPcMapComment;
+        private bool _userAuthProbed;
+        private bool _hasUserAuthColumns;
+        private bool _userDeletedProbed;
+        private bool _hasUserDeletedColumn;
 
         public OracleDirectoryRepository()
         {
@@ -45,6 +49,40 @@ namespace GBCWorkHub.DAC
         public Task<int> UpsertUserAsync(DirectoryUserDto user)
         {
             return Task.Run(() => UpsertUser(user));
+        }
+
+        public Task<DirectoryUserDto> FindUserForAuthAsync(string loginOrName)
+        {
+            return Task.Run(() => FindUserForAuth(loginOrName));
+        }
+
+        public Task<DirectoryUserDto> FindUserByLocalEndpointAsync(string pcName, string pcIp)
+        {
+            return Task.Run(() => FindUserByLocalEndpoint(pcName, pcIp));
+        }
+
+        public bool HasUserAuthColumns
+        {
+            get
+            {
+                if (!IsConfigured)
+                    return false;
+                try
+                {
+                    using (var conn = OpenConnection())
+                    {
+                        EnsureUserTable(conn);
+                        if (!_hasUserTable)
+                            return false;
+                        EnsureUserAuthColumns(conn);
+                        return _hasUserAuthColumns;
+                    }
+                }
+                catch
+                {
+                    return false;
+                }
+            }
         }
 
         public Task<int> UpsertPcMapAsync(PcMapDto map)
@@ -77,6 +115,11 @@ namespace GBCWorkHub.DAC
             return Task.Run(() => GetPcMapsBySite(siteCode));
         }
 
+        public Task<int> DeletePcMapAsync(string siteCode, string pcName)
+        {
+            return Task.Run(() => DeletePcMap(siteCode, pcName));
+        }
+
         public int UpsertUser(DirectoryUserDto user)
         {
             if (user == null || string.IsNullOrWhiteSpace(user.UserName) || string.IsNullOrWhiteSpace(user.LocalPcName))
@@ -91,37 +134,587 @@ namespace GBCWorkHub.DAC
                     EnsureUserTable(conn);
                     if (!_hasUserTable)
                         return 0;
+                    EnsureUserAuthColumns(conn);
+
+                    // Avoid MERGE ORA-38104: ON-clause columns (LOGIN_ID/USER_NM) cannot be UPDATEd.
+                    if (_hasUserAuthColumns)
+                        return UpsertUserWithAuth(conn, user);
+                    return UpsertUserLegacy(conn, user);
+                }
+            }
+            catch (Exception ex)
+            {
+                WorkHubFileLogger.Warn("DIRECTORY", "UpsertUser failed: " + SafeError(ex));
+                return -1;
+            }
+        }
+
+        private int UpsertUserWithAuth(OracleConnection conn, DirectoryUserDto user)
+        {
+            string loginId = string.IsNullOrWhiteSpace(user.LoginId) ? user.UserName : user.LoginId;
+            object pcNm = Trim(user.LocalPcName, 100);
+            object userNm = Trim(user.UserName, 200);
+            object teamNm = (object)Trim(user.TeamName, 100) ?? DBNull.Value;
+            object ip = (object)Trim(user.LocalPcIp, 50) ?? DBNull.Value;
+            object winAcct = (object)Trim(user.WindowsAccount, 200) ?? DBNull.Value;
+            object login = (object)Trim(loginId, 100) ?? DBNull.Value;
+            object pwHash = (object)Trim(user.PasswordHash, 128) ?? DBNull.Value;
+            object isActive = user.IsActive ? "Y" : "N";
+
+            string setSql =
+                @"SET USER_NM = :userNm,
+                      TEAM_NM = :teamNm,
+                      LOCAL_PC_NM = :pcNm,
+                      LOCAL_PC_IP = :ip,
+                      WIN_ACCOUNT = :winAcct,
+                      LOGIN_ID = :loginId,
+                      PASSWORD_HASH = NVL(:pwHash, PASSWORD_HASH),
+                      IS_ACTIVE = NVL(:isActive, IS_ACTIVE),
+                      UPDT_DTM = SYSTIMESTAMP";
+
+            using (var cmd = CreateCommand(conn))
+            {
+                // 1) Match existing account by LOGIN_ID — the ONLY identity anchor. LOCAL_PC_NM is
+                //    never part of identity resolution; it is overwritten below as "latest PC" only.
+                cmd.CommandText =
+                    @"UPDATE " + UserTable + @"
+                      " + setSql + @"
+                    WHERE UPPER(TRIM(LOGIN_ID)) = UPPER(TRIM(:loginId))";
+                BindUpsertUserParams(cmd, pcNm, userNm, teamNm, ip, winAcct, login, pwHash, isActive);
+                int n = cmd.ExecuteNonQuery();
+                if (n > 0)
+                {
+                    FetchUserId(conn, loginId, user);
+                    return n;
+                }
+
+                // 2) Legacy row: LOGIN_ID empty, USER_NM matches (pre-sql/20 rows only)
+                cmd.Parameters.Clear();
+                cmd.CommandText =
+                    @"UPDATE " + UserTable + @"
+                      " + setSql + @"
+                    WHERE UPPER(TRIM(USER_NM)) = UPPER(TRIM(:userNm))
+                      AND (LOGIN_ID IS NULL OR TRIM(LOGIN_ID) IS NULL)
+                      AND UPPER(TRIM(LOCAL_PC_NM)) <> 'ADMIN'";
+                BindUpsertUserParams(cmd, pcNm, userNm, teamNm, ip, winAcct, login, pwHash, isActive);
+                n = cmd.ExecuteNonQuery();
+                if (n > 0)
+                {
+                    FetchUserId(conn, loginId, user);
+                    return n;
+                }
+
+                // 3) New account. LOCAL_PC_NM carries no uniqueness constraint (sql/23
+                //    MSDWHTKD_USR_IDENTITY_FIX dropped UK_MSDWHTKD_USR_PC) — registering from a PC
+                //    someone else has used before must NEVER reuse/overwrite that person's row.
+                cmd.Parameters.Clear();
+                cmd.CommandText =
+                    @"INSERT INTO " + UserTable + @"
+                        (USR_ID, USER_NM, TEAM_NM, LOCAL_PC_NM, LOCAL_PC_IP, WIN_ACCOUNT,
+                         LOGIN_ID, PASSWORD_HASH, IS_ACTIVE, CREATED_AT, UPDT_DTM)
+                      VALUES (" + UserSeq + @".NEXTVAL, :userNm, :teamNm, :pcNm, :ip, :winAcct,
+                              :loginId, :pwHash, NVL(:isActive, 'Y'), SYSTIMESTAMP, SYSTIMESTAMP)";
+                BindUpsertUserParams(cmd, pcNm, userNm, teamNm, ip, winAcct, login, pwHash, isActive);
+                try
+                {
+                    n = cmd.ExecuteNonQuery();
+                    if (n > 0)
+                        FetchUserId(conn, loginId, user);
+                    return n;
+                }
+                catch (OracleException ox) when (ox.Number == 1)
+                {
+                    // Only possible remaining unique key is LOGIN_ID (UX_MSDWHTKD_USR_LOGIN) — a
+                    // genuine race between two concurrent registrations of the same LOGIN_ID.
+                    // Fail safely: log and return -1. Never overwrite another user's identity row.
+                    WorkHubFileLogger.Warn("DIRECTORY",
+                        "UpsertUser identity conflict on LOGIN_ID='" + loginId + "' (concurrent registration?): "
+                        + SafeError(ox));
+                    return -1;
+                }
+            }
+        }
+
+        /// <summary>UPDATE/INSERT 성공 직후 USR_ID를 채워 세션에 즉시 보관할 수 있게 한다.</summary>
+        private void FetchUserId(OracleConnection conn, string loginId, DirectoryUserDto user)
+        {
+            try
+            {
+                using (var cmd = CreateCommand(conn))
+                {
+                    cmd.CommandText = "SELECT USR_ID FROM " + UserTable + " WHERE UPPER(TRIM(LOGIN_ID)) = UPPER(TRIM(:loginId))";
+                    cmd.Parameters.Add("loginId", OracleDbType.NVarchar2).Value =
+                        (object)Trim(loginId, 100) ?? DBNull.Value;
+                    object result = cmd.ExecuteScalar();
+                    if (result != null && result != DBNull.Value)
+                        user.UserId = Convert.ToInt64(result);
+                }
+            }
+            catch (Exception ex)
+            {
+                WorkHubFileLogger.Warn("DIRECTORY", "FetchUserId failed: " + SafeError(ex));
+            }
+        }
+
+        private int UpsertUserLegacy(OracleConnection conn, DirectoryUserDto user)
+        {
+            using (var cmd = CreateCommand(conn))
+            {
+                cmd.CommandText =
+                    @"UPDATE " + UserTable + @"
+                        SET TEAM_NM = :teamNm,
+                            LOCAL_PC_NM = :pcNm,
+                            LOCAL_PC_IP = :ip,
+                            WIN_ACCOUNT = :winAcct,
+                            UPDT_DTM = SYSTIMESTAMP
+                      WHERE UPPER(TRIM(USER_NM)) = UPPER(TRIM(:userNm))";
+                cmd.Parameters.Add("pcNm", OracleDbType.Varchar2).Value = Trim(user.LocalPcName, 100);
+                cmd.Parameters.Add("userNm", OracleDbType.NVarchar2).Value = Trim(user.UserName, 200);
+                cmd.Parameters.Add("teamNm", OracleDbType.NVarchar2).Value =
+                    (object)Trim(user.TeamName, 100) ?? DBNull.Value;
+                cmd.Parameters.Add("ip", OracleDbType.Varchar2).Value =
+                    (object)Trim(user.LocalPcIp, 50) ?? DBNull.Value;
+                cmd.Parameters.Add("winAcct", OracleDbType.Varchar2).Value =
+                    (object)Trim(user.WindowsAccount, 200) ?? DBNull.Value;
+                int n = cmd.ExecuteNonQuery();
+                if (n > 0)
+                    return n;
+
+                cmd.Parameters.Clear();
+                cmd.CommandText =
+                    @"INSERT INTO " + UserTable + @"
+                        (USR_ID, USER_NM, TEAM_NM, LOCAL_PC_NM, LOCAL_PC_IP, WIN_ACCOUNT, CREATED_AT, UPDT_DTM)
+                      VALUES (" + UserSeq + @".NEXTVAL, :userNm, :teamNm, :pcNm, :ip, :winAcct, SYSTIMESTAMP, SYSTIMESTAMP)";
+                cmd.Parameters.Add("pcNm", OracleDbType.Varchar2).Value = Trim(user.LocalPcName, 100);
+                cmd.Parameters.Add("userNm", OracleDbType.NVarchar2).Value = Trim(user.UserName, 200);
+                cmd.Parameters.Add("teamNm", OracleDbType.NVarchar2).Value =
+                    (object)Trim(user.TeamName, 100) ?? DBNull.Value;
+                cmd.Parameters.Add("ip", OracleDbType.Varchar2).Value =
+                    (object)Trim(user.LocalPcIp, 50) ?? DBNull.Value;
+                cmd.Parameters.Add("winAcct", OracleDbType.Varchar2).Value =
+                    (object)Trim(user.WindowsAccount, 200) ?? DBNull.Value;
+                try
+                {
+                    return cmd.ExecuteNonQuery();
+                }
+                catch (OracleException ox) when (ox.Number == 1)
+                {
+                    cmd.Parameters.Clear();
+                    cmd.CommandText =
+                        @"UPDATE " + UserTable + @"
+                            SET USER_NM = :userNm,
+                                TEAM_NM = :teamNm,
+                                LOCAL_PC_IP = :ip,
+                                WIN_ACCOUNT = :winAcct,
+                                UPDT_DTM = SYSTIMESTAMP
+                          WHERE UPPER(TRIM(LOCAL_PC_NM)) = UPPER(TRIM(:pcNm))
+                            AND UPPER(TRIM(LOCAL_PC_NM)) <> 'ADMIN'";
+                    cmd.Parameters.Add("pcNm", OracleDbType.Varchar2).Value = Trim(user.LocalPcName, 100);
+                    cmd.Parameters.Add("userNm", OracleDbType.NVarchar2).Value = Trim(user.UserName, 200);
+                    cmd.Parameters.Add("teamNm", OracleDbType.NVarchar2).Value =
+                        (object)Trim(user.TeamName, 100) ?? DBNull.Value;
+                    cmd.Parameters.Add("ip", OracleDbType.Varchar2).Value =
+                        (object)Trim(user.LocalPcIp, 50) ?? DBNull.Value;
+                    cmd.Parameters.Add("winAcct", OracleDbType.Varchar2).Value =
+                        (object)Trim(user.WindowsAccount, 200) ?? DBNull.Value;
+                    return cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        private static void BindUpsertUserParams(
+            OracleCommand cmd,
+            object pcNm,
+            object userNm,
+            object teamNm,
+            object ip,
+            object winAcct,
+            object loginId,
+            object pwHash,
+            object isActive)
+        {
+            cmd.Parameters.Add("pcNm", OracleDbType.Varchar2).Value = pcNm;
+            cmd.Parameters.Add("userNm", OracleDbType.NVarchar2).Value = userNm;
+            cmd.Parameters.Add("teamNm", OracleDbType.NVarchar2).Value = teamNm;
+            cmd.Parameters.Add("ip", OracleDbType.Varchar2).Value = ip;
+            cmd.Parameters.Add("winAcct", OracleDbType.Varchar2).Value = winAcct;
+            cmd.Parameters.Add("loginId", OracleDbType.NVarchar2).Value = loginId;
+            cmd.Parameters.Add("pwHash", OracleDbType.Varchar2).Value = pwHash;
+            cmd.Parameters.Add("isActive", OracleDbType.Char).Value = isActive;
+        }
+
+        public DirectoryUserDto FindUserForAuth(string loginOrName)
+        {
+            if (string.IsNullOrWhiteSpace(loginOrName) || !IsConfigured)
+                return null;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                {
+                    EnsureUserTable(conn);
+                    if (!_hasUserTable)
+                        return null;
+                    EnsureUserAuthColumns(conn);
+                    if (!_hasUserAuthColumns)
+                        return null;
 
                     using (var cmd = CreateCommand(conn))
                     {
                         cmd.CommandText =
-                            @"MERGE INTO " + UserTable + @" t
-                              USING (SELECT :pcNm AS LOCAL_PC_NM FROM DUAL) s
-                                 ON (UPPER(TRIM(t.LOCAL_PC_NM)) = UPPER(TRIM(s.LOCAL_PC_NM)))
-                              WHEN MATCHED THEN UPDATE SET
-                                    t.USER_NM = :userNm,
-                                    t.TEAM_NM = :teamNm,
-                                    t.LOCAL_PC_IP = :ip,
-                                    t.WIN_ACCOUNT = :winAcct,
-                                    t.UPDT_DTM = SYSTIMESTAMP
-                              WHEN NOT MATCHED THEN INSERT
-                                    (USR_ID, USER_NM, TEAM_NM, LOCAL_PC_NM, LOCAL_PC_IP, WIN_ACCOUNT, CREATED_AT, UPDT_DTM)
-                              VALUES (" + UserSeq + @".NEXTVAL, :userNm, :teamNm, :pcNm, :ip, :winAcct, SYSTIMESTAMP, SYSTIMESTAMP)";
-                        cmd.Parameters.Add("pcNm", OracleDbType.Varchar2).Value = Trim(user.LocalPcName, 100);
+                            @"SELECT * FROM (
+                                SELECT USR_ID, USER_NM, TEAM_NM, LOCAL_PC_NM, LOCAL_PC_IP, WIN_ACCOUNT,
+                                       LOGIN_ID, PASSWORD_HASH, IS_ACTIVE
+                                  FROM " + UserTable + @"
+                                 WHERE UPPER(TRIM(USER_NM)) = UPPER(TRIM(:id))
+                                    OR UPPER(TRIM(LOGIN_ID)) = UPPER(TRIM(:id))
+                                 ORDER BY CASE
+                                            WHEN UPPER(TRIM(LOGIN_ID)) = UPPER(TRIM(:id)) THEN 0
+                                            ELSE 1
+                                          END,
+                                          UPDT_DTM DESC
+                              ) WHERE ROWNUM = 1";
+                        cmd.Parameters.Add("id", OracleDbType.NVarchar2).Value = loginOrName.Trim();
+                        using (var reader = cmd.ExecuteReader())
+                        {
+                            if (!reader.Read())
+                                return null;
+                            return new DirectoryUserDto
+                            {
+                                UserId = reader.IsDBNull(0) ? (long?)null : Convert.ToInt64(reader.GetValue(0)),
+                                UserName = reader.IsDBNull(1) ? null : Convert.ToString(reader.GetValue(1)),
+                                TeamName = reader.IsDBNull(2) ? null : Convert.ToString(reader.GetValue(2)),
+                                LocalPcName = reader.IsDBNull(3) ? null : Convert.ToString(reader.GetValue(3)),
+                                LocalPcIp = reader.IsDBNull(4) ? null : Convert.ToString(reader.GetValue(4)),
+                                WindowsAccount = reader.IsDBNull(5) ? null : Convert.ToString(reader.GetValue(5)),
+                                LoginId = reader.IsDBNull(6) ? null : Convert.ToString(reader.GetValue(6)),
+                                PasswordHash = reader.IsDBNull(7) ? null : Convert.ToString(reader.GetValue(7)),
+                                IsActive = reader.IsDBNull(8)
+                                    || string.Equals(Convert.ToString(reader.GetValue(8)), "Y", StringComparison.OrdinalIgnoreCase)
+                            };
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WorkHubFileLogger.Warn("DIRECTORY", "FindUserForAuth failed: " + SafeError(ex));
+                return null;
+            }
+        }
+
+        public DirectoryUserDto FindUserByLocalEndpoint(string pcName, string pcIp)
+        {
+            if (!IsConfigured)
+                return null;
+            if (string.IsNullOrWhiteSpace(pcName) && string.IsNullOrWhiteSpace(pcIp))
+                return null;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                {
+                    EnsureUserTable(conn);
+                    if (!_hasUserTable)
+                        return null;
+                    EnsureUserAuthColumns(conn);
+
+                    using (var cmd = CreateCommand(conn))
+                    {
+                        if (_hasUserAuthColumns)
+                        {
+                            cmd.CommandText =
+                                @"SELECT * FROM (
+                                    SELECT USR_ID, USER_NM, TEAM_NM, LOCAL_PC_NM, LOCAL_PC_IP, WIN_ACCOUNT,
+                                           LOGIN_ID, PASSWORD_HASH, IS_ACTIVE
+                                      FROM " + UserTable + @"
+                                     WHERE (
+                                             (:hasIp = 1 AND UPPER(TRIM(LOCAL_PC_IP)) = UPPER(TRIM(:ip)))
+                                          OR (:hasPc = 1 AND UPPER(TRIM(LOCAL_PC_NM)) = UPPER(TRIM(:pcNm)))
+                                           )
+                                       AND UPPER(TRIM(NVL(LOGIN_ID, ' '))) <> 'ADMIN'
+                                       AND UPPER(TRIM(NVL(USER_NM, ' '))) NOT IN ('ADMIN', N'관리자')
+                                       AND UPPER(TRIM(NVL(LOCAL_PC_NM, ' '))) <> 'ADMIN'
+                                     ORDER BY CASE
+                                                WHEN :hasIp = 1 AND UPPER(TRIM(LOCAL_PC_IP)) = UPPER(TRIM(:ip)) THEN 0
+                                                ELSE 1
+                                              END,
+                                              UPDT_DTM DESC
+                                  ) WHERE ROWNUM = 1";
+                        }
+                        else
+                        {
+                            cmd.CommandText =
+                                @"SELECT * FROM (
+                                    SELECT USR_ID, USER_NM, TEAM_NM, LOCAL_PC_NM, LOCAL_PC_IP, WIN_ACCOUNT
+                                      FROM " + UserTable + @"
+                                     WHERE (
+                                             (:hasIp = 1 AND UPPER(TRIM(LOCAL_PC_IP)) = UPPER(TRIM(:ip)))
+                                          OR (:hasPc = 1 AND UPPER(TRIM(LOCAL_PC_NM)) = UPPER(TRIM(:pcNm)))
+                                           )
+                                       AND UPPER(TRIM(NVL(USER_NM, ' '))) NOT IN ('ADMIN', N'관리자')
+                                       AND UPPER(TRIM(NVL(LOCAL_PC_NM, ' '))) <> 'ADMIN'
+                                     ORDER BY CASE
+                                                WHEN :hasIp = 1 AND UPPER(TRIM(LOCAL_PC_IP)) = UPPER(TRIM(:ip)) THEN 0
+                                                ELSE 1
+                                              END,
+                                              UPDT_DTM DESC
+                                  ) WHERE ROWNUM = 1";
+                        }
+
+                        bool hasIp = !string.IsNullOrWhiteSpace(pcIp) && pcIp.Trim() != "-";
+                        bool hasPc = !string.IsNullOrWhiteSpace(pcName);
+                        cmd.Parameters.Add("hasIp", OracleDbType.Int32).Value = hasIp ? 1 : 0;
+                        cmd.Parameters.Add("ip", OracleDbType.Varchar2).Value =
+                            hasIp ? (object)pcIp.Trim() : DBNull.Value;
+                        cmd.Parameters.Add("hasPc", OracleDbType.Int32).Value = hasPc ? 1 : 0;
+                        cmd.Parameters.Add("pcNm", OracleDbType.Varchar2).Value =
+                            hasPc ? (object)pcName.Trim() : DBNull.Value;
+
+                        using (var reader = cmd.ExecuteReader())
+                        {
+                            if (!reader.Read())
+                                return null;
+                            var dto = new DirectoryUserDto
+                            {
+                                UserId = reader.IsDBNull(0) ? (long?)null : Convert.ToInt64(reader.GetValue(0)),
+                                UserName = reader.IsDBNull(1) ? null : Convert.ToString(reader.GetValue(1)),
+                                TeamName = reader.IsDBNull(2) ? null : Convert.ToString(reader.GetValue(2)),
+                                LocalPcName = reader.IsDBNull(3) ? null : Convert.ToString(reader.GetValue(3)),
+                                LocalPcIp = reader.IsDBNull(4) ? null : Convert.ToString(reader.GetValue(4)),
+                                WindowsAccount = reader.IsDBNull(5) ? null : Convert.ToString(reader.GetValue(5)),
+                                IsActive = true
+                            };
+                            if (_hasUserAuthColumns)
+                            {
+                                dto.LoginId = reader.IsDBNull(6) ? null : Convert.ToString(reader.GetValue(6));
+                                dto.PasswordHash = reader.IsDBNull(7) ? null : Convert.ToString(reader.GetValue(7));
+                                dto.IsActive = reader.IsDBNull(8)
+                                    || string.Equals(Convert.ToString(reader.GetValue(8)), "Y", StringComparison.OrdinalIgnoreCase);
+                            }
+                            return dto;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WorkHubFileLogger.Warn("DIRECTORY", "FindUserByLocalEndpoint failed: " + SafeError(ex));
+                return null;
+            }
+        }
+
+        public DirectoryUserDto FindClaimableUserOnLocalEndpoint(string pcName, string pcIp)
+        {
+            if (!IsConfigured)
+                return null;
+            if (string.IsNullOrWhiteSpace(pcName) && string.IsNullOrWhiteSpace(pcIp))
+                return null;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                {
+                    EnsureUserTable(conn);
+                    if (!_hasUserTable)
+                        return null;
+                    EnsureUserAuthColumns(conn);
+
+                    using (var cmd = CreateCommand(conn))
+                    {
+                        // Include rows overwritten as 관리자/ADMIN on a real PC (not ADMIN seed).
+                        if (_hasUserAuthColumns)
+                        {
+                            cmd.CommandText =
+                                @"SELECT * FROM (
+                                    SELECT USR_ID, USER_NM, TEAM_NM, LOCAL_PC_NM, LOCAL_PC_IP, WIN_ACCOUNT,
+                                           LOGIN_ID, PASSWORD_HASH, IS_ACTIVE
+                                      FROM " + UserTable + @"
+                                     WHERE (
+                                             (:hasIp = 1 AND UPPER(TRIM(LOCAL_PC_IP)) = UPPER(TRIM(:ip)))
+                                          OR (:hasPc = 1 AND UPPER(TRIM(LOCAL_PC_NM)) = UPPER(TRIM(:pcNm)))
+                                           )
+                                       AND UPPER(TRIM(NVL(LOCAL_PC_NM, ' '))) <> 'ADMIN'
+                                     ORDER BY CASE
+                                                WHEN :hasIp = 1 AND UPPER(TRIM(LOCAL_PC_IP)) = UPPER(TRIM(:ip)) THEN 0
+                                                ELSE 1
+                                              END,
+                                              UPDT_DTM DESC
+                                  ) WHERE ROWNUM = 1";
+                        }
+                        else
+                        {
+                            cmd.CommandText =
+                                @"SELECT * FROM (
+                                    SELECT USR_ID, USER_NM, TEAM_NM, LOCAL_PC_NM, LOCAL_PC_IP, WIN_ACCOUNT
+                                      FROM " + UserTable + @"
+                                     WHERE (
+                                             (:hasIp = 1 AND UPPER(TRIM(LOCAL_PC_IP)) = UPPER(TRIM(:ip)))
+                                          OR (:hasPc = 1 AND UPPER(TRIM(LOCAL_PC_NM)) = UPPER(TRIM(:pcNm)))
+                                           )
+                                       AND UPPER(TRIM(NVL(LOCAL_PC_NM, ' '))) <> 'ADMIN'
+                                     ORDER BY CASE
+                                                WHEN :hasIp = 1 AND UPPER(TRIM(LOCAL_PC_IP)) = UPPER(TRIM(:ip)) THEN 0
+                                                ELSE 1
+                                              END,
+                                              UPDT_DTM DESC
+                                  ) WHERE ROWNUM = 1";
+                        }
+
+                        bool hasIp = !string.IsNullOrWhiteSpace(pcIp) && pcIp.Trim() != "-";
+                        bool hasPc = !string.IsNullOrWhiteSpace(pcName);
+                        cmd.Parameters.Add("hasIp", OracleDbType.Int32).Value = hasIp ? 1 : 0;
+                        cmd.Parameters.Add("ip", OracleDbType.Varchar2).Value =
+                            hasIp ? (object)pcIp.Trim() : DBNull.Value;
+                        cmd.Parameters.Add("hasPc", OracleDbType.Int32).Value = hasPc ? 1 : 0;
+                        cmd.Parameters.Add("pcNm", OracleDbType.Varchar2).Value =
+                            hasPc ? (object)pcName.Trim() : DBNull.Value;
+
+                        using (var reader = cmd.ExecuteReader())
+                        {
+                            if (!reader.Read())
+                                return null;
+                            var dto = new DirectoryUserDto
+                            {
+                                UserId = reader.IsDBNull(0) ? (long?)null : Convert.ToInt64(reader.GetValue(0)),
+                                UserName = reader.IsDBNull(1) ? null : Convert.ToString(reader.GetValue(1)),
+                                TeamName = reader.IsDBNull(2) ? null : Convert.ToString(reader.GetValue(2)),
+                                LocalPcName = reader.IsDBNull(3) ? null : Convert.ToString(reader.GetValue(3)),
+                                LocalPcIp = reader.IsDBNull(4) ? null : Convert.ToString(reader.GetValue(4)),
+                                WindowsAccount = reader.IsDBNull(5) ? null : Convert.ToString(reader.GetValue(5)),
+                                IsActive = true
+                            };
+                            if (_hasUserAuthColumns)
+                            {
+                                dto.LoginId = reader.IsDBNull(6) ? null : Convert.ToString(reader.GetValue(6));
+                                dto.PasswordHash = reader.IsDBNull(7) ? null : Convert.ToString(reader.GetValue(7));
+                                dto.IsActive = reader.IsDBNull(8)
+                                    || string.Equals(Convert.ToString(reader.GetValue(8)), "Y", StringComparison.OrdinalIgnoreCase);
+                            }
+                            return dto;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WorkHubFileLogger.Warn("DIRECTORY", "FindClaimableUserOnLocalEndpoint failed: " + SafeError(ex));
+                return null;
+            }
+        }
+
+        public int UpdateUserIdentity(long userId, DirectoryUserDto user)
+        {
+            if (userId <= 0 || user == null || string.IsNullOrWhiteSpace(user.UserName))
+                return 0;
+            if (!IsConfigured)
+                return 0;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                {
+                    EnsureUserTable(conn);
+                    if (!_hasUserTable)
+                        return 0;
+                    EnsureUserAuthColumns(conn);
+
+                    using (var cmd = CreateCommand(conn))
+                    {
+                        if (_hasUserAuthColumns)
+                        {
+                            cmd.CommandText =
+                                @"UPDATE " + UserTable + @"
+                                    SET USER_NM = :userNm,
+                                        TEAM_NM = :teamNm,
+                                        LOCAL_PC_NM = :pcNm,
+                                        LOCAL_PC_IP = :ip,
+                                        WIN_ACCOUNT = :winAcct,
+                                        LOGIN_ID = :loginId,
+                                        PASSWORD_HASH = NVL(:pwHash, PASSWORD_HASH),
+                                        IS_ACTIVE = NVL(:isActive, IS_ACTIVE),
+                                        UPDT_DTM = SYSTIMESTAMP
+                                  WHERE USR_ID = :usrId";
+                        }
+                        else
+                        {
+                            cmd.CommandText =
+                                @"UPDATE " + UserTable + @"
+                                    SET USER_NM = :userNm,
+                                        TEAM_NM = :teamNm,
+                                        LOCAL_PC_NM = :pcNm,
+                                        LOCAL_PC_IP = :ip,
+                                        WIN_ACCOUNT = :winAcct,
+                                        UPDT_DTM = SYSTIMESTAMP
+                                  WHERE USR_ID = :usrId";
+                        }
+
+                        cmd.Parameters.Add("usrId", OracleDbType.Int64).Value = userId;
                         cmd.Parameters.Add("userNm", OracleDbType.NVarchar2).Value = Trim(user.UserName, 200);
                         cmd.Parameters.Add("teamNm", OracleDbType.NVarchar2).Value =
                             (object)Trim(user.TeamName, 100) ?? DBNull.Value;
+                        cmd.Parameters.Add("pcNm", OracleDbType.Varchar2).Value =
+                            (object)Trim(user.LocalPcName, 100) ?? DBNull.Value;
                         cmd.Parameters.Add("ip", OracleDbType.Varchar2).Value =
                             (object)Trim(user.LocalPcIp, 50) ?? DBNull.Value;
                         cmd.Parameters.Add("winAcct", OracleDbType.Varchar2).Value =
                             (object)Trim(user.WindowsAccount, 200) ?? DBNull.Value;
+                        if (_hasUserAuthColumns)
+                        {
+                            string loginId = string.IsNullOrWhiteSpace(user.LoginId) ? user.UserName : user.LoginId;
+                            cmd.Parameters.Add("loginId", OracleDbType.Varchar2).Value =
+                                (object)Trim(loginId, 100) ?? DBNull.Value;
+                            cmd.Parameters.Add("pwHash", OracleDbType.Varchar2).Value =
+                                (object)Trim(user.PasswordHash, 128) ?? DBNull.Value;
+                            cmd.Parameters.Add("isActive", OracleDbType.Char).Value =
+                                user.IsActive ? "Y" : "N";
+                        }
                         return cmd.ExecuteNonQuery();
                     }
                 }
             }
             catch (Exception ex)
             {
-                WorkHubFileLogger.Warn("DIRECTORY", "UpsertUser failed: " + SafeError(ex));
+                WorkHubFileLogger.Warn("DIRECTORY", "UpdateUserIdentity failed: " + SafeError(ex));
+                return -1;
+            }
+        }
+
+        public int UpdatePasswordHash(string loginOrName, string passwordHash)
+        {
+            if (string.IsNullOrWhiteSpace(loginOrName) || string.IsNullOrWhiteSpace(passwordHash))
+                return 0;
+            if (!IsConfigured)
+                return 0;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                {
+                    EnsureUserTable(conn);
+                    if (!_hasUserTable)
+                        return 0;
+                    EnsureUserAuthColumns(conn);
+                    if (!_hasUserAuthColumns)
+                        return 0;
+
+                    using (var cmd = CreateCommand(conn))
+                    {
+                        cmd.CommandText =
+                            @"UPDATE " + UserTable + @"
+                                SET PASSWORD_HASH = :pwHash,
+                                    UPDT_DTM = SYSTIMESTAMP
+                              WHERE UPPER(TRIM(LOGIN_ID)) = UPPER(TRIM(:id))
+                                 OR UPPER(TRIM(USER_NM)) = UPPER(TRIM(:id))";
+                        cmd.Parameters.Add("pwHash", OracleDbType.Varchar2).Value = Trim(passwordHash, 128);
+                        cmd.Parameters.Add("id", OracleDbType.NVarchar2).Value = loginOrName.Trim();
+                        return cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WorkHubFileLogger.Warn("DIRECTORY", "UpdatePasswordHash failed: " + SafeError(ex));
                 return -1;
             }
         }
@@ -402,25 +995,59 @@ namespace GBCWorkHub.DAC
                     EnsureUserTable(conn);
                     if (!_hasUserTable)
                         return list;
+                    EnsureUserAuthColumns(conn);
+                    EnsureUserDeletedColumn(conn);
 
                     using (var cmd = CreateCommand(conn))
                     {
-                        cmd.CommandText =
-                            @"SELECT USER_NM, TEAM_NM, LOCAL_PC_NM, LOCAL_PC_IP, WIN_ACCOUNT
-                                FROM " + UserTable + @"
-                               ORDER BY UPDT_DTM DESC";
+                        if (_hasUserAuthColumns)
+                        {
+                            cmd.CommandText =
+                                @"SELECT USR_ID, USER_NM, TEAM_NM, LOCAL_PC_NM, LOCAL_PC_IP, WIN_ACCOUNT,
+                                         LOGIN_ID, IS_ACTIVE" + (_hasUserDeletedColumn ? ", IS_DELETED" : string.Empty) + @"
+                                    FROM " + UserTable + @"
+                                   ORDER BY UPDT_DTM DESC";
+                        }
+                        else
+                        {
+                            cmd.CommandText =
+                                @"SELECT USER_NM, TEAM_NM, LOCAL_PC_NM, LOCAL_PC_IP, WIN_ACCOUNT
+                                    FROM " + UserTable + @"
+                                   ORDER BY UPDT_DTM DESC";
+                        }
                         using (var reader = cmd.ExecuteReader())
                         {
                             while (reader.Read())
                             {
-                                list.Add(new DirectoryUserDto
+                                if (_hasUserAuthColumns)
                                 {
-                                    UserName = reader.IsDBNull(0) ? null : Convert.ToString(reader.GetValue(0)),
-                                    TeamName = reader.IsDBNull(1) ? null : Convert.ToString(reader.GetValue(1)),
-                                    LocalPcName = reader.IsDBNull(2) ? null : Convert.ToString(reader.GetValue(2)),
-                                    LocalPcIp = reader.IsDBNull(3) ? null : Convert.ToString(reader.GetValue(3)),
-                                    WindowsAccount = reader.IsDBNull(4) ? null : Convert.ToString(reader.GetValue(4))
-                                });
+                                    list.Add(new DirectoryUserDto
+                                    {
+                                        UserId = reader.IsDBNull(0) ? (long?)null : Convert.ToInt64(reader.GetValue(0)),
+                                        UserName = reader.IsDBNull(1) ? null : Convert.ToString(reader.GetValue(1)),
+                                        TeamName = reader.IsDBNull(2) ? null : Convert.ToString(reader.GetValue(2)),
+                                        LocalPcName = reader.IsDBNull(3) ? null : Convert.ToString(reader.GetValue(3)),
+                                        LocalPcIp = reader.IsDBNull(4) ? null : Convert.ToString(reader.GetValue(4)),
+                                        WindowsAccount = reader.IsDBNull(5) ? null : Convert.ToString(reader.GetValue(5)),
+                                        LoginId = reader.IsDBNull(6) ? null : Convert.ToString(reader.GetValue(6)),
+                                        IsActive = reader.IsDBNull(7)
+                                            || string.Equals(Convert.ToString(reader.GetValue(7)), "Y", StringComparison.OrdinalIgnoreCase),
+                                        IsDeleted = _hasUserDeletedColumn
+                                            && !reader.IsDBNull(8) && Convert.ToInt32(reader.GetValue(8)) != 0
+                                    });
+                                }
+                                else
+                                {
+                                    list.Add(new DirectoryUserDto
+                                    {
+                                        UserName = reader.IsDBNull(0) ? null : Convert.ToString(reader.GetValue(0)),
+                                        TeamName = reader.IsDBNull(1) ? null : Convert.ToString(reader.GetValue(1)),
+                                        LocalPcName = reader.IsDBNull(2) ? null : Convert.ToString(reader.GetValue(2)),
+                                        LocalPcIp = reader.IsDBNull(3) ? null : Convert.ToString(reader.GetValue(3)),
+                                        WindowsAccount = reader.IsDBNull(4) ? null : Convert.ToString(reader.GetValue(4)),
+                                        IsActive = true
+                                    });
+                                }
                             }
                         }
                     }
@@ -432,6 +1059,155 @@ namespace GBCWorkHub.DAC
             }
 
             return list;
+        }
+
+        public int SetUserActive(string loginOrName, bool isActive)
+        {
+            if (string.IsNullOrWhiteSpace(loginOrName) || !IsConfigured)
+                return 0;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                {
+                    EnsureUserTable(conn);
+                    if (!_hasUserTable)
+                        return 0;
+                    EnsureUserAuthColumns(conn);
+                    if (!_hasUserAuthColumns)
+                        return 0;
+
+                    using (var cmd = CreateCommand(conn))
+                    {
+                        cmd.CommandText =
+                            @"UPDATE " + UserTable + @"
+                                SET IS_ACTIVE = :active,
+                                    UPDT_DTM = SYSTIMESTAMP
+                              WHERE UPPER(TRIM(LOGIN_ID)) = UPPER(TRIM(:id))
+                                 OR UPPER(TRIM(USER_NM)) = UPPER(TRIM(:id))";
+                        cmd.Parameters.Add("active", OracleDbType.Char).Value = isActive ? "Y" : "N";
+                        cmd.Parameters.Add("id", OracleDbType.NVarchar2).Value = loginOrName.Trim();
+                        return cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WorkHubFileLogger.Warn("DIRECTORY", "SetUserActive failed: " + SafeError(ex));
+                return -1;
+            }
+        }
+
+        /// <summary>실제 DELETE 대신 IS_DELETED만 세운다 — 요청사항/업무기록이 USR_ID를 FK로 참조한다.</summary>
+        public int SetUserDeleted(long userId, bool isDeleted)
+        {
+            if (userId <= 0 || !IsConfigured)
+                return 0;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                {
+                    EnsureUserTable(conn);
+                    if (!_hasUserTable)
+                        return 0;
+                    EnsureUserDeletedColumn(conn);
+                    if (!_hasUserDeletedColumn)
+                        return 0;
+
+                    using (var cmd = CreateCommand(conn))
+                    {
+                        cmd.CommandText =
+                            @"UPDATE " + UserTable + @"
+                                 SET IS_DELETED = :deleted,
+                                     UPDT_DTM = SYSTIMESTAMP
+                               WHERE USR_ID = :userId";
+                        cmd.Parameters.Add("deleted", OracleDbType.Int32).Value = isDeleted ? 1 : 0;
+                        cmd.Parameters.Add("userId", OracleDbType.Int64).Value = userId;
+                        return cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WorkHubFileLogger.Warn("DIRECTORY", "SetUserDeleted failed: " + SafeError(ex));
+                return -1;
+            }
+        }
+
+        /// <summary>
+        /// 관리자 개인정보 수정 팝업 전용 — 이름/소속/로그인ID만 좁게 갱신한다. UpdateUserIdentity는
+        /// PC/비밀번호/활성여부까지 같이 덮어써서 이 용도로 재사용하면 위험하다.
+        /// </summary>
+        public int UpdateUserProfile(long userId, string userName, string teamName, string loginId)
+        {
+            if (userId <= 0 || string.IsNullOrWhiteSpace(userName) || !IsConfigured)
+                return 0;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                {
+                    EnsureUserTable(conn);
+                    if (!_hasUserTable)
+                        return 0;
+
+                    using (var cmd = CreateCommand(conn))
+                    {
+                        cmd.CommandText =
+                            @"UPDATE " + UserTable + @"
+                                 SET USER_NM = :userName,
+                                     TEAM_NM = :teamName,
+                                     LOGIN_ID = :loginId,
+                                     UPDT_DTM = SYSTIMESTAMP
+                               WHERE USR_ID = :userId";
+                        cmd.Parameters.Add("userName", OracleDbType.NVarchar2).Value = Trim(userName, 200);
+                        cmd.Parameters.Add("teamName", OracleDbType.NVarchar2).Value = (object)Trim(teamName, 100) ?? DBNull.Value;
+                        cmd.Parameters.Add("loginId", OracleDbType.Varchar2).Value = (object)Trim(loginId, 100) ?? DBNull.Value;
+                        cmd.Parameters.Add("userId", OracleDbType.Int64).Value = userId;
+                        return cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WorkHubFileLogger.Warn("DIRECTORY", "UpdateUserProfile failed: " + SafeError(ex));
+                return -1;
+            }
+        }
+
+        /// <summary>LOGIN_ID 유니크 제약(UX_MSDWHTKD_USR_LOGIN) 위반을 저장 전에 미리 확인.</summary>
+        public bool LoginIdExists(string loginId, long excludeUserId)
+        {
+            if (string.IsNullOrWhiteSpace(loginId) || !IsConfigured)
+                return false;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                {
+                    EnsureUserTable(conn);
+                    if (!_hasUserTable)
+                        return false;
+
+                    using (var cmd = CreateCommand(conn))
+                    {
+                        cmd.CommandText =
+                            @"SELECT COUNT(*) FROM " + UserTable + @"
+                               WHERE UPPER(TRIM(LOGIN_ID)) = UPPER(TRIM(:loginId))
+                                 AND USR_ID <> :excludeUserId";
+                        cmd.Parameters.Add("loginId", OracleDbType.Varchar2).Value = loginId.Trim();
+                        cmd.Parameters.Add("excludeUserId", OracleDbType.Int64).Value = excludeUserId;
+                        object result = cmd.ExecuteScalar();
+                        return result != null && Convert.ToInt32(result) > 0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WorkHubFileLogger.Warn("DIRECTORY", "LoginIdExists failed: " + SafeError(ex));
+                return false;
+            }
         }
 
         public IList<PcMapDto> GetPcMapsBySite(string siteCode)
@@ -501,12 +1277,102 @@ namespace GBCWorkHub.DAC
             return list;
         }
 
+        public int DeletePcMap(string siteCode, string pcName)
+        {
+            if (string.IsNullOrWhiteSpace(siteCode) || string.IsNullOrWhiteSpace(pcName) || !IsConfigured)
+                return 0;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                {
+                    EnsurePcMapTable(conn);
+                    if (!_hasPcMapTable)
+                        return 0;
+
+                    using (var cmd = CreateCommand(conn))
+                    {
+                        cmd.CommandText =
+                            @"DELETE FROM " + PcMapTable + @"
+                               WHERE UPPER(TRIM(SITE_CD)) = UPPER(TRIM(:siteCd))
+                                 AND UPPER(TRIM(PC_NM)) = UPPER(TRIM(:pcNm))";
+                        cmd.Parameters.Add("siteCd", OracleDbType.Varchar2).Value = siteCode.Trim();
+                        cmd.Parameters.Add("pcNm", OracleDbType.Varchar2).Value = pcName.Trim();
+                        return cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WorkHubFileLogger.Warn("DIRECTORY", "DeletePcMap failed: " + SafeError(ex));
+                return -1;
+            }
+        }
+
         private void EnsureUserTable(OracleConnection conn)
         {
             if (_userProbed)
                 return;
             _userProbed = true;
             _hasUserTable = ProbeTable(conn, UserTable, "MSDWHTKD_USR");
+        }
+
+        private void EnsureUserAuthColumns(OracleConnection conn)
+        {
+            if (_userAuthProbed)
+                return;
+            _userAuthProbed = true;
+            if (!_hasUserTable)
+                return;
+            try
+            {
+                using (var cmd = CreateCommand(conn))
+                {
+                    cmd.CommandText = "SELECT LOGIN_ID, PASSWORD_HASH, IS_ACTIVE FROM " + UserTable + " WHERE ROWNUM = 0";
+                    cmd.ExecuteScalar();
+                }
+                _hasUserAuthColumns = true;
+            }
+            catch (OracleException ex)
+            {
+                if (ex.Number == 904)
+                {
+                    _hasUserAuthColumns = false;
+                    WorkHubFileLogger.Warn("DIRECTORY",
+                        "MSDWHTKD_USR auth columns missing; password login limited. Apply sql/20_MSDWHTKD_USR_AUTH.sql when DBA can.");
+                    return;
+                }
+                throw;
+            }
+        }
+
+        private void EnsureUserDeletedColumn(OracleConnection conn)
+        {
+            if (_userDeletedProbed)
+                return;
+            _userDeletedProbed = true;
+            if (!_hasUserTable)
+                return;
+            try
+            {
+                using (var cmd = CreateCommand(conn))
+                {
+                    cmd.CommandText = "SELECT IS_DELETED FROM " + UserTable + " WHERE ROWNUM = 0";
+                    cmd.ExecuteScalar();
+                }
+                _hasUserDeletedColumn = true;
+            }
+            catch (OracleException ex)
+            {
+                if (ex.Number == 904)
+                {
+                    _hasUserDeletedColumn = false;
+                    WorkHubFileLogger.Warn("DIRECTORY",
+                        "MSDWHTKD_USR.IS_DELETED missing; account soft-delete disabled. Apply sql/30_MSDWHTKD_USR_SOFT_DELETE.sql when DBA can.");
+                    return;
+                }
+                throw;
+            }
         }
 
         private void EnsurePcMapTable(OracleConnection conn)

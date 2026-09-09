@@ -20,6 +20,10 @@ namespace GBCWorkHub.DTO
                     return "VPN";
                 if (string.Equals(Kind, "VPN_PW", StringComparison.OrdinalIgnoreCase))
                     return "VPW";
+                if (string.Equals(Kind, "AUTH_ID", StringComparison.OrdinalIgnoreCase))
+                    return "Auth";
+                if (string.Equals(Kind, "AUTH_PW", StringComparison.OrdinalIgnoreCase))
+                    return "APW";
                 return "ID";
             }
         }
@@ -66,6 +70,13 @@ namespace GBCWorkHub.DTO
             if (!sections.TryGetValue("vpn_password", out vpnPwBody))
                 sections.TryGetValue("vpn_pw", out vpnPwBody);
 
+            // CMC Auth: accept [Auth ID]/[Auth Password]; also fall back to VPN keys for legacy rows.
+            string authIdBody;
+            string authPwBody;
+            sections.TryGetValue("auth_id", out authIdBody);
+            if (!sections.TryGetValue("auth_password", out authPwBody))
+                sections.TryGetValue("auth_pw", out authPwBody);
+
             foreach (string id in ExtractIds(idBody))
                 list.Add(new PcAccessCredential { Kind = "ID", Value = id });
             foreach (string pw in ExtractPasswords(pwBody))
@@ -74,6 +85,10 @@ namespace GBCWorkHub.DTO
                 list.Add(new PcAccessCredential { Kind = "VPN_ID", Value = id });
             foreach (string pw in ExtractPasswords(vpnPwBody))
                 list.Add(new PcAccessCredential { Kind = "VPN_PW", Value = pw });
+            foreach (string id in ExtractVpnIds(authIdBody))
+                list.Add(new PcAccessCredential { Kind = "AUTH_ID", Value = id });
+            foreach (string pw in ExtractPasswords(authPwBody))
+                list.Add(new PcAccessCredential { Kind = "AUTH_PW", Value = pw });
 
             return list;
         }
@@ -132,6 +147,12 @@ namespace GBCWorkHub.DTO
             if (t == "vpn password" || t == "vpn pw" || t == "vpn_pw" || t == "vpn_password"
                 || t == "vpw" || t == "vpn비번" || t == "vpn 비번" || t == "vpn 비밀번호")
                 return "vpn_password";
+            if (t == "auth id" || t == "authid" || t == "auth_id" || t == "auth계정" || t == "auth 계정"
+                || t == "인증 id" || t == "인증계정")
+                return "auth_id";
+            if (t == "auth password" || t == "auth pw" || t == "auth_pw" || t == "auth_password"
+                || t == "auth비번" || t == "auth 비번" || t == "인증 비번" || t == "인증 비밀번호")
+                return "auth_password";
             if (t == "comment" || t == "comments" || t == "비고" || t == "메모")
                 return "comment";
             return null;

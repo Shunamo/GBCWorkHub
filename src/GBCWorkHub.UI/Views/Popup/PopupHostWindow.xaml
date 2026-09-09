@@ -17,7 +17,7 @@
                 <Setter Property="VerticalContentAlignment" Value="Center" />
                 <Setter Property="Background" Value="Transparent" />
                 <Setter Property="BorderThickness" Value="0" />
-                <Setter Property="Padding" Value="14,0" />
+                <Setter Property="Padding" Value="0" />
                 <Setter Property="FontSize" Value="14" />
                 <Setter Property="Foreground" Value="{StaticResource WlGlassInk}" />
                 <Setter Property="CaretBrush" Value="{StaticResource WlGlassAccent}" />
@@ -25,7 +25,8 @@
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="TextBox">
-                            <Border Background="#F4F6F9"
+                            <Border x:Name="Bd"
+                                    Background="#F4F6F9"
                                     BorderBrush="#D8DEE8"
                                     BorderThickness="1"
                                     CornerRadius="12"
@@ -34,8 +35,9 @@
                                     <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.10" Color="#2F4466" />
                                 </Border.Effect>
                                 <Grid>
+                                    <!-- 힌트는 오른쪽 / 캐럿은 왼쪽(12) -->
                                     <TextBlock Text="{TemplateBinding Tag}"
-                                               Margin="{TemplateBinding Padding}"
+                                               Margin="18,0,14,0"
                                                VerticalAlignment="Center"
                                                FontSize="{TemplateBinding FontSize}"
                                                Foreground="#94A3B8"
@@ -55,10 +57,60 @@
                                         </TextBlock.Style>
                                     </TextBlock>
                                     <ScrollViewer x:Name="PART_ContentHost"
-                                                  Margin="0"
+                                                  Margin="12,0,14,0"
                                                   VerticalAlignment="Center" />
                                 </Grid>
                             </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="#93C5FD" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="GlassPromptPassword" TargetType="PasswordBox">
+                <Setter Property="MinHeight" Value="40" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="Foreground" Value="{StaticResource WlGlassInk}" />
+                <Setter Property="CaretBrush" Value="{StaticResource WlGlassAccent}" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="PasswordBox">
+                            <Border x:Name="Bd"
+                                    Background="#F4F6F9"
+                                    BorderBrush="#D8DEE8"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    SnapsToDevicePixels="True">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.10" Color="#2F4466" />
+                                </Border.Effect>
+                                <Grid>
+                                    <TextBlock x:Name="Placeholder"
+                                               Text="{TemplateBinding Tag}"
+                                               Margin="18,0,14,0"
+                                               VerticalAlignment="Center"
+                                               FontSize="{TemplateBinding FontSize}"
+                                               Foreground="#94A3B8"
+                                               IsHitTestVisible="False" />
+                                    <ScrollViewer x:Name="PART_ContentHost"
+                                                  Margin="12,0,14,0"
+                                                  VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="#93C5FD" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </Setter.Value>
                 </Setter>
@@ -113,21 +165,66 @@
                     </TextBlock.Style>
                 </TextBlock>
 
-                <StackPanel Grid.Row="2" Visibility="{Binding ShowInput, Converter={StaticResource BoolToVis}}">
+                <StackPanel Grid.Row="2" Visibility="{Binding ShowPromptFields, Converter={StaticResource BoolToVis}}">
+                    <StackPanel Visibility="{Binding ShowInput, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="이름" FontSize="12" Foreground="#64748B" Margin="0,0,0,4" />
+                        <TextBox x:Name="PromptInputBox"
+                                 Style="{StaticResource GlassPromptInput}"
+                                 Tag="ex) 김ㅇㅇ"
+                                 Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
                     <StackPanel Visibility="{Binding ShowAffiliationInput, Converter={StaticResource BoolToVis}}"
-                                Margin="0,0,0,10">
+                                Margin="0,10,0,0">
                         <TextBlock Text="소속" FontSize="12" Foreground="#64748B" Margin="0,0,0,4" />
                         <TextBox x:Name="AffiliationInputBox"
                                  Style="{StaticResource GlassPromptInput}"
                                  Tag="ex) 진료지원"
                                  Text="{Binding AffiliationText, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
-                    <TextBlock Text="사용자명" FontSize="12" Foreground="#64748B" Margin="0,0,0,4"
-                               Visibility="{Binding ShowAffiliationInput, Converter={StaticResource BoolToVis}}" />
-                    <TextBox x:Name="PromptInputBox"
-                             Style="{StaticResource GlassPromptInput}"
-                             Tag="ex) 김ㅇㅇ"
-                             Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}" />
+                    <StackPanel Visibility="{Binding ShowSecondaryInput, Converter={StaticResource BoolToVis}}"
+                                Margin="0,10,0,0">
+                        <TextBlock Text="{Binding SecondaryInputLabel}" FontSize="12" Foreground="#64748B" Margin="0,0,0,4" />
+                        <TextBox x:Name="SecondaryInputBox"
+                                 Style="{StaticResource GlassPromptInput}"
+                                 Text="{Binding SecondaryInputText, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                    <StackPanel Visibility="{Binding ShowCurrentPasswordInput, Converter={StaticResource BoolToVis}}"
+                                Margin="0,10,0,0">
+                        <TextBlock Text="현재 비밀번호" FontSize="12" Foreground="#64748B" Margin="0,0,0,4" />
+                        <PasswordBox x:Name="PromptCurrentPasswordBox"
+                                     Style="{StaticResource GlassPromptPassword}"
+                                     Tag="영문·숫자만"
+                                     InputMethod.IsInputMethodEnabled="False"
+                                     PreviewTextInput="PromptCurrentPasswordBox_PreviewTextInput"
+                                     PreviewKeyDown="PromptCurrentPasswordBox_PreviewKeyDown"
+                                     PasswordChanged="PromptCurrentPasswordBox_PasswordChanged" />
+                    </StackPanel>
+                    <StackPanel Visibility="{Binding ShowPasswordInput, Converter={StaticResource BoolToVis}}"
+                                Margin="0,10,0,0">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <TextBlock Text="{Binding PasswordFieldLabel, Mode=OneWay}" FontSize="12" Foreground="#64748B" />
+                            <TextBlock Text=" (비워두면 변경 안 함)" FontSize="12" Foreground="#94A3B8"
+                                       Visibility="{Binding ShowPasswordOptionalHint, Converter={StaticResource BoolToVis}}" />
+                        </StackPanel>
+                        <PasswordBox x:Name="PromptPasswordBox"
+                                     Style="{StaticResource GlassPromptPassword}"
+                                     Tag="영문·숫자만"
+                                     InputMethod.IsInputMethodEnabled="False"
+                                     PreviewTextInput="PromptPasswordBox_PreviewTextInput"
+                                     PreviewKeyDown="PromptPasswordBox_PreviewKeyDown"
+                                     PasswordChanged="PromptPasswordBox_PasswordChanged" />
+                    </StackPanel>
+                    <StackPanel Visibility="{Binding ShowPasswordConfirm, Converter={StaticResource BoolToVis}}"
+                                Margin="0,10,0,0">
+                        <TextBlock Text="비밀번호 확인" FontSize="12" Foreground="#64748B" Margin="0,0,0,4" />
+                        <PasswordBox x:Name="PromptPasswordConfirmBox"
+                                     Style="{StaticResource GlassPromptPassword}"
+                                     Tag="영문·숫자만"
+                                     InputMethod.IsInputMethodEnabled="False"
+                                     PreviewTextInput="PromptPasswordConfirmBox_PreviewTextInput"
+                                     PreviewKeyDown="PromptPasswordConfirmBox_PreviewKeyDown"
+                                     PasswordChanged="PromptPasswordConfirmBox_PasswordChanged" />
+                    </StackPanel>
                     <TextBlock Text="{Binding InputError}" FontSize="12" Foreground="#DC2626" Margin="0,6,0,0"
                                Visibility="{Binding HasInputError, Converter={StaticResource BoolToVis}}" />
                 </StackPanel>

@@ -5,8 +5,8 @@ using Newtonsoft.Json;
 namespace GBCWorkHub.BIZ
 {
     /// <summary>
-    /// 첫 실행에 정한 점유명. 점유(ACCS_USER_ID)와 업무기록 작성자 표시에 쓴다.
-    /// Windows 로그인 계정명과 별개다.
+    /// 앱 로그인 점유명. 점유(ACCS_USER_ID)·업무기록 작성자 식별에 쓴다.
+    /// 로그인 후에는 Windows 계정·로컬 PC명과 별개로 취급한다.
     /// </summary>
     public static class OccupancyNameStore
     {
@@ -14,6 +14,9 @@ namespace GBCWorkHub.BIZ
         {
             public string OccupancyName { get; set; }
             public string Affiliation { get; set; }
+            public bool IsAdmin { get; set; }
+            /// <summary>MSDWHTKD_USR.USR_ID. 로그인 세션의 불변 사용자 식별자 — 표시명/PC와 무관하게 유지된다.</summary>
+            public long? UserId { get; set; }
         }
 
         public static string FilePath
@@ -37,6 +40,25 @@ namespace GBCWorkHub.BIZ
                 if (dto == null || string.IsNullOrWhiteSpace(dto.OccupancyName))
                     return null;
                 return dto.OccupancyName.Trim();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 현재 세션의 MSDWHTKD_USR.USR_ID. 로그인 시 저장되며, 표시명 변경/PC 변경과 무관하게 유지된다.
+        /// 신규 기능(개선사항 요청 등)의 사용자 관계는 반드시 이 값을 FK로 사용하고, 이름/PC 매칭으로 재해석하지 않는다.
+        /// </summary>
+        public static long? TryGetUserId()
+        {
+            try
+            {
+                if (!File.Exists(FilePath))
+                    return null;
+                var dto = JsonConvert.DeserializeObject<FileDto>(File.ReadAllText(FilePath));
+                return dto == null ? null : dto.UserId;
             }
             catch
             {
@@ -100,6 +122,15 @@ namespace GBCWorkHub.BIZ
             get { return !string.IsNullOrWhiteSpace(TryGetAffiliation()); }
         }
 
+        public static bool IsAdmin
+        {
+            get
+            {
+                // Never trust a stale IsAdmin flag alone — identity is the occupancy name.
+                return IsAdminIdentity(TryGet());
+            }
+        }
+
         public static bool IsLocalOccupant(string storedUserId)
         {
             return IsLocalOccupant(storedUserId, null);
@@ -107,6 +138,31 @@ namespace GBCWorkHub.BIZ
 
         public static bool IsLocalOccupant(string storedUserId, string accessPcName)
         {
+            // App login identity wins: same PC / Windows account must NOT count as "me"
+            // when another login id is active on this machine.
+            string occupancy = TryGet();
+            if (!string.IsNullOrWhiteSpace(occupancy))
+            {
+                if (string.IsNullOrWhiteSpace(storedUserId))
+                    return false;
+
+                string raw = storedUserId.Trim();
+                if (string.Equals(raw, occupancy, StringComparison.OrdinalIgnoreCase))
+                    return true;
+
+                string stripped = StripDomain(raw);
+                if (!string.IsNullOrWhiteSpace(stripped)
+                    && string.Equals(stripped, occupancy, StringComparison.OrdinalIgnoreCase))
+                    return true;
+
+                // ADMIN login id vs display name (관리자) — both mean the same account.
+                if (IsAdminIdentity(occupancy) && IsAdminIdentity(raw))
+                    return true;
+
+                return false;
+            }
+
+            // Legacy (no app login): PC / Windows account heuristics.
             if (!string.IsNullOrWhiteSpace(accessPcName)
                 && string.Equals(accessPcName.Trim(), Environment.MachineName, StringComparison.OrdinalIgnoreCase))
                 return true;
@@ -114,34 +170,38 @@ namespace GBCWorkHub.BIZ
             if (string.IsNullOrWhiteSpace(storedUserId))
                 return false;
 
-            string raw = storedUserId.Trim();
-            string occupancy = TryGet();
-            if (!string.IsNullOrWhiteSpace(occupancy)
-                && string.Equals(raw, occupancy, StringComparison.OrdinalIgnoreCase))
-                return true;
-
+            string stored = storedUserId.Trim();
             string windows = RemotePcShareBiz.LocalWindowsAccount;
             if (!string.IsNullOrWhiteSpace(windows)
-                && string.Equals(raw, windows, StringComparison.OrdinalIgnoreCase))
+                && string.Equals(stored, windows, StringComparison.OrdinalIgnoreCase))
                 return true;
 
             string sam = Environment.UserName;
             if (string.IsNullOrWhiteSpace(sam))
                 return false;
-            if (string.Equals(raw, sam, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(stored, sam, StringComparison.OrdinalIgnoreCase))
                 return true;
 
-            int slash = raw.LastIndexOf('\\');
-            if (slash >= 0 && slash < raw.Length - 1)
+            int slash = stored.LastIndexOf('\\');
+            if (slash >= 0 && slash < stored.Length - 1)
             {
-                string domain = raw.Substring(0, slash);
-                string user = raw.Substring(slash + 1);
+                string domain = stored.Substring(0, slash);
+                string user = stored.Substring(slash + 1);
                 if (string.Equals(user, sam, StringComparison.OrdinalIgnoreCase)
                     && string.Equals(domain, Environment.UserDomainName, StringComparison.OrdinalIgnoreCase))
                     return true;
             }
 
             return false;
+        }
+
+        private static bool IsAdminIdentity(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+            string v = StripDomain(value.Trim());
+            return string.Equals(v, AuthBiz.AdminLoginId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(v, AuthBiz.AdminDisplayName, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -221,10 +281,22 @@ namespace GBCWorkHub.BIZ
 
         public static void Save(string name)
         {
-            Save(name, TryGetAffiliation());
+            Save(name, TryGetAffiliation(), IsAdminIdentity(name), TryGetUserId());
         }
 
         public static void Save(string name, string affiliation)
+        {
+            Save(name, affiliation, IsAdminIdentity(name), TryGetUserId());
+        }
+
+        /// <summary>기존 세션의 UserId를 보존한 채 표시명/소속/관리자 플래그만 갱신한다(이름 변경 등).</summary>
+        public static void Save(string name, string affiliation, bool isAdmin)
+        {
+            Save(name, affiliation, isAdmin, TryGetUserId());
+        }
+
+        /// <summary>로그인 직후 등 실제 DB에서 확정된 USR_ID로 세션을 새로 쓸 때 사용한다.</summary>
+        public static void Save(string name, string affiliation, bool isAdmin, long? userId)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("점유명이 비어 있습니다.", "name");
@@ -236,11 +308,30 @@ namespace GBCWorkHub.BIZ
             string team = string.IsNullOrWhiteSpace(affiliation) ? null : affiliation.Trim();
             if (team != null && team.Length > 100)
                 team = team.Substring(0, 100);
+
+            // Flag follows identity only (김수현 + leftover admin flag must not open admin shell).
+            bool admin = IsAdminIdentity(name) && isAdmin;
             File.WriteAllText(FilePath, JsonConvert.SerializeObject(new FileDto
             {
                 OccupancyName = name.Trim(),
-                Affiliation = team
+                Affiliation = team,
+                IsAdmin = admin,
+                UserId = userId
             }));
+        }
+
+        /// <summary>로그아웃 시 로컬 점유명/소속/관리자 플래그를 지운다.</summary>
+        public static void Clear()
+        {
+            try
+            {
+                if (File.Exists(FilePath))
+                    File.Delete(FilePath);
+            }
+            catch
+            {
+                // 로그아웃은 실패해도 UI 세션을 막지 않는다.
+            }
         }
     }
 }

@@ -396,13 +396,13 @@ namespace GBCWorkHub.UI.ViewModels
             get
             {
                 if (IsAvailable)
-                    return "원격 접속";
+                    return OccupancyNameStore.HasName ? "원격 접속" : "로그인 후 접속";
                 if (IsConnecting && IsOwnedByCurrentUser)
                     return "연결 중...";
                 if (IsInUse && IsOwnedByCurrentUser)
                     return "사용 중";
                 if (IsOwnedByOtherUser)
-                    return "점유 가져가기";
+                    return OccupancyNameStore.HasName ? "점유 가져가기" : "로그인 후 접속";
                 if (IsCheckRequired)
                     return "상태 확인";
                 return StatusDisplayName;
@@ -616,6 +616,11 @@ namespace GBCWorkHub.UI.ViewModels
             RaisePropertyChanged("ConnectionStartedDisplayText");
             RaisePropertyChanged("PreviewStyleKey");
             RaisePropertyChanged("StatusBadgeStyleKey");
+        }
+
+        public void RefreshComputedUi()
+        {
+            RaiseComputed();
         }
     }
 }

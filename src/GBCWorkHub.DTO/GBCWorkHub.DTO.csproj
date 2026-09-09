@@ -65,6 +65,11 @@
     <Compile Include="RemotePcReserveParams.cs" />
     <Compile Include="RemotePcUsageLogDto.cs" />
     <Compile Include="DevSessionFileDto.cs" />
+    <Compile Include="Improvement\ImprovementConstants.cs" />
+    <Compile Include="Improvement\ImprovementRequestDto.cs" />
+    <Compile Include="Improvement\ImprovementCommentDto.cs" />
+    <Compile Include="Improvement\ImprovementAttachmentDto.cs" />
+    <Compile Include="Improvement\ImprovementListQuery.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

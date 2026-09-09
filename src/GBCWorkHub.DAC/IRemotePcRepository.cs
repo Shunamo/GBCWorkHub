@@ -34,5 +34,19 @@ namespace GBCWorkHub.DAC
         Task<int> RenameOccupantAsync(string oldName, string newName, string accessPcName);
         /// <summary>한 달보다 오래된 종료·취소 접속 이력을 지운다. 진행 중 세션은 남긴다.</summary>
         Task<int> PurgeUsageLogsOlderThanMonthsAsync(int months);
+
+        /// <summary>관리자: 전체 접속 이력 조회 (선택 검색어).</summary>
+        Task<IList<RemotePcUsageLogDto>> GetUsageLogsForAdminAsync(string search, int take);
+
+        /// <summary>관리자: 접속 이력 수정 (접속자/상태/종료시각/메시지).</summary>
+        Task<bool> UpdateUsageLogForAdminAsync(
+            long logId,
+            string accessUserId,
+            string sessionStatus,
+            DateTime? endedAt,
+            string resultMessage);
+
+        /// <summary>관리자: 접속 이력 1건 삭제.</summary>
+        Task<bool> DeleteUsageLogForAdminAsync(long logId);
     }
 }

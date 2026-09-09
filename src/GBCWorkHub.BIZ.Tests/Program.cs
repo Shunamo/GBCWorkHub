@@ -44,6 +44,8 @@ namespace GBCWorkHub.BIZ.Tests
             Test_CandidateRecommendAndExclude(parser, session);
             Test_SamplePreviewDump(parser, session);
 
+            IdentityTests.RunAll(AssertTrue);
+
             Console.WriteLine();
             Console.WriteLine("Passed={0} Failed={1}", _passed, _failed);
             return _failed == 0 ? 0 : 1;

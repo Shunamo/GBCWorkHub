@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
@@ -136,7 +137,22 @@ namespace GBCWorkHub.UI.Controls
         private static void OnItemsSourceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             var c = (CustomDropdown)d;
+
+            var oldNotify = e.OldValue as INotifyCollectionChanged;
+            if (oldNotify != null)
+                oldNotify.CollectionChanged -= c.ItemsSource_CollectionChanged;
+
+            var newNotify = e.NewValue as INotifyCollectionChanged;
+            if (newNotify != null)
+                newNotify.CollectionChanged += c.ItemsSource_CollectionChanged;
+
             c.RefreshEmptyState();
+        }
+
+        /// <summary>ItemsSource 인스턴스는 그대로인 채 Clear/Add로 내용만 바뀌는 경우를 대비한 구독.</summary>
+        private void ItemsSource_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            RefreshEmptyState();
         }
 
         private static void OnSelectedItemChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -289,7 +305,7 @@ namespace GBCWorkHub.UI.Controls
             else
             {
                 PART_RootBorder.BorderBrush = new System.Windows.Media.SolidColorBrush(
-                    (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#D8DEE8"));
+                    (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#F2FFFFFF"));
             }
             if (PART_ValidationText != null)
             {

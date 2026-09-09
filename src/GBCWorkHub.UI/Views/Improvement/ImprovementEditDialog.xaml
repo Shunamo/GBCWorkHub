@@ -1,0 +1,650 @@
+<UserControl x:Class="GBCWorkHub.UI.Views.Improvement.ImprovementEditDialog"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctrl="clr-namespace:GBCWorkHub.UI.Controls"
+             xmlns:imp="clr-namespace:GBCWorkHub.UI.ViewModels.Improvement"
+             x:Name="EditRoot"
+             Background="Transparent">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogStyles.xaml" />
+                <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogGlassStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <!--
+      주의: WorkLogInfoTile/WorkLogDetailCard/WorkLogGhostButton/WorkLogPrimaryButton/WorkLogIconButton/
+      WorkLogInput/WorkLogFieldTitle는 코드비하인드 ApplyGlassOverrides()가 실행 중에 값을 바꿔치기하는
+      스타일이므로 반드시 DynamicResource로 참조해야 한다 — StaticResource는 InitializeComponent 시점에
+      한 번만 해석되어 그 이후의 바꿔치기를 반영하지 못한다(업무일지 WorkLogEditDialog.xaml과 동일 원칙).
+    -->
+    <Grid Background="Transparent">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- 본문: 스크롤 가능함을 알 수 있도록 얇은 글래스 스크롤바를 항상 보이게 함 -->
+        <ScrollViewer Grid.Row="0" Padding="20" VerticalScrollBarVisibility="Visible">
+            <ScrollViewer.Resources>
+                <Style TargetType="ScrollBar" BasedOn="{StaticResource GlassScrollBar}">
+                    <Setter Property="Opacity" Value="0.85" />
+                </Style>
+            </ScrollViewer.Resources>
+            <StackPanel HorizontalAlignment="Stretch">
+
+                <TextBlock Text="{Binding ValidationError}" Foreground="#DC2626" Margin="0,0,0,12"
+                           Visibility="{Binding HasValidationError, Converter={StaticResource BoolToVis}}" />
+
+                <!-- 상세: 업무일지 상세 카드와 동일한 구조 — 큰 제목 + 색깔 배지(유형/상태) + 기본정보 한 줄 + 삭제 버튼 -->
+                <Border Style="{DynamicResource WorkLogDetailCard}"
+                        Visibility="{Binding IsDetailMode, Converter={StaticResource BoolToVis}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" MinWidth="0" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,12,0" MinWidth="0" ClipToBounds="True">
+                            <DockPanel LastChildFill="False" Margin="0,0,0,10">
+                                <TextBlock DockPanel.Dock="Left" Text="{Binding TicketNoText}"
+                                           FontSize="{StaticResource FontSize.Xxxl}" FontWeight="Bold" Foreground="#94A3B8"
+                                           VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBlock DockPanel.Dock="Left" Text="{Binding Title}"
+                                           FontSize="{StaticResource FontSize.Xxxl}" FontWeight="Bold" Foreground="#0F172A"
+                                           VerticalAlignment="Center" Margin="0,0,12,0" TextTrimming="CharacterEllipsis" />
+                                <WrapPanel VerticalAlignment="Center">
+                                    <!-- 유형별 배지 색상 구분(목록과 동일: 버그=주황, 기능개선=파랑, 기타=보라) -->
+                                    <Border CornerRadius="10" Padding="8,3" Margin="0,0,6,0">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="#FFEDD5" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding RequestType}" Value="기능 개선">
+                                                        <Setter Property="Background" Value="#DBEAFE" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding RequestType}" Value="기타">
+                                                        <Setter Property="Background" Value="#EDE9FE" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="{Binding RequestType}" FontSize="{StaticResource FontSize.Md}"
+                                                   FontWeight="SemiBold">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="#C2410C" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding RequestType}" Value="기능 개선">
+                                                            <Setter Property="Foreground" Value="#1D4ED8" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding RequestType}" Value="기타">
+                                                            <Setter Property="Foreground" Value="#6D28D9" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Border>
+                                    <Border Style="{StaticResource WorkLogChipCategory}">
+                                        <TextBlock Text="{Binding StatusLabel}" Style="{StaticResource WorkLogChipCategoryText}" />
+                                    </Border>
+                                </WrapPanel>
+                            </DockPanel>
+                            <!-- 작성자/소속/사이트/PC/버전/등록일을 한 줄로 압축 — 값 없는 항목은 구분선까지 통째로 숨김 -->
+                            <WrapPanel>
+                                <TextBlock Text="{Binding AuthorName}" FontSize="{StaticResource FontSize.Base}" Foreground="#64748B" VerticalAlignment="Center" Margin="0,2,0,2" />
+                                <TextBlock Text=" (삭제된 계정)" FontSize="{StaticResource FontSize.Base}" Foreground="#94A3B8" VerticalAlignment="Center" Margin="0,2,0,2"
+                                           Visibility="{Binding HasDeletedAuthorSuffix, Converter={StaticResource BoolToVis}}" />
+                                <StackPanel Orientation="Horizontal" Visibility="{Binding HasTeamName, Converter={StaticResource BoolToVis}}">
+                                    <Border Width="1" Height="12" Background="#E2E8F0" Margin="10,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding TeamName}" FontSize="{StaticResource FontSize.Base}" Foreground="#64748B" VerticalAlignment="Center" Margin="0,2,0,2" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Visibility="{Binding HasSiteCode, Converter={StaticResource BoolToVis}}">
+                                    <Border Width="1" Height="12" Background="#E2E8F0" Margin="10,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding SiteCode}" FontSize="{StaticResource FontSize.Base}" Foreground="#64748B" VerticalAlignment="Center" Margin="0,2,0,2" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Visibility="{Binding HasPcName, Converter={StaticResource BoolToVis}}">
+                                    <Border Width="1" Height="12" Background="#E2E8F0" Margin="10,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding PcName}" FontSize="{StaticResource FontSize.Base}" Foreground="#64748B" VerticalAlignment="Center" Margin="0,2,0,2" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Visibility="{Binding HasAppVersion, Converter={StaticResource BoolToVis}}">
+                                    <Border Width="1" Height="12" Background="#E2E8F0" Margin="10,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding AppVersion, StringFormat=v{0}}" FontSize="{StaticResource FontSize.Base}" Foreground="#64748B" VerticalAlignment="Center" Margin="0,2,0,2" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="1" Height="12" Background="#E2E8F0" Margin="10,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding CreatedAtText}" FontSize="{StaticResource FontSize.Base}" Foreground="#64748B" VerticalAlignment="Center" Margin="0,2,0,2" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Visibility="{Binding HasRequestEdit, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="{Binding RequestEditedAtText}" FontSize="{StaticResource FontSize.Sm}" Foreground="#94A3B8"
+                                               FontStyle="Italic" VerticalAlignment="Center" Margin="6,2,0,2" />
+                                </StackPanel>
+                            </WrapPanel>
+                            <TextBlock Text="{Binding ResolvedNoteText}" Foreground="#16A34A" FontWeight="SemiBold" Margin="0,10,0,0"
+                                       Visibility="{Binding HasResolvedNote, Converter={StaticResource BoolToVis}}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Panel.ZIndex="1">
+                            <Button Style="{DynamicResource WorkLogIconButton}" Padding="4" Width="28" Height="28"
+                                    ToolTip="요청 삭제" Command="{Binding DeleteCommand}"
+                                    Visibility="{Binding CanManageRequest, Converter={StaticResource BoolToVis}}">
+                                <Image Source="{StaticResource TrashDuotoneIcon}" Width="16" Height="16" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- 작성: 유형/사이트/PC — 제목/재현방법과 동일하게 각각 별도 카드로 구분하되,
+                     한 줄에 너비를 맞춰 나란히 배치 -->
+                <Grid Visibility="{Binding IsNewRecord, Converter={StaticResource BoolToVis}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Style="{DynamicResource WorkLogDetailCard}">
+                        <StackPanel>
+                            <TextBlock Text="유형" Style="{DynamicResource WorkLogFieldTitle}" />
+                            <ctrl:InlineOptionPicker ItemsSource="{Binding TypeOptions}" SelectedItem="{Binding RequestType, Mode=TwoWay}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="2" Style="{DynamicResource WorkLogDetailCard}">
+                        <StackPanel>
+                            <TextBlock Text="사이트" Style="{DynamicResource WorkLogFieldTitle}" />
+                            <ctrl:InlineOptionPicker ItemsSource="{Binding SiteOptions}" SelectedItem="{Binding SiteCode, Mode=TwoWay}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="4" Style="{DynamicResource WorkLogDetailCard}">
+                        <StackPanel>
+                            <TextBlock Text="PC" Style="{DynamicResource WorkLogFieldTitle}" />
+                            <!-- 원격 PC 접속 화면과 동일하게 팀별로 묶어서 고를 수 있는 팝업 피커.
+                                 이름만 쭉 나열되던 CustomEditableDropdown 대신 사용.
+                                 HorizontalAlignment=Left로 내용 길이만큼만 차지하게 함(칸 전체로 늘어나지 않게). -->
+                            <Grid HorizontalAlignment="Left">
+                                <!-- 팝업 열림 상태는 ViewModel이 아니라 EditRoot(View)의 로컬 상태 —
+                                     이 다이얼로그의 부모(ImprovementListViewModel)는 메인 탭과 관리자
+                                     화면에 동시에 임베드되는 같은 인스턴스라, ViewModel에 두면 안 보이는
+                                     사본의 팝업까지 같이 열린다. -->
+                                <!-- 옆의 유형/사이트 InlineOptionPicker 칩과 같은 크기감으로 맞춤(작은 알약형) -->
+                                <Button x:Name="PcPickerButton" Click="PcPickerButton_Click"
+                                        HorizontalContentAlignment="Stretch" Padding="10,4" MinHeight="22" MaxWidth="140"
+                                        Background="#E5E7EB" BorderThickness="0"
+                                        Cursor="Hand">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}"
+                                                    CornerRadius="6"
+                                                    Padding="{TemplateBinding Padding}">
+                                                <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center" />
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid Grid.Column="0">
+                                            <TextBlock Text="PC 선택" Foreground="#94A3B8"
+                                                       FontSize="11" TextTrimming="CharacterEllipsis">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding PcName}" Value="">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding PcName}" Value="{x:Null}">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding PcName}" Foreground="#334155" FontWeight="SemiBold"
+                                                       FontSize="11" TextTrimming="CharacterEllipsis" />
+                                        </Grid>
+                                        <Image Grid.Column="1" Width="7" Height="7" Margin="6,0,0,0" Opacity="0.6" Stretch="Uniform">
+                                            <Image.Style>
+                                                <Style TargetType="Image">
+                                                    <Setter Property="Source" Value="{StaticResource ExpandDownIcon}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsPcPickerOpen, ElementName=EditRoot}" Value="True">
+                                                            <Setter Property="Source" Value="{StaticResource ExpandUpIcon}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Image.Style>
+                                        </Image>
+                                    </Grid>
+                                </Button>
+                                <Popup IsOpen="{Binding IsPcPickerOpen, ElementName=EditRoot, Mode=TwoWay}"
+                                       PlacementTarget="{Binding ElementName=EditRoot}"
+                                       Placement="Center"
+                                       AllowsTransparency="True" PopupAnimation="None" StaysOpen="True"
+                                       Opened="PcPickerPopup_Opened" Panel.ZIndex="60">
+                                    <!-- 다이얼로그 나머지 카드와 동일한 글래스 재질(EditGlassFillSoft 그라디언트)로 맞춤 -->
+                                    <Border BorderBrush="#D9FFFFFF" BorderThickness="1.5" CornerRadius="16"
+                                            Padding="16" MinWidth="320" MaxWidth="380">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0.18,1">
+                                                <GradientStop Color="#F2FFFFFF" Offset="0" />
+                                                <GradientStop Color="#E0FFFFFF" Offset="0.4" />
+                                                <GradientStop Color="#D6EEF3FF" Offset="1" />
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="26" ShadowDepth="5" Opacity="0.22" Color="#2F4466" />
+                                        </Border.Effect>
+                                        <StackPanel>
+                                            <DockPanel Margin="0,0,0,8">
+                                                <TextBlock DockPanel.Dock="Left" Text="PC 선택" FontSize="{StaticResource FontSize.Base}"
+                                                           FontWeight="Bold" Foreground="{StaticResource WlGlassInk}" />
+                                                <Button DockPanel.Dock="Right" Content="✕" HorizontalAlignment="Right"
+                                                        Width="22" Height="22" Padding="0" Background="Transparent" BorderThickness="0"
+                                                        Foreground="{StaticResource WlGlassMuted}"
+                                                        Cursor="Hand" Click="PcChip_Click" />
+                                            </DockPanel>
+                                            <TextBlock Text="해당 사이트에 등록된 PC가 없습니다" Foreground="{StaticResource WlGlassMuted}"
+                                                       Visibility="{Binding HasPcGroups, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
+                                            <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Visible"
+                                                          Visibility="{Binding HasPcGroups, Converter={StaticResource BoolToVis}}">
+                                                <ScrollViewer.Resources>
+                                                    <Style TargetType="ScrollBar" BasedOn="{StaticResource GlassScrollBar}">
+                                                        <Setter Property="Opacity" Value="0.85" />
+                                                    </Style>
+                                                </ScrollViewer.Resources>
+                                                <ItemsControl ItemsSource="{Binding PcGroups}" Margin="0,0,6,0">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate DataType="{x:Type imp:ImprovementPcGroupViewModel}">
+                                                            <StackPanel Margin="0,0,0,10">
+                                                                <TextBlock Text="{Binding Name}" FontSize="{StaticResource FontSize.Xs}"
+                                                                           FontWeight="SemiBold" Foreground="{StaticResource WlGlassMuted}" Margin="2,0,0,4" />
+                                                                <ItemsControl ItemsSource="{Binding Pcs}">
+                                                                    <ItemsControl.ItemTemplate>
+                                                                        <DataTemplate DataType="{x:Type imp:ImprovementPcOptionViewModel}">
+                                                                            <Button Command="{Binding DataContext.SelectPcCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                                    CommandParameter="{Binding PcName}" Click="PcChip_Click"
+                                                                                    HorizontalContentAlignment="Stretch" Background="Transparent" BorderThickness="0"
+                                                                                    Padding="8,6" Cursor="Hand" Margin="0,0,0,1">
+                                                                                <Button.Template>
+                                                                                    <ControlTemplate TargetType="Button">
+                                                                                        <Border x:Name="RowBg" Background="Transparent" CornerRadius="7"
+                                                                                                Padding="{TemplateBinding Padding}">
+                                                                                            <ContentPresenter />
+                                                                                        </Border>
+                                                                                        <ControlTemplate.Triggers>
+                                                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                                                <Setter TargetName="RowBg" Property="Background" Value="{StaticResource WlGlassRowHoverBg}" />
+                                                                                            </Trigger>
+                                                                                        </ControlTemplate.Triggers>
+                                                                                    </ControlTemplate>
+                                                                                </Button.Template>
+                                                                                <Grid>
+                                                                                    <Grid.ColumnDefinitions>
+                                                                                        <ColumnDefinition Width="*" />
+                                                                                        <ColumnDefinition Width="Auto" />
+                                                                                    </Grid.ColumnDefinitions>
+                                                                                    <TextBlock Grid.Column="0" Text="{Binding PcName}"
+                                                                                               FontWeight="SemiBold" FontSize="{StaticResource FontSize.Sm}"
+                                                                                               Foreground="{StaticResource WlGlassInk}" TextTrimming="CharacterEllipsis" />
+                                                                                    <TextBlock Grid.Column="1" Text="{Binding PcDomain}"
+                                                                                               FontSize="{StaticResource FontSize.Xs}" Foreground="{StaticResource WlGlassMuted}"
+                                                                                               Margin="10,0,0,0" VerticalAlignment="Center"
+                                                                                               TextTrimming="CharacterEllipsis" MaxWidth="170"
+                                                                                               Visibility="{Binding HasPcDomain, Converter={StaticResource BoolToVis}}" />
+                                                                                </Grid>
+                                                                            </Button>
+                                                                        </DataTemplate>
+                                                                    </ItemsControl.ItemTemplate>
+                                                                </ItemsControl>
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+                                        </StackPanel>
+                                    </Border>
+                                </Popup>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- 작성: 제목 -->
+                <Border Style="{DynamicResource WorkLogDetailCard}" Visibility="{Binding IsNewRecord, Converter={StaticResource BoolToVis}}">
+                    <StackPanel>
+                        <TextBlock Text="제목" Style="{DynamicResource WorkLogFieldTitle}" />
+                        <TextBox Text="{Binding Title, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{DynamicResource WorkLogInput}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- 설명: 커뮤니티 글처럼 라벨 없이 본문만 — 블로그처럼 이어서 쓰다가 캐럿 위치에
+                     바로 이미지를 끼워넣는 단일 에디터. 제목(WorkLogInput)과 같은 입력창 박스 배경을
+                     써서 카드 배경과 구분되게 하고, 이미지 삽입 버튼은 우측 하단에 고정한다.
+                     RichTextBox 하단 여백(Padding)만큼은 본문이 그 영역을 채우지 않으므로 버튼과
+                     겹치지 않는다. -->
+                <Border Style="{DynamicResource WorkLogDetailCard}">
+                    <Grid>
+                        <Border Background="#99FFFFFF" BorderBrush="#D9FFFFFF" BorderThickness="1" CornerRadius="10">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.08" Color="#2F4466" />
+                            </Border.Effect>
+                            <RichTextBox x:Name="ContentRichTextBox"
+                                         Background="Transparent" BorderThickness="0"
+                                         Padding="10,8,10,40"
+                                         IsReadOnly="{Binding IsDetailMode}"
+                                         IsDocumentEnabled="True"
+                                         MinHeight="100"
+                                         VerticalScrollBarVisibility="Disabled"
+                                         AcceptsTab="False"
+                                         FontSize="{StaticResource FontSize.Base}" />
+                        </Border>
+                        <Button Style="{DynamicResource WorkLogIconButton}" Padding="4" Width="28" Height="28"
+                                HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,8,8"
+                                ToolTip="이미지 삽입" Click="InsertImageButton_Click"
+                                Visibility="{Binding IsNewRecord, Converter={StaticResource BoolToVis}}">
+                            <Image Source="{StaticResource ImageInsertFillIcon}" Width="16" Height="16" Stretch="Uniform" />
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <!-- 재현 방법: 선택 항목 — 상세에서는 값이 있을 때만 카드를 표시 -->
+                <Border Style="{DynamicResource WorkLogDetailCard}"
+                        Visibility="{Binding ShowReproductionCard, Converter={StaticResource BoolToVis}}">
+                    <StackPanel>
+                        <TextBlock Text="{Binding ReproductionFieldLabel}" Style="{DynamicResource WorkLogFieldTitle}" />
+                        <TextBox Text="{Binding ReproductionSteps, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{DynamicResource WorkLogInput}" IsReadOnly="{Binding IsDetailMode}"
+                                 AcceptsReturn="True" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <!-- 상세: 반응 — 컨테이너 없는 아이콘 버튼. 버그일 때만 아래에 문구가 붙는다 -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,16"
+                            Visibility="{Binding IsDetailMode, Converter={StaticResource BoolToVis}}">
+                    <Button Command="{Binding ReactReproducedCommand}" Background="Transparent" BorderThickness="0"
+                            Padding="8,2" Margin="0,0,16,0" Cursor="Hand">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <ContentPresenter />
+                            </ControlTemplate>
+                        </Button.Template>
+                        <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Image Source="{StaticResource SadFaceIcon}" Width="18" Height="18" />
+                                <TextBlock Text="{Binding ReproducedCount, Mode=OneWay}" FontSize="{StaticResource FontSize.Sm}"
+                                           Foreground="#64748B" VerticalAlignment="Center" Margin="4,0,0,0" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding ReactedLabel, Mode=OneWay}" HorizontalAlignment="Center" Margin="0,2,0,0"
+                                       FontSize="{StaticResource FontSize.Xs}" Foreground="#94A3B8"
+                                       Visibility="{Binding IsBugType, Converter={StaticResource BoolToVis}}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding ReactNotReproducedCommand}" Background="Transparent" BorderThickness="0"
+                            Padding="8,2" Cursor="Hand">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <ContentPresenter />
+                            </ControlTemplate>
+                        </Button.Template>
+                        <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Image Source="{StaticResource HappyFaceIcon}" Width="18" Height="18" />
+                                <TextBlock Text="{Binding NotReproducedCount, Mode=OneWay}" FontSize="{StaticResource FontSize.Sm}"
+                                           Foreground="#64748B" VerticalAlignment="Center" Margin="4,0,0,0" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding NotReactedLabel, Mode=OneWay}" HorizontalAlignment="Center" Margin="0,2,0,0"
+                                       FontSize="{StaticResource FontSize.Xs}" Foreground="#94A3B8"
+                                       Visibility="{Binding IsBugType, Converter={StaticResource BoolToVis}}" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <!-- 상세: 관리자 처리 -->
+                <Border Style="{DynamicResource WorkLogDetailCard}"
+                        Visibility="{Binding IsAdmin, Converter={StaticResource BoolToVis}}">
+                    <StackPanel Visibility="{Binding IsDetailMode, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="관리자 처리" Style="{StaticResource WorkLogDetailCardTitle}" Foreground="#1E40AF" />
+                        <TextBlock Text="상태" Style="{DynamicResource WorkLogFieldTitle}" />
+                        <ctrl:InlineOptionPicker ItemsSource="{Binding AdminStatusOptions}" SelectedItem="{Binding AdminStatus, Mode=TwoWay}" Margin="0,0,0,10" />
+                        <TextBlock Text="해결 버전" Style="{DynamicResource WorkLogFieldTitle}" />
+                        <TextBox Text="{Binding AdminResolvedVersion, Mode=TwoWay}" Style="{DynamicResource WorkLogInput}" Margin="0,0,0,10" />
+                        <TextBlock Text="관리자 메모" Style="{DynamicResource WorkLogFieldTitle}" />
+                        <TextBox Text="{Binding AdminNote, Mode=TwoWay}" Style="{DynamicResource WorkLogInput}"
+                                 AcceptsReturn="True" TextWrapping="Wrap" Margin="0,0,0,10" />
+                        <Button Content="저장" Style="{DynamicResource WorkLogPrimaryButton}" HorizontalAlignment="Right"
+                                Command="{Binding SaveAdminCommand}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- 상세: 댓글 (업무일지 COMMENT 카드와 동일한 점-선 타임라인 스타일) -->
+                <Border Style="{DynamicResource WorkLogDetailCard}"
+                        Visibility="{Binding IsDetailMode, Converter={StaticResource BoolToVis}}">
+                    <StackPanel>
+                        <TextBlock Text="댓글" Style="{StaticResource WorkLogDetailCardTitle}" Foreground="#1E40AF" />
+                        <ItemsControl ItemsSource="{Binding Comments}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type imp:ImprovementCommentItemViewModel}">
+                                    <Grid Margin="0,0,0,14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="16" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid Grid.Column="0" HorizontalAlignment="Center" Width="16">
+                                            <Rectangle Width="2" Fill="#BFDBFE" HorizontalAlignment="Center" />
+                                            <Ellipse Width="8" Height="8" Fill="#3B82F6" VerticalAlignment="Top" Margin="0,4,0,0" />
+                                        </Grid>
+                                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                            <!-- 배경 강조는 이 댓글 자신의 내용에만 걸어야 한다(답글 목록까지 포함하면
+                                                 이미 달려 있던 답글들까지 같이 칠해져 버린다) -->
+                                            <Border Padding="6" CornerRadius="8">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="Transparent" />
+                                                        <Setter Property="Margin" Value="-6,-6,-6,0" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsReplyTarget}" Value="True">
+                                                                <Setter Property="Background" Value="#EFF6FF" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <StackPanel>
+                                                    <!-- 삭제됨: 실제로는 남아 있지만(밑에 답글이 있을 수 있어서) 화면엔 흐리게만 -->
+                                                    <TextBlock Text="삭제된 댓글입니다" Foreground="#94A3B8"
+                                                               FontSize="{StaticResource FontSize.Sm}" Opacity="0.7"
+                                                               Visibility="{Binding IsDeleted, Converter={StaticResource BoolToVis}}" />
+                                                    <StackPanel Visibility="{Binding IsDeleted, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}">
+                                                        <Grid>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="{Binding AuthorName}" FontWeight="SemiBold" FontSize="{StaticResource FontSize.Sm}" />
+                                                                <TextBlock Text=" (삭제된 계정)" FontSize="{StaticResource FontSize.Xs}" Foreground="#94A3B8"
+                                                                           Visibility="{Binding HasDeletedAuthorSuffix, Converter={StaticResource BoolToVis}}" />
+                                                                <StackPanel Orientation="Horizontal" Visibility="{Binding HasTeamName, Converter={StaticResource BoolToVis}}">
+                                                                    <TextBlock Text=" · " FontSize="{StaticResource FontSize.Sm}" Foreground="#CBD5E1" />
+                                                                    <TextBlock Text="{Binding TeamName}" FontSize="{StaticResource FontSize.Sm}" Foreground="#64748B" />
+                                                                </StackPanel>
+                                                                <TextBlock Text=" · " FontSize="{StaticResource FontSize.Sm}" Foreground="#CBD5E1" />
+                                                                <TextBlock Text="{Binding AppVersion, StringFormat=v{0}}" FontSize="{StaticResource FontSize.Xs}" Foreground="#94A3B8" />
+                                                                <TextBlock Text=" · " FontSize="{StaticResource FontSize.Sm}" Foreground="#CBD5E1" />
+                                                                <TextBlock Text="{Binding CreatedAtText}" FontSize="{StaticResource FontSize.Xs}" Foreground="#94A3B8" />
+                                                                <TextBlock Text="{Binding EditedAtText}" FontSize="{StaticResource FontSize.Xs}" Foreground="#94A3B8"
+                                                                           Margin="4,0,0,0"
+                                                                           Visibility="{Binding IsEdited, Converter={StaticResource BoolToVis}}" />
+                                                            </StackPanel>
+                                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                                                                        Visibility="{Binding CanManage, Converter={StaticResource BoolToVis}}">
+                                                                <Button Style="{DynamicResource WorkLogIconButton}" Padding="3" Width="22" Height="22"
+                                                                        ToolTip="수정"
+                                                                        Command="{Binding DataContext.BeginEditCommentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                        CommandParameter="{Binding}">
+                                                                    <Image Source="{StaticResource EditFillIcon}" Width="13" Height="13" />
+                                                                </Button>
+                                                                <Button Style="{DynamicResource WorkLogIconButton}" Padding="3" Width="22" Height="22" Margin="4,0,0,0"
+                                                                        ToolTip="삭제"
+                                                                        Command="{Binding DataContext.DeleteCommentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                        CommandParameter="{Binding}">
+                                                                    <Image Source="{StaticResource TrashDuotoneIcon}" Width="13" Height="13" />
+                                                                </Button>
+                                                            </StackPanel>
+                                                        </Grid>
+                                                        <TextBlock Text="{Binding CommentText}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                                                   FontSize="{StaticResource FontSize.Md}" Foreground="#334155"
+                                                                   Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
+                                                        <StackPanel Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}" Margin="0,6,0,0">
+                                                            <TextBox Text="{Binding EditText, Mode=TwoWay}" Style="{DynamicResource WorkLogInput}"
+                                                                     AcceptsReturn="True" TextWrapping="Wrap" />
+                                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
+                                                                <Button Content="취소" Style="{DynamicResource WorkLogGhostButton}"
+                                                                        Command="{Binding DataContext.CancelEditCommentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                        CommandParameter="{Binding}" />
+                                                                <Button Content="저장" Style="{DynamicResource WorkLogPrimaryButton}" Margin="8,0,0,0"
+                                                                        Command="{Binding DataContext.SaveEditCommentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                        CommandParameter="{Binding}" />
+                                                            </StackPanel>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- 답글: 하단 통합 입력창으로 다는 것으로 링크만 표시(최상위 댓글에서만) -->
+                                            <Button Content="답글 달기" HorizontalAlignment="Left" Padding="0" Margin="0,6,0,0"
+                                                    Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                                    Foreground="{StaticResource WlGlassMuted}" FontSize="{StaticResource FontSize.Sm}"
+                                                    Command="{Binding DataContext.ToggleReplyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Visibility="{Binding IsReply, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
+
+                                            <!-- 답글(대댓글) 목록: 원댓글과 동일한 점-선 타임라인, 연한 하늘색으로 표시 -->
+                                            <ItemsControl ItemsSource="{Binding Replies}" Margin="20,10,0,0">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate DataType="{x:Type imp:ImprovementCommentItemViewModel}">
+                                                        <Grid Margin="0,0,0,14">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="16" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <Grid Grid.Column="0" HorizontalAlignment="Center" Width="16">
+                                                                <Rectangle Width="2" Fill="#DBEAFE" HorizontalAlignment="Center" />
+                                                                <Ellipse Width="7" Height="7" Fill="#93C5FD" VerticalAlignment="Top" Margin="0,4,0,0" />
+                                                            </Grid>
+                                                            <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                                                <TextBlock Text="삭제된 댓글입니다" Foreground="#94A3B8"
+                                                                           FontSize="{StaticResource FontSize.Sm}" Opacity="0.7"
+                                                                           Visibility="{Binding IsDeleted, Converter={StaticResource BoolToVis}}" />
+                                                                <StackPanel Visibility="{Binding IsDeleted, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}">
+                                                                    <Grid>
+                                                                        <StackPanel Orientation="Horizontal">
+                                                                            <TextBlock Text="{Binding AuthorName}" FontWeight="SemiBold" FontSize="{StaticResource FontSize.Sm}" />
+                                                                            <TextBlock Text=" (삭제된 계정)" FontSize="{StaticResource FontSize.Xs}" Foreground="#94A3B8"
+                                                                                       Visibility="{Binding HasDeletedAuthorSuffix, Converter={StaticResource BoolToVis}}" />
+                                                                            <StackPanel Orientation="Horizontal" Visibility="{Binding HasTeamName, Converter={StaticResource BoolToVis}}">
+                                                                                <TextBlock Text=" · " FontSize="{StaticResource FontSize.Sm}" Foreground="#CBD5E1" />
+                                                                                <TextBlock Text="{Binding TeamName}" FontSize="{StaticResource FontSize.Sm}" Foreground="#64748B" />
+                                                                            </StackPanel>
+                                                                            <TextBlock Text=" · " FontSize="{StaticResource FontSize.Sm}" Foreground="#CBD5E1" />
+                                                                            <TextBlock Text="{Binding CreatedAtText}" FontSize="{StaticResource FontSize.Xs}" Foreground="#94A3B8" />
+                                                                            <TextBlock Text="{Binding EditedAtText}" FontSize="{StaticResource FontSize.Xs}" Foreground="#94A3B8"
+                                                                                       Margin="4,0,0,0"
+                                                                                       Visibility="{Binding IsEdited, Converter={StaticResource BoolToVis}}" />
+                                                                        </StackPanel>
+                                                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                                                                                    Visibility="{Binding CanManage, Converter={StaticResource BoolToVis}}">
+                                                                            <Button Style="{DynamicResource WorkLogIconButton}" Padding="3" Width="22" Height="22"
+                                                                                    ToolTip="수정"
+                                                                                    Command="{Binding DataContext.BeginEditCommentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                                    CommandParameter="{Binding}">
+                                                                                <Image Source="{StaticResource EditFillIcon}" Width="13" Height="13" />
+                                                                            </Button>
+                                                                            <Button Style="{DynamicResource WorkLogIconButton}" Padding="3" Width="22" Height="22" Margin="4,0,0,0"
+                                                                                    ToolTip="삭제"
+                                                                                    Command="{Binding DataContext.DeleteCommentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                                    CommandParameter="{Binding}">
+                                                                                <Image Source="{StaticResource TrashDuotoneIcon}" Width="13" Height="13" />
+                                                                            </Button>
+                                                                        </StackPanel>
+                                                                    </Grid>
+                                                                    <TextBlock Text="{Binding CommentText}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                                                               FontSize="{StaticResource FontSize.Md}" Foreground="#334155"
+                                                                               Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
+                                                                    <StackPanel Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}" Margin="0,6,0,0">
+                                                                        <TextBox Text="{Binding EditText, Mode=TwoWay}" Style="{DynamicResource WorkLogInput}"
+                                                                                 AcceptsReturn="True" TextWrapping="Wrap" />
+                                                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
+                                                                            <Button Content="취소" Style="{DynamicResource WorkLogGhostButton}"
+                                                                                    Command="{Binding DataContext.CancelEditCommentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                                    CommandParameter="{Binding}" />
+                                                                            <Button Content="저장" Style="{DynamicResource WorkLogPrimaryButton}" Margin="8,0,0,0"
+                                                                                    Command="{Binding DataContext.SaveEditCommentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                                    CommandParameter="{Binding}" />
+                                                                        </StackPanel>
+                                                                    </StackPanel>
+                                                                </StackPanel>
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <!-- 댓글/답글 통합 입력창 — 답글 대상이 있으면 그 사실만 알려주는 얇은 표시줄 -->
+                        <StackPanel Orientation="Horizontal" Margin="24,0,0,4"
+                                    Visibility="{Binding IsReplyingToComment, Converter={StaticResource BoolToVis}}">
+                            <Ellipse Width="6" Height="6" Fill="#93C5FD" VerticalAlignment="Center" Margin="0,0,4,0" />
+                            <TextBlock FontSize="{StaticResource FontSize.Xs}" Foreground="{StaticResource WlGlassMuted}">
+                                <Run Text="{Binding ReplyTargetAuthorName, Mode=OneWay}" /><Run Text="님에게 답글 작성 중" />
+                            </TextBlock>
+                            <Button Content="✕" Margin="6,0,0,0" Padding="0" Width="16" Height="16"
+                                    Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                    Foreground="{StaticResource WlGlassMuted}" FontSize="{StaticResource FontSize.Xs}"
+                                    Command="{Binding CancelReplyCommand}" />
+                        </StackPanel>
+                        <Grid Margin="24,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Width="28" Height="28" CornerRadius="14" Margin="0,0,8,0" VerticalAlignment="Top"
+                                    Background="{StaticResource WlGlassAccent}">
+                                <TextBlock Text="{Binding CurrentUserInitial}" Foreground="White" FontWeight="Bold"
+                                           FontSize="{StaticResource FontSize.Sm}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBox x:Name="CommentInputBox" Grid.Column="1"
+                                     Text="{Binding NewCommentText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{DynamicResource WorkLogInput}" AcceptsReturn="True" TextWrapping="Wrap"
+                                     Margin="0,0,8,0" PreviewKeyDown="CommentInputBox_PreviewKeyDown" />
+                            <Button Grid.Column="2" Content="작성" Style="{DynamicResource WorkLogPrimaryButton}"
+                                    VerticalAlignment="Top" Margin="0"
+                                    Command="{Binding AddCommentCommand}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- 푸터: 카드 컨테이너 없이 버튼만 하단에 고정. 상세는 헤더 뒤로가기로 닫으므로
+             별도 닫기 버튼 없이, 작성 중일 때만 취소/등록을 보여준다. -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,16,10"
+                    Visibility="{Binding IsNewRecord, Converter={StaticResource BoolToVis}}">
+            <Button Content="취소" Style="{DynamicResource WorkLogGhostButton}" Margin="0,0,8,0"
+                    Command="{Binding CloseCommand}"
+                    Visibility="{Binding IsNewRecord, Converter={StaticResource BoolToVis}}" />
+            <Button Content="등록" Style="{DynamicResource WorkLogPrimaryButton}"
+                    Command="{Binding SaveCommand}" Click="SaveButton_Click"
+                    Visibility="{Binding IsNewRecord, Converter={StaticResource BoolToVis}}" />
+        </StackPanel>
+
+        <!-- PC 선택 팝업 뒤 전체 배경 딤 처리(업무일지 사이트/필터 팝업과 동일한 관례) -->
+        <Border Grid.Row="0" Grid.RowSpan="2" Background="#66000000" Panel.ZIndex="50"
+                Visibility="{Binding IsPcPickerOpen, ElementName=EditRoot, Converter={StaticResource BoolToVis}}"
+                MouseLeftButtonUp="PcPickerScrim_MouseLeftButtonUp" />
+    </Grid>
+</UserControl>

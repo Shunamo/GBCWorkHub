@@ -38,6 +38,10 @@ namespace GBCWorkHub.BIZ
 
         public int UpsertLocalUser()
         {
+            // Admin must not remount onto this PC's user row (same machine ≠ same account).
+            if (OccupancyNameStore.IsAdmin)
+                return 0;
+
             string name = OccupancyNameStore.TryGet();
             if (string.IsNullOrWhiteSpace(name))
                 return 0;
@@ -49,10 +53,12 @@ namespace GBCWorkHub.BIZ
             int n = _repository.UpsertUser(new DirectoryUserDto
             {
                 UserName = name.Trim(),
+                LoginId = name.Trim(),
                 TeamName = OccupancyNameStore.TryGetAffiliation(),
                 LocalPcName = pcNm.Trim(),
                 LocalPcIp = RemotePcShareBiz.LocalAccessIp,
-                WindowsAccount = RemotePcShareBiz.LocalWindowsAccount
+                WindowsAccount = RemotePcShareBiz.LocalWindowsAccount,
+                IsActive = true
             });
             InvalidateUserCache();
             return n;
@@ -317,6 +323,145 @@ namespace GBCWorkHub.BIZ
             }
         }
 
+        /// <summary>관리자: 사이트별(또는 전체) PCMAP 목록.</summary>
+        public IList<PcMapDto> ListPcMapsForAdmin(string siteCode)
+        {
+            if (!OccupancyNameStore.IsAdmin || !IsConfigured)
+                return new List<PcMapDto>();
+
+            var list = new List<PcMapDto>();
+            if (!string.IsNullOrWhiteSpace(siteCode)
+                && !string.Equals(siteCode.Trim(), "ALL", StringComparison.OrdinalIgnoreCase))
+            {
+                IList<PcMapDto> one = GetPcMapsBySite(siteCode.Trim());
+                if (one != null)
+                {
+                    for (int i = 0; i < one.Count; i++)
+                    {
+                        if (one[i] != null)
+                            list.Add(one[i]);
+                    }
+                }
+                return list;
+            }
+
+            for (int i = 0; i < SiteCodes.Length; i++)
+            {
+                IList<PcMapDto> maps = GetPcMapsBySite(SiteCodes[i]);
+                if (maps == null)
+                    continue;
+                for (int j = 0; j < maps.Count; j++)
+                {
+                    if (maps[j] != null)
+                        list.Add(maps[j]);
+                }
+            }
+            return list;
+        }
+
+        /// <summary>관리자: PCMAP 추가/수정. originalPcName이 다르면 이름 변경(삭제 후 등록).</summary>
+        public string UpsertPcMapForAdmin(PcMapDto map, string originalPcName)
+        {
+            if (!OccupancyNameStore.IsAdmin)
+                return "관리자만 사용할 수 있습니다.";
+            if (!IsConfigured)
+                return "디렉터리 DB가 연결되지 않았습니다.";
+            if (map == null || string.IsNullOrWhiteSpace(map.SiteCode) || string.IsNullOrWhiteSpace(map.PcName))
+                return "사이트와 PC 이름을 입력해 주세요.";
+
+            string site = map.SiteCode.Trim();
+            string pc = map.PcName.Trim();
+            map.SiteCode = site;
+            map.PcName = pc;
+            if (string.IsNullOrWhiteSpace(map.ShareKey))
+            {
+                bool aurora = string.Equals(site, "AURORA", StringComparison.OrdinalIgnoreCase);
+                map.ShareKey = aurora && LooksLikeIpv4(map.PcIp)
+                    ? map.PcIp.Trim()
+                    : pc;
+            }
+            if (string.IsNullOrWhiteSpace(map.PcIp) && LooksLikeIpv4(map.ShareKey))
+                map.PcIp = map.ShareKey.Trim();
+
+            string original = string.IsNullOrWhiteSpace(originalPcName) ? null : originalPcName.Trim();
+            if (original != null && !Eq(original, pc))
+            {
+                int del = _repository.DeletePcMap(site, original);
+                if (del < 0)
+                    return "기존 PC 이름 변경(삭제)에 실패했습니다.";
+            }
+
+            int n = _repository.UpsertPcMap(map);
+            if (n < 0)
+                return "PC 저장에 실패했습니다.";
+            InvalidateUserCache();
+            return null;
+        }
+
+        /// <summary>관리자: PCMAP 삭제.</summary>
+        public string DeletePcMapForAdmin(string siteCode, string pcName)
+        {
+            if (!OccupancyNameStore.IsAdmin)
+                return "관리자만 사용할 수 있습니다.";
+            if (!IsConfigured)
+                return "디렉터리 DB가 연결되지 않았습니다.";
+            if (string.IsNullOrWhiteSpace(siteCode) || string.IsNullOrWhiteSpace(pcName))
+                return "사이트와 PC 이름을 지정해 주세요.";
+
+            int n = _repository.DeletePcMap(siteCode.Trim(), pcName.Trim());
+            if (n < 0)
+                return "PC 삭제에 실패했습니다.";
+            if (n == 0)
+                return "삭제할 PC를 찾지 못했습니다.";
+            InvalidateUserCache();
+            return null;
+        }
+
+        /// <summary>갤러리용: config에 없는 PCMAP PC를 목록에 추가.</summary>
+        public void MergePcMapsIntoRemoteList(string siteCode, IList<RemotePcDto> pcs)
+        {
+            if (pcs == null || string.IsNullOrWhiteSpace(siteCode) || !IsConfigured)
+                return;
+
+            IList<PcMapDto> maps = GetPcMapsBySite(siteCode);
+            if (maps == null || maps.Count == 0)
+                return;
+
+            for (int i = 0; i < maps.Count; i++)
+            {
+                PcMapDto map = maps[i];
+                if (map == null || string.IsNullOrWhiteSpace(map.PcName))
+                    continue;
+
+                bool exists = false;
+                for (int j = 0; j < pcs.Count; j++)
+                {
+                    RemotePcDto dto = pcs[j];
+                    if (dto != null && Eq(dto.PcName, map.PcName))
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (exists)
+                    continue;
+
+                var added = new RemotePcDto
+                {
+                    HospitalCode = siteCode.Trim(),
+                    PcName = map.PcName.Trim(),
+                    GroupName = map.TeamName,
+                    PcDomain = map.PcDomain,
+                    PcNote = map.PcNote,
+                    PcComment = map.PcComment,
+                    IpAddress = !string.IsNullOrWhiteSpace(map.ShareKey) ? map.ShareKey.Trim() : map.PcName.Trim(),
+                    HostAddress = LooksLikeIpv4(map.PcIp) ? map.PcIp.Trim() : null
+                };
+                ApplyPcMapIdentity(added, map);
+                pcs.Add(added);
+            }
+        }
+
         /// <summary>선택 PC 코멘트 저장. 재시드해도 NVL로 기존값 유지.</summary>
         public int UpdatePcComment(string siteCode, string pcName, string comment)
         {
@@ -378,6 +523,15 @@ namespace GBCWorkHub.BIZ
                 _pcMapCache = null;
                 _pcMapCacheUtc = DateTime.MinValue;
             }
+        }
+
+        /// <summary>
+        /// 현재 로그인 세션의 MSDWHTKD_USR.USR_ID. 이름/PC명 매칭으로 재해석하지 않고 로그인 시
+        /// 저장된 세션 값만 반환한다(개선사항 요청의 작성자/댓글/반응 FK와 소유권 판정에 사용).
+        /// </summary>
+        public static long? ResolveCurrentUserId()
+        {
+            return OccupancyNameStore.TryGetUserId();
         }
 
         /// <summary>MSDWHTKD_USR에서 소속. 점유자 표시용.</summary>

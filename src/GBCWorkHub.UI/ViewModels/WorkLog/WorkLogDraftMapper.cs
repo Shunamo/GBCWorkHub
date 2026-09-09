@@ -876,6 +876,9 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             else if (string.IsNullOrWhiteSpace(item.AuthorName))
                 item.AuthorName = WorkHubUserProfile.OccupancyName;
 
+            if (!item.AuthorUserId.HasValue)
+                item.AuthorUserId = OccupancyNameStore.TryGetUserId();
+
             if (string.IsNullOrWhiteSpace(item.TeamName))
                 item.TeamName = OccupancyNameStore.TryGetAffiliation();
 

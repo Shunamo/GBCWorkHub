@@ -28,6 +28,8 @@ namespace GBCWorkHub.DAC
         private string _lastConnectionError;
         private bool _teamNmProbed;
         private bool _hasTeamNm;
+        private bool _usrIdProbed;
+        private bool _hasUsrId;
 
         private const string HeaderSelectBase =
             @"LOG_ID, CLIENT_KEY, WRITE_STATUS, TICKET_NO, TICKET_CONTENTS,
@@ -482,11 +484,12 @@ namespace GBCWorkHub.DAC
                 using (var conn = OpenConnection())
                 {
                     EnsureTeamNmColumn(conn);
+                    EnsureUsrIdColumn(conn);
                     var map = new Dictionary<long, WorkLogRecordDto>();
                     using (var cmd = CreateCommand(conn))
                     {
                         cmd.CommandText =
-                            @"SELECT " + HeaderSelectBase + HeaderSelectTeam + @"
+                            @"SELECT " + HeaderSelectBase + HeaderSelectTeam + HeaderSelectAuthorUser + @"
                                 FROM " + HeaderTable + @" w
                                ORDER BY " + TimelineDateExpr + @" DESC NULLS LAST, w.LOG_ID DESC";
                         using (var reader = cmd.ExecuteReader())
@@ -534,6 +537,7 @@ namespace GBCWorkHub.DAC
                 using (var conn = OpenConnection())
                 {
                     EnsureTeamNmColumn(conn);
+                    EnsureUsrIdColumn(conn);
                     string whereSql;
                     Action<OracleCommand> bindFilters;
                     BuildListFilter(query, out whereSql, out bindFilters);
@@ -553,7 +557,7 @@ namespace GBCWorkHub.DAC
                     using (var cmd = CreateCommand(conn))
                     {
                         cmd.CommandText =
-                            @"SELECT " + HeaderSelectBase + HeaderSelectTeam + @"
+                            @"SELECT " + HeaderSelectBase + HeaderSelectTeam + HeaderSelectAuthorUser + @"
                                 FROM " + HeaderTable + @" w
                                WHERE 1=1" + whereSql + @"
                                ORDER BY " + TimelineDateExpr + @" DESC NULLS LAST, w.LOG_ID DESC
@@ -974,10 +978,11 @@ namespace GBCWorkHub.DAC
                 using (var cmd = CreateCommand(conn))
                 {
                     EnsureTeamNmColumn(conn);
+                    EnsureUsrIdColumn(conn);
                     cmd.CommandText =
-                        @"SELECT " + HeaderSelectBase + HeaderSelectTeam + @"
-                            FROM " + HeaderTable + @"
-                           WHERE LOG_ID = :logId";
+                        @"SELECT " + HeaderSelectBase + HeaderSelectTeam + HeaderSelectAuthorUser + @"
+                            FROM " + HeaderTable + @" w
+                           WHERE w.LOG_ID = :logId";
                     cmd.Parameters.Add("logId", OracleDbType.Int64).Value = logId;
                     using (var reader = cmd.ExecuteReader())
                     {
@@ -1108,6 +1113,7 @@ namespace GBCWorkHub.DAC
                 using (var tx = conn.BeginTransaction())
                 {
                     EnsureTeamNmColumn(conn);
+                    EnsureUsrIdColumn(conn);
                     bool isNew = record.LogId <= 0;
                     if (isNew)
                         record.LogId = NextVal(conn, HeaderSeq);
@@ -1160,6 +1166,8 @@ namespace GBCWorkHub.DAC
         {
             using (var cmd = CreateCommand(conn))
             {
+                string usrIdColumn = _hasUsrId ? ", USR_ID" : string.Empty;
+                string usrIdValue = _hasUsrId ? ", :usrId" : string.Empty;
                 if (_hasTeamNm)
                 {
                     cmd.CommandText =
@@ -1168,13 +1176,13 @@ namespace GBCWorkHub.DAC
                               MENU_NM, PC_NM, PERSON_IN_CHARGE, LOCAL_PC_IP,
                               START_DT, END_DT, DEPLOY_STATUS, DEPLOY_DT, WORK_COMMENT,
                               CHANGESET_ID, TFS_COMMENT, TFS_AUTHOR, AUTHOR_NM, TEAM_NM, CHECKED_IN_AT,
-                              CHANGED_FILE_COUNT, NEEDS_TICKET_REVIEW, CREATED_AT, UPDT_DTM
+                              CHANGED_FILE_COUNT, NEEDS_TICKET_REVIEW, CREATED_AT, UPDT_DTM" + usrIdColumn + @"
                           ) VALUES (
                               :logId, :clientKey, :siteCd, :writeStatus, :ticketNo, :ticketContents,
                               :menuNm, :pcNm, :person, :localIp,
                               :startDt, :endDt, :deployStatus, :deployDt, :workComment,
                               :changesetId, :tfsComment, :tfsAuthor, :authorNm, :teamNm, :checkedInAt,
-                              :changedFileCount, :needsReview, SYSTIMESTAMP, SYSTIMESTAMP
+                              :changedFileCount, :needsReview, SYSTIMESTAMP, SYSTIMESTAMP" + usrIdValue + @"
                           )";
                 }
                 else
@@ -1185,13 +1193,13 @@ namespace GBCWorkHub.DAC
                               MENU_NM, PC_NM, PERSON_IN_CHARGE, LOCAL_PC_IP,
                               START_DT, END_DT, DEPLOY_STATUS, DEPLOY_DT, WORK_COMMENT,
                               CHANGESET_ID, TFS_COMMENT, TFS_AUTHOR, AUTHOR_NM, CHECKED_IN_AT,
-                              CHANGED_FILE_COUNT, NEEDS_TICKET_REVIEW, CREATED_AT, UPDT_DTM
+                              CHANGED_FILE_COUNT, NEEDS_TICKET_REVIEW, CREATED_AT, UPDT_DTM" + usrIdColumn + @"
                           ) VALUES (
                               :logId, :clientKey, :siteCd, :writeStatus, :ticketNo, :ticketContents,
                               :menuNm, :pcNm, :person, :localIp,
                               :startDt, :endDt, :deployStatus, :deployDt, :workComment,
                               :changesetId, :tfsComment, :tfsAuthor, :authorNm, :checkedInAt,
-                              :changedFileCount, :needsReview, SYSTIMESTAMP, SYSTIMESTAMP
+                              :changedFileCount, :needsReview, SYSTIMESTAMP, SYSTIMESTAMP" + usrIdValue + @"
                           )";
                 }
                 BindHeader(cmd, r);
@@ -1224,7 +1232,9 @@ namespace GBCWorkHub.DAC
                              TFS_AUTHOR = :tfsAuthor,
                              AUTHOR_NM = :authorNm,"
                     + (_hasTeamNm ? @"
-                             TEAM_NM = :teamNm," : string.Empty) + @"
+                             TEAM_NM = :teamNm," : string.Empty)
+                    + (_hasUsrId ? @"
+                             USR_ID = :usrId," : string.Empty) + @"
                              CHECKED_IN_AT = :checkedInAt,
                              CHANGED_FILE_COUNT = :changedFileCount,
                              NEEDS_TICKET_REVIEW = :needsReview,
@@ -1262,6 +1272,8 @@ namespace GBCWorkHub.DAC
             cmd.Parameters.Add("authorNm", OracleDbType.Varchar2).Value = (object)Trim(r.AuthorName, 200) ?? DBNull.Value;
             if (_hasTeamNm)
                 cmd.Parameters.Add("teamNm", OracleDbType.NVarchar2).Value = (object)Trim(r.TeamName, 100) ?? DBNull.Value;
+            if (_hasUsrId)
+                cmd.Parameters.Add("usrId", OracleDbType.Int64).Value = r.UserId.HasValue ? (object)r.UserId.Value : DBNull.Value;
             cmd.Parameters.Add("checkedInAt", OracleDbType.TimeStamp).Value = ToDbDate(r.CheckedInAt);
             cmd.Parameters.Add("changedFileCount", OracleDbType.Int32).Value = r.ChangedFileCount;
             cmd.Parameters.Add("needsReview", OracleDbType.Char).Value = r.NeedsTicketReview ? "Y" : "N";
@@ -1526,8 +1538,26 @@ namespace GBCWorkHub.DAC
             }
         }
 
+        /// <summary>
+        /// USR_ID/AUTHOR_IS_DELETED는 TEAM_NM 유무에 따라 실제 컬럼 위치가 달라지므로(선택적으로
+        /// 뒤에 붙는 컬럼들), 고정 인덱스가 아니라 컬럼명으로 찾는다 — 없으면 IndexOutOfRangeException.
+        /// </summary>
+        private static int? TryGetOrdinal(IDataRecord reader, string columnName)
+        {
+            try
+            {
+                return reader.GetOrdinal(columnName);
+            }
+            catch (IndexOutOfRangeException)
+            {
+                return null;
+            }
+        }
+
         private static WorkLogRecordDto MapHeader(IDataRecord reader)
         {
+            int? usrIdOrd = TryGetOrdinal(reader, "USR_ID");
+            int? authorDeletedOrd = TryGetOrdinal(reader, "AUTHOR_IS_DELETED");
             return new WorkLogRecordDto
             {
                 LogId = Convert.ToInt64(reader.GetValue(0)),
@@ -1554,7 +1584,11 @@ namespace GBCWorkHub.DAC
                 CreatedAt = ReadTimestamp(reader, 21),
                 UpdatedAt = ReadTimestamp(reader, 22),
                 SiteCode = reader.FieldCount > 23 ? ReadString(reader, 23) : null,
-                TeamName = reader.FieldCount > 24 ? ReadString(reader, 24) : null
+                TeamName = reader.FieldCount > 24 ? ReadString(reader, 24) : null,
+                UserId = usrIdOrd.HasValue && !reader.IsDBNull(usrIdOrd.Value)
+                    ? (long?)Convert.ToInt64(reader.GetValue(usrIdOrd.Value)) : null,
+                IsAuthorDeleted = authorDeletedOrd.HasValue && !reader.IsDBNull(authorDeletedOrd.Value)
+                    && Convert.ToInt32(reader.GetValue(authorDeletedOrd.Value)) != 0
             };
         }
 
@@ -1626,6 +1660,47 @@ namespace GBCWorkHub.DAC
                     _hasTeamNm = false;
                     WorkHubFileLogger.Warn("WORKLOG_SCHEMA",
                         "TEAM_NM column missing; queries run without it. Apply sql/12_ALTER_WRK_TEAM_NM.sql when DBA can.");
+                    return;
+                }
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 작성자 계정 FK(USR_ID) + 그 계정이 삭제됐는지(AUTHOR_IS_DELETED, 상관 서브쿼리). 컬럼명으로
+        /// GetOrdinal 조회하므로 TEAM_NM 유무에 따라 실제 컬럼 위치가 달라져도 안전하다.
+        /// </summary>
+        private string HeaderSelectAuthorUser
+        {
+            get
+            {
+                return _hasUsrId
+                    ? ", w.USR_ID, (SELECT NVL(u.IS_DELETED,0) FROM XSUP.MSDWHTKD_USR u WHERE u.USR_ID = w.USR_ID) AS AUTHOR_IS_DELETED"
+                    : string.Empty;
+            }
+        }
+
+        private void EnsureUsrIdColumn(OracleConnection conn)
+        {
+            if (_usrIdProbed)
+                return;
+            _usrIdProbed = true;
+            try
+            {
+                using (var cmd = CreateCommand(conn))
+                {
+                    cmd.CommandText = "SELECT USR_ID FROM " + HeaderTable + " WHERE ROWNUM = 0";
+                    cmd.ExecuteScalar();
+                }
+                _hasUsrId = true;
+            }
+            catch (OracleException ex)
+            {
+                if (ex.Number == 904)
+                {
+                    _hasUsrId = false;
+                    WorkHubFileLogger.Warn("WORKLOG_SCHEMA",
+                        "USR_ID column missing; deleted-account badge disabled for WorkLog. Apply sql/31_MSDWHTKD_WRK_USR_ID.sql when DBA can.");
                     return;
                 }
                 throw;

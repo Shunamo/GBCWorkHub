@@ -27,9 +27,11 @@ namespace GBCWorkHub.BIZ
 
         public List<RemotePcDto> GetRemotePcListBySite(string siteCode)
         {
-            List<RemotePcDto> list = _dac.GetRemotePcListBySite(siteCode);
-            if (list != null && list.Count > 0)
-                new DirectoryBiz().ApplyPcTeams(siteCode, list);
+            List<RemotePcDto> list = _dac.GetRemotePcListBySite(siteCode) ?? new List<RemotePcDto>();
+            var directory = new DirectoryBiz();
+            directory.MergePcMapsIntoRemoteList(siteCode, list);
+            if (list.Count > 0)
+                directory.ApplyPcTeams(siteCode, list);
             return list;
         }
 

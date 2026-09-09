@@ -29,6 +29,10 @@ namespace GBCWorkHub.DTO.WorkLog
         public string TfsComment { get; set; }
         public string TfsAuthor { get; set; }
         public string AuthorName { get; set; }
+        /// <summary>MSDWHTKD_USR.USR_ID FK. 옛 기록은 NULL(계정 연결 없음).</summary>
+        public long? UserId { get; set; }
+        /// <summary>작성자 계정이 이후 삭제됐는지 — 목록 표시용, 저장 대상 아님.</summary>
+        public bool IsAuthorDeleted { get; set; }
         /// <summary>작성자 소속. 예: 진료지원. 팀 검색용.</summary>
         public string TeamName { get; set; }
         public DateTime? CheckedInAt { get; set; }

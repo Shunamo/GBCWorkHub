@@ -38,6 +38,8 @@ namespace GBCWorkHub.UI.Services.Popup
         private bool _progressOpen;
         private string _openDedupKey;
         private bool _resultSet;
+        private Func<PopupHostViewModelSnapshot, Task<string>> _primaryValidator;
+        private bool _primaryValidating;
 
         public Window Owner { get; set; }
 
@@ -181,14 +183,25 @@ namespace GBCWorkHub.UI.Services.Popup
         {
             _vm = new PopupHostViewModel();
             _vm.Apply(request);
+            _primaryValidator = request != null ? request.PrimaryValidator : null;
+            _primaryValidating = false;
             _vm.ButtonCommand = new RelayCommand<object>(p =>
             {
                 var btn = p as PopupButtonDefinition;
-                if (btn == null)
+                if (btn == null || _primaryValidating)
                     return;
-                if (btn.ResultType == PopupResultType.Primary && !_vm.TryAcceptInput())
-                    return;
-                CloseHost(PopupResult.From(btn.ResultType, btn.Text, _vm.InputText, _vm.AffiliationText));
+                if (btn.ResultType == PopupResultType.Primary)
+                {
+                    if (!_vm.TryAcceptInput())
+                        return;
+                    if (_primaryValidator != null)
+                    {
+                        _primaryValidating = true;
+                        var ignored = RunPrimaryValidatorAsync(btn);
+                        return;
+                    }
+                }
+                CloseHost(PopupResult.From(btn.ResultType, btn.Text, _vm.InputText, _vm.AffiliationText, _vm.PasswordText));
             });
             _vm.CancelProgressCommand = new RelayCommand(() =>
             {
@@ -222,6 +235,50 @@ namespace GBCWorkHub.UI.Services.Popup
             layer.Children.Add(_host);
             layer.Visibility = Visibility.Visible;
             _host.Focus();
+        }
+
+        private async Task RunPrimaryValidatorAsync(PopupButtonDefinition btn)
+        {
+            var validator = _primaryValidator;
+            string error = null;
+            try
+            {
+                if (validator != null && _vm != null)
+                {
+                    var snap = new PopupHostViewModelSnapshot
+                    {
+                        InputText = _vm.InputText,
+                        AffiliationText = _vm.AffiliationText,
+                        SecondaryInputText = _vm.SecondaryInputText,
+                        PasswordText = _vm.PasswordText,
+                        CurrentPasswordText = _vm.CurrentPasswordText,
+                        PasswordConfirmText = _vm.PasswordConfirmText
+                    };
+                    error = await validator(snap).ConfigureAwait(true);
+                }
+            }
+            catch (Exception ex)
+            {
+                error = "처리 중 오류가 발생했습니다.\n" + ex.Message;
+            }
+
+            RunOnUi(() =>
+            {
+                _primaryValidating = false;
+                if (_vm == null)
+                    return;
+                if (!string.IsNullOrWhiteSpace(error))
+                {
+                    _vm.InputError = error.Trim();
+                    return;
+                }
+                CloseHost(PopupResult.From(
+                    btn != null ? btn.ResultType : PopupResultType.Primary,
+                    btn != null ? btn.Text : "확인",
+                    _vm.InputText,
+                    _vm.AffiliationText,
+                    _vm.PasswordText));
+            });
         }
 
         private Panel FindOverlayLayer()
@@ -269,12 +326,27 @@ namespace GBCWorkHub.UI.Services.Popup
                 var def = FindDefaultButton();
                 if (def != null)
                 {
-                    if (def.ResultType == PopupResultType.Primary && !_vm.TryAcceptInput())
+                    if (_primaryValidating)
                     {
                         e.Handled = true;
                         return;
                     }
-                    CloseHost(PopupResult.From(def.ResultType, def.Text, _vm.InputText, _vm.AffiliationText));
+                    if (def.ResultType == PopupResultType.Primary)
+                    {
+                        if (!_vm.TryAcceptInput())
+                        {
+                            e.Handled = true;
+                            return;
+                        }
+                        if (_primaryValidator != null)
+                        {
+                            _primaryValidating = true;
+                            var ignored = RunPrimaryValidatorAsync(def);
+                            e.Handled = true;
+                            return;
+                        }
+                    }
+                    CloseHost(PopupResult.From(def.ResultType, def.Text, _vm.InputText, _vm.AffiliationText, _vm.PasswordText));
                     e.Handled = true;
                 }
             }
@@ -343,6 +415,8 @@ namespace GBCWorkHub.UI.Services.Popup
             _progressOpen = false;
             _openDedupKey = null;
             _resultSet = false;
+            _primaryValidator = null;
+            _primaryValidating = false;
         }
 
         private static void RunOnUi(Action action)

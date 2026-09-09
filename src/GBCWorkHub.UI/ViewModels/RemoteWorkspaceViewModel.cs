@@ -31,6 +31,8 @@ namespace GBCWorkHub.UI.ViewModels
         private TfsWorkLogViewModel _tfsWorkLog;
         private WorkLog.WorkLogListViewModel _workLogList;
         private Action _refreshPendingTfsBadge;
+        private Action _notifyIdentityChanged;
+        private Action _onAuthSucceeded;
         private readonly Action _onSiteContextChanged;
 
         private ObservableCollection<RemoteComputerItemViewModel> _remoteComputers;
@@ -41,6 +43,8 @@ namespace GBCWorkHub.UI.ViewModels
         private string _selectedPcCommentBaseline = string.Empty;
         private bool _isPcAccessEditing;
         private bool _isPcAccessSaving;
+        private string _adminEditPcIp = string.Empty;
+        private string _adminEditTeamName = string.Empty;
         private readonly Dictionary<string, List<RemotePcDto>> _sitePcCache =
             new Dictionary<string, List<RemotePcDto>>(StringComparer.OrdinalIgnoreCase);
         private IList<RemotePcStatus> _lastOccupancy;
@@ -142,6 +146,8 @@ namespace GBCWorkHub.UI.ViewModels
             BeginEditPcAccessCommand = new RelayCommand(BeginEditPcAccess, () => HasSelectedRemoteComputer && !IsPcAccessEditing && !IsPcAccessSaving);
             SavePcAccessCommand = new RelayCommand(() => { var _ = SavePcAccessAsync(); }, () => IsPcAccessEditing && !IsPcAccessSaving);
             CancelEditPcAccessCommand = new RelayCommand(CancelEditPcAccess, () => IsPcAccessEditing && !IsPcAccessSaving);
+            AddRemotePcCommand = new RelayCommand(() => { var _ = AddRemotePcAsync(); }, () => IsAdmin && IsGalleryVisible && !string.IsNullOrWhiteSpace(SelectedSiteCode));
+            DeleteRemotePcCommand = new RelayCommand(() => { var _ = DeleteRemotePcAsync(); }, () => ShowAdminDeletePcButton);
 
             _selectedPcAccessSections = new ObservableCollection<PcAccessSectionViewModel>();
             ApplyWorkHubUserToSession();
@@ -154,7 +160,9 @@ namespace GBCWorkHub.UI.ViewModels
             WorkLog.WorkLogListViewModel workLogList,
             TfsSyncCoordinator tfsSync,
             Action<string> requestSelectMainTab,
-            Action refreshPendingTfsBadge)
+            Action refreshPendingTfsBadge,
+            Action notifyIdentityChanged = null,
+            Action onAuthSucceeded = null)
         {
             _popup = popup;
             _tfsWorkLog = tfsWorkLog;
@@ -162,6 +170,8 @@ namespace GBCWorkHub.UI.ViewModels
             _tfsSync = tfsSync;
             // requestSelectMainTab: Shell(MainViewModel) owns tab navigation; unused here after phase 1 split.
             _refreshPendingTfsBadge = refreshPendingTfsBadge;
+            _notifyIdentityChanged = notifyIdentityChanged;
+            _onAuthSucceeded = onAuthSucceeded;
             _session.AttachUi(new SessionUiBridge(this));
         }
 
@@ -385,6 +395,13 @@ namespace GBCWorkHub.UI.ViewModels
                 RaisePcAccessEditCommands();
                 RebuildSelectedPcAccessPanel();
                 SyncDetailPanelFromSelected();
+                RaisePropertyChanged("ShowAdminDeletePcButton");
+                var add = AddRemotePcCommand as RelayCommand;
+                if (add != null)
+                    add.RaiseCanExecuteChanged();
+                var del = DeleteRemotePcCommand as RelayCommand;
+                if (del != null)
+                    del.RaiseCanExecuteChanged();
                 if (_selectedRemoteComputer == null)
                     ApplyRecentUsageLogs(++_usageLogLoadGeneration, null);
                 else
@@ -528,6 +545,36 @@ namespace GBCWorkHub.UI.ViewModels
         public ICommand BeginEditPcAccessCommand { get; private set; }
         public ICommand SavePcAccessCommand { get; private set; }
         public ICommand CancelEditPcAccessCommand { get; private set; }
+        public ICommand AddRemotePcCommand { get; private set; }
+        public ICommand DeleteRemotePcCommand { get; private set; }
+
+        public bool IsAdmin
+        {
+            get { return OccupancyNameStore.IsAdmin; }
+        }
+
+        public bool ShowAdminDeletePcButton
+        {
+            get
+            {
+                return IsAdmin
+                    && HasSelectedRemoteComputer
+                    && !IsPcAccessEditing
+                    && !IsPcAccessSaving;
+            }
+        }
+
+        public string AdminEditPcIp
+        {
+            get { return _adminEditPcIp; }
+            set { SetProperty(ref _adminEditPcIp, value ?? string.Empty); }
+        }
+
+        public string AdminEditTeamName
+        {
+            get { return _adminEditTeamName; }
+            set { SetProperty(ref _adminEditTeamName, value ?? string.Empty); }
+        }
 
         /// <summary>선택 PC의 원격 Windows 로그인(엑셀 ID).</summary>
         public string SelectedPcDomain
@@ -677,6 +724,10 @@ namespace GBCWorkHub.UI.ViewModels
                 cancel.RaiseCanExecuteChanged();
             RaisePropertyChanged("ShowPcAccessEditButton");
             RaisePropertyChanged("ShowPcAccessSaveButton");
+            RaisePropertyChanged("ShowAdminDeletePcButton");
+            var del = DeleteRemotePcCommand as RelayCommand;
+            if (del != null)
+                del.RaiseCanExecuteChanged();
         }
 
         private void ApplyCredentialEditFlags()
@@ -695,7 +746,94 @@ namespace GBCWorkHub.UI.ViewModels
         {
             if (!HasSelectedRemoteComputer || IsPcAccessEditing)
                 return;
+            EnsureEditableAccessSections();
             IsPcAccessEditing = true;
+        }
+
+        /// <summary>편집 시 Domain + (CMC Auth / RC·MNGHA VPN) 빈 칸이 항상 보이게.</summary>
+        private void EnsureEditableAccessSections()
+        {
+            var item = SelectedRemoteComputer;
+            if (item == null || _selectedPcAccessSections == null)
+                return;
+
+            EnsureSectionHasEditableFields(FindAccessSection("Domain"), "Domain");
+
+            bool cmc = string.Equals(item.SiteCode, "CMC", StringComparison.OrdinalIgnoreCase);
+            bool vpnSite = string.Equals(item.SiteCode, "RC", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(item.SiteCode, "MNGHA", StringComparison.OrdinalIgnoreCase);
+
+            if (cmc)
+            {
+                // Legacy CMC VPN rows already mapped to Auth in RebuildSelectedPcAccessPanel.
+                if (FindAccessSection("Auth") == null && FindAccessSection("VPN") != null)
+                {
+                    // leave VPN as-is if somehow still present; prefer Auth slot
+                }
+                if (FindAccessSection("Auth") == null)
+                    _selectedPcAccessSections.Add(CreateAccessSection("Auth", new List<string> { string.Empty }, new List<string> { string.Empty }));
+                else
+                    EnsureSectionHasEditableFields(FindAccessSection("Auth"), "Auth");
+            }
+            else if (vpnSite)
+            {
+                if (FindAccessSection("VPN") == null)
+                    _selectedPcAccessSections.Add(CreateAccessSection("VPN", new List<string> { string.Empty }, new List<string> { string.Empty }));
+                else
+                    EnsureSectionHasEditableFields(FindAccessSection("VPN"), "VPN");
+            }
+
+            if (FindAccessSection("Domain") == null)
+                _selectedPcAccessSections.Insert(0, CreateAccessSection("Domain", new List<string> { string.Empty }, new List<string> { string.Empty }));
+
+            RaisePropertyChanged("HasSelectedPcAccessSections");
+            RaisePropertyChanged("PcAccessSectionColumns");
+        }
+
+        private PcAccessSectionViewModel FindAccessSection(string title)
+        {
+            if (_selectedPcAccessSections == null)
+                return null;
+            for (int i = 0; i < _selectedPcAccessSections.Count; i++)
+            {
+                var s = _selectedPcAccessSections[i];
+                if (s != null && string.Equals(s.Title, title, StringComparison.OrdinalIgnoreCase))
+                    return s;
+            }
+            return null;
+        }
+
+        private void EnsureSectionHasEditableFields(PcAccessSectionViewModel section, string title)
+        {
+            if (section == null)
+                return;
+            EnsureFieldHasLine(section, "ID", "ID");
+            EnsureFieldHasLine(section, "PW", "PW");
+        }
+
+        private void EnsureFieldHasLine(PcAccessSectionViewModel section, string kind, string label)
+        {
+            if (section == null || section.Fields == null)
+                return;
+            PcCredentialFieldViewModel field = null;
+            for (int i = 0; i < section.Fields.Count; i++)
+            {
+                if (section.Fields[i] != null
+                    && string.Equals(section.Fields[i].Kind, kind, StringComparison.OrdinalIgnoreCase))
+                {
+                    field = section.Fields[i];
+                    break;
+                }
+            }
+            if (field == null)
+            {
+                field = new PcCredentialFieldViewModel(kind, label);
+                section.Fields.Add(field);
+            }
+            if (field.Lines == null)
+                return;
+            if (field.Lines.Count == 0)
+                field.Lines.Add(new PcCredentialLineViewModel(string.Empty, CopyPcCredentialCommand));
         }
 
         private void CancelEditPcAccess()
@@ -723,9 +861,37 @@ namespace GBCWorkHub.UI.ViewModels
             IsPcAccessSaving = true;
             try
             {
-                int n = await _directoryBiz.UpdatePcAccessAsync(site, pc, note, comment, domain).ConfigureAwait(true);
-                if (n < 0)
-                    return;
+                if (IsAdmin)
+                {
+                    var map = new PcMapDto
+                    {
+                        SiteCode = site,
+                        PcName = pc,
+                        PcIp = AdminEditPcIp,
+                        ShareKey = string.IsNullOrWhiteSpace(item.IpAddress) ? pc : item.IpAddress,
+                        TeamName = AdminEditTeamName,
+                        PcDomain = domain,
+                        PcNote = note,
+                        PcComment = comment
+                    };
+                    // AURORA는 IP를 점유키로
+                    if (string.Equals(site, "AURORA", StringComparison.OrdinalIgnoreCase)
+                        && !string.IsNullOrWhiteSpace(AdminEditPcIp))
+                        map.ShareKey = AdminEditPcIp.Trim();
+
+                    string err = await Task.Run(() => _directoryBiz.UpsertPcMapForAdmin(map, pc)).ConfigureAwait(true);
+                    if (!string.IsNullOrWhiteSpace(err))
+                    {
+                        await ShowInfoPopupAsync("PC 저장", err, PopupIconKind.Warning).ConfigureAwait(true);
+                        return;
+                    }
+                }
+                else
+                {
+                    int n = await _directoryBiz.UpdatePcAccessAsync(site, pc, note, comment, domain).ConfigureAwait(true);
+                    if (n < 0)
+                        return;
+                }
 
                 if (SelectedRemoteComputer != null
                     && string.Equals(SelectedRemoteComputer.SiteCode, site, StringComparison.OrdinalIgnoreCase)
@@ -734,9 +900,19 @@ namespace GBCWorkHub.UI.ViewModels
                     SelectedRemoteComputer.PcNote = string.IsNullOrWhiteSpace(note) ? null : note;
                     SelectedRemoteComputer.PcComment = string.IsNullOrWhiteSpace(comment) ? null : comment.Trim();
                     SelectedRemoteComputer.PcDomain = string.IsNullOrWhiteSpace(domain) ? null : domain;
+                    if (IsAdmin)
+                    {
+                        if (!string.IsNullOrWhiteSpace(AdminEditPcIp))
+                            SelectedRemoteComputer.HostAddress = AdminEditPcIp.Trim();
+                        SelectedRemoteComputer.GroupName = string.IsNullOrWhiteSpace(AdminEditTeamName)
+                            ? null
+                            : AdminEditTeamName.Trim();
+                    }
                     _selectedPcCommentBaseline = comment;
                     IsPcAccessEditing = false;
                     RebuildSelectedPcAccessPanel();
+                    if (IsAdmin)
+                        await LoadSelectedSiteGalleryAsync().ConfigureAwait(true);
                 }
             }
             finally
@@ -745,16 +921,112 @@ namespace GBCWorkHub.UI.ViewModels
             }
         }
 
+        private async Task AddRemotePcAsync()
+        {
+            if (!IsAdmin || _popup == null || string.IsNullOrWhiteSpace(SelectedSiteCode))
+                return;
+
+            string site = SelectedSiteCode.Trim();
+            var result = await _popup.ShowPromptAsync(new PopupRequest
+            {
+                Title = "PC 추가",
+                Message = "사이트: " + site
+                    + "\n· 사용자명 칸 → PC 이름\n· 소속 칸 → 팀(예: 진료지원)\n· IP는 추가 후 하단 수정에서 입력",
+                Icon = PopupIconKind.Info,
+                ShowAffiliationInput = true,
+                RequireAffiliation = false,
+                AffiliationText = string.Empty,
+                InputText = string.Empty,
+                Buttons = new[]
+                {
+                    new PopupButtonDefinition("취소", PopupResultType.Cancel, isCancel: true),
+                    new PopupButtonDefinition("추가", PopupResultType.Primary, isDefault: true)
+                }
+            }).ConfigureAwait(true);
+
+            if (result == null || !result.IsPrimary || string.IsNullOrWhiteSpace(result.InputText))
+                return;
+
+            string pcName = result.InputText.Trim();
+            string team = string.IsNullOrWhiteSpace(result.AffiliationText) ? null : result.AffiliationText.Trim();
+            var map = new PcMapDto
+            {
+                SiteCode = site,
+                PcName = pcName,
+                TeamName = team,
+                ShareKey = pcName
+            };
+
+            string err = await Task.Run(() => _directoryBiz.UpsertPcMapForAdmin(map, null)).ConfigureAwait(true);
+            if (!string.IsNullOrWhiteSpace(err))
+            {
+                await ShowInfoPopupAsync("PC 추가", err, PopupIconKind.Warning).ConfigureAwait(true);
+                return;
+            }
+
+            await LoadSelectedSiteGalleryAsync().ConfigureAwait(true);
+            if (RemoteComputers == null)
+                return;
+            for (int i = 0; i < RemoteComputers.Count; i++)
+            {
+                var row = RemoteComputers[i];
+                if (row != null && string.Equals(row.PcName, pcName, StringComparison.OrdinalIgnoreCase))
+                {
+                    SelectedRemoteComputer = row;
+                    break;
+                }
+            }
+        }
+
+        private async Task DeleteRemotePcAsync()
+        {
+            if (!IsAdmin || _popup == null)
+                return;
+            var item = SelectedRemoteComputer;
+            if (item == null || string.IsNullOrWhiteSpace(item.SiteCode) || string.IsNullOrWhiteSpace(item.PcName))
+                return;
+
+            var confirm = await _popup.ShowConfirmAsync(new PopupRequest
+            {
+                Title = "PC 삭제",
+                Message = item.SiteCode + " / " + item.PcName + " 을(를) 목록에서 삭제할까요?",
+                Icon = PopupIconKind.Warning,
+                Buttons = new[]
+                {
+                    new PopupButtonDefinition("취소", PopupResultType.Cancel, isCancel: true),
+                    new PopupButtonDefinition("삭제", PopupResultType.Primary, isDefault: true)
+                }
+            }).ConfigureAwait(true);
+
+            if (confirm == null || !confirm.IsPrimary)
+                return;
+
+            string err = await Task.Run(() => _directoryBiz.DeletePcMapForAdmin(item.SiteCode, item.PcName))
+                .ConfigureAwait(true);
+            if (!string.IsNullOrWhiteSpace(err))
+            {
+                await ShowInfoPopupAsync("PC 삭제", err, PopupIconKind.Warning).ConfigureAwait(true);
+                return;
+            }
+
+            SelectedRemoteComputer = null;
+            await LoadSelectedSiteGalleryAsync().ConfigureAwait(true);
+        }
+
         private static string BuildPcNoteFromSections(IEnumerable<PcAccessSectionViewModel> sections)
         {
             var ids = new List<string>();
             var pws = new List<string>();
             var vpnIds = new List<string>();
             var vpnPws = new List<string>();
+            var authIds = new List<string>();
+            var authPws = new List<string>();
             CollectSectionLines(sections, "Domain", "ID", ids);
             CollectSectionLines(sections, "Domain", "PW", pws);
             CollectSectionLines(sections, "VPN", "ID", vpnIds);
             CollectSectionLines(sections, "VPN", "PW", vpnPws);
+            CollectSectionLines(sections, "Auth", "ID", authIds);
+            CollectSectionLines(sections, "Auth", "PW", authPws);
 
             var parts = new List<string>();
             if (ids.Count > 0)
@@ -765,6 +1037,10 @@ namespace GBCWorkHub.UI.ViewModels
                 parts.Add("[VPN ID]\n" + string.Join("\n", vpnIds.ToArray()));
             if (vpnPws.Count > 0)
                 parts.Add("[VPN Password]\n" + string.Join("\n", vpnPws.ToArray()));
+            if (authIds.Count > 0)
+                parts.Add("[Auth ID]\n" + string.Join("\n", authIds.ToArray()));
+            if (authPws.Count > 0)
+                parts.Add("[Auth Password]\n" + string.Join("\n", authPws.ToArray()));
             return parts.Count == 0 ? null : string.Join("\n\n", parts.ToArray());
         }
 
@@ -825,6 +1101,8 @@ namespace GBCWorkHub.UI.ViewModels
             {
                 SetProperty(ref _selectedPcComment, string.Empty, "SelectedPcComment");
                 _selectedPcCommentBaseline = string.Empty;
+                AdminEditPcIp = string.Empty;
+                AdminEditTeamName = string.Empty;
                 RaisePropertyChanged("HasSelectedPcAccessSections");
                 RaisePropertyChanged("ShowPcAccessCommentColumn");
                 RaisePropertyChanged("PcAccessSectionColumns");
@@ -832,10 +1110,15 @@ namespace GBCWorkHub.UI.ViewModels
                 return;
             }
 
+            AdminEditPcIp = item.HostAddress ?? item.IpAddress ?? string.Empty;
+            AdminEditTeamName = item.GroupName ?? string.Empty;
+
             var ids = new List<string>();
             var pws = new List<string>();
             var vpnIds = new List<string>();
             var vpnPws = new List<string>();
+            var authIds = new List<string>();
+            var authPws = new List<string>();
 
             IList<PcAccessCredential> creds = PcAccessNoteParser.ParseCredentials(item.PcNote);
             if ((creds == null || creds.Count == 0) && !string.IsNullOrWhiteSpace(item.PcDomain))
@@ -850,6 +1133,7 @@ namespace GBCWorkHub.UI.ViewModels
             }
             else if (creds != null)
             {
+                bool cmc = string.Equals(item.SiteCode, "CMC", StringComparison.OrdinalIgnoreCase);
                 for (int i = 0; i < creds.Count; i++)
                 {
                     PcAccessCredential c = creds[i];
@@ -858,6 +1142,12 @@ namespace GBCWorkHub.UI.ViewModels
                     string v = c.Value.Trim();
                     if (string.Equals(c.Kind, "PW", StringComparison.OrdinalIgnoreCase))
                         pws.Add(v);
+                    else if (string.Equals(c.Kind, "AUTH_ID", StringComparison.OrdinalIgnoreCase)
+                        || (cmc && string.Equals(c.Kind, "VPN_ID", StringComparison.OrdinalIgnoreCase)))
+                        authIds.Add(v);
+                    else if (string.Equals(c.Kind, "AUTH_PW", StringComparison.OrdinalIgnoreCase)
+                        || (cmc && string.Equals(c.Kind, "VPN_PW", StringComparison.OrdinalIgnoreCase)))
+                        authPws.Add(v);
                     else if (string.Equals(c.Kind, "VPN_ID", StringComparison.OrdinalIgnoreCase))
                         vpnIds.Add(v);
                     else if (string.Equals(c.Kind, "VPN_PW", StringComparison.OrdinalIgnoreCase))
@@ -871,6 +1161,8 @@ namespace GBCWorkHub.UI.ViewModels
                 _selectedPcAccessSections.Add(CreateAccessSection("Domain", ids, pws));
             if (vpnIds.Count > 0 || vpnPws.Count > 0)
                 _selectedPcAccessSections.Add(CreateAccessSection("VPN", vpnIds, vpnPws));
+            if (authIds.Count > 0 || authPws.Count > 0)
+                _selectedPcAccessSections.Add(CreateAccessSection("Auth", authIds, authPws));
 
             string comment = item.PcComment;
             if (string.IsNullOrWhiteSpace(comment))
@@ -888,30 +1180,33 @@ namespace GBCWorkHub.UI.ViewModels
         private PcAccessSectionViewModel CreateAccessSection(string title, IList<string> idValues, IList<string> pwValues)
         {
             var section = new PcAccessSectionViewModel(title);
-            if (idValues != null && idValues.Count > 0)
+            var idField = new PcCredentialFieldViewModel("ID", "ID");
+            if (idValues != null)
             {
-                var field = new PcCredentialFieldViewModel("ID", "ID");
                 for (int i = 0; i < idValues.Count; i++)
                 {
                     if (string.IsNullOrWhiteSpace(idValues[i]))
                         continue;
-                    field.Lines.Add(new PcCredentialLineViewModel(idValues[i].Trim(), CopyPcCredentialCommand));
+                    idField.Lines.Add(new PcCredentialLineViewModel(idValues[i].Trim(), CopyPcCredentialCommand));
                 }
-                if (field.Lines.Count > 0)
-                    section.Fields.Add(field);
             }
-            if (pwValues != null && pwValues.Count > 0)
+            if (idField.Lines.Count == 0)
+                idField.Lines.Add(new PcCredentialLineViewModel(string.Empty, CopyPcCredentialCommand));
+            section.Fields.Add(idField);
+
+            var pwField = new PcCredentialFieldViewModel("PW", "PW");
+            if (pwValues != null)
             {
-                var field = new PcCredentialFieldViewModel("PW", "PW");
                 for (int i = 0; i < pwValues.Count; i++)
                 {
                     if (string.IsNullOrWhiteSpace(pwValues[i]))
                         continue;
-                    field.Lines.Add(new PcCredentialLineViewModel(pwValues[i].Trim(), CopyPcCredentialCommand));
+                    pwField.Lines.Add(new PcCredentialLineViewModel(pwValues[i].Trim(), CopyPcCredentialCommand));
                 }
-                if (field.Lines.Count > 0)
-                    section.Fields.Add(field);
             }
+            if (pwField.Lines.Count == 0)
+                pwField.Lines.Add(new PcCredentialLineViewModel(string.Empty, CopyPcCredentialCommand));
+            section.Fields.Add(pwField);
             return section;
         }
 
@@ -956,6 +1251,9 @@ namespace GBCWorkHub.UI.ViewModels
                     RaisePropertyChanged("IsGalleryVisible");
                     RaisePropertyChanged("HeaderTitle");
                     SyncSiteShortcutSelection();
+                    var add = AddRemotePcCommand as RelayCommand;
+                    if (add != null)
+                        add.RaiseCanExecuteChanged();
                     if (_onSiteContextChanged != null)
                         _onSiteContextChanged();
                 }
@@ -2213,12 +2511,18 @@ namespace GBCWorkHub.UI.ViewModels
                 return;
             }
 
+            if (!await EnsureLoggedInForConnectAsync().ConfigureAwait(true))
+                return;
+
             await ConnectRemoteComputerAsync(item).ConfigureAwait(true);
         }
 
         private async Task ConnectRemoteComputerAsync(RemoteComputerItemViewModel item)
         {
             if (item == null)
+                return;
+
+            if (!await EnsureLoggedInForConnectAsync().ConfigureAwait(true))
                 return;
 
             SelectedRemoteComputer = item;
@@ -2349,6 +2653,51 @@ namespace GBCWorkHub.UI.ViewModels
             {
                 await ShowInfoPopupAsync("원격 접속", "상태 조회 실패: " + ex.Message).ConfigureAwait(true);
             }
+        }
+
+        public void RefreshConnectAuthUi()
+        {
+            if (RemoteComputers == null)
+                return;
+            foreach (var pc in RemoteComputers)
+            {
+                if (pc != null)
+                    pc.RefreshComputedUi();
+            }
+            RaisePropertyChanged("IsAdmin");
+            RaisePropertyChanged("ShowAdminDeletePcButton");
+            var add = AddRemotePcCommand as RelayCommand;
+            if (add != null)
+                add.RaiseCanExecuteChanged();
+            var del = DeleteRemotePcCommand as RelayCommand;
+            if (del != null)
+                del.RaiseCanExecuteChanged();
+        }
+
+        private async Task<bool> EnsureLoggedInForConnectAsync()
+        {
+            if (OccupancyNameStore.HasName)
+                return true;
+
+            if (_popup == null)
+            {
+                await ShowInfoPopupAsync("원격 접속", "로그인 후 접속할 수 있습니다.").ConfigureAwait(true);
+                return false;
+            }
+
+            bool ok = await OccupancyNamePrompt.LoginAsync(_popup).ConfigureAwait(true);
+            if (!ok || !OccupancyNameStore.HasName)
+                return false;
+
+            if (_notifyIdentityChanged != null)
+                _notifyIdentityChanged();
+            else
+                RefreshConnectAuthUi();
+
+            if (_onAuthSucceeded != null)
+                _onAuthSucceeded();
+
+            return true;
         }
 
         private async Task ShowInfoPopupAsync(string title, string message, PopupIconKind icon = PopupIconKind.Info)

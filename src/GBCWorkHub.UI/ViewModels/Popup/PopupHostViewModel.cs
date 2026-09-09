@@ -18,6 +18,17 @@ namespace GBCWorkHub.UI.ViewModels.Popup
         private bool _showAffiliationInput;
         private bool _requireAffiliation;
         private string _affiliationText;
+        private bool _showSecondaryInput;
+        private bool _requireSecondaryInput;
+        private string _secondaryInputLabel;
+        private string _secondaryInputText;
+        private bool _showPasswordInput;
+        private bool _requirePassword;
+        private string _passwordText;
+        private bool _showCurrentPasswordInput;
+        private string _currentPasswordText;
+        private bool _showPasswordConfirm;
+        private string _passwordConfirmText;
         private string _inputError;
         private string _infoIp;
         private string _infoWindowsAccount;
@@ -122,6 +133,128 @@ namespace GBCWorkHub.UI.ViewModels.Popup
             }
         }
 
+        public bool ShowSecondaryInput
+        {
+            get { return _showSecondaryInput; }
+            set { SetProperty(ref _showSecondaryInput, value); }
+        }
+
+        public bool RequireSecondaryInput
+        {
+            get { return _requireSecondaryInput; }
+            set { SetProperty(ref _requireSecondaryInput, value); }
+        }
+
+        public string SecondaryInputLabel
+        {
+            get { return _secondaryInputLabel; }
+            set { SetProperty(ref _secondaryInputLabel, value); }
+        }
+
+        public string SecondaryInputText
+        {
+            get { return _secondaryInputText; }
+            set
+            {
+                if (SetProperty(ref _secondaryInputText, value))
+                    InputError = null;
+            }
+        }
+
+        public bool ShowPasswordInput
+        {
+            get { return _showPasswordInput; }
+            set
+            {
+                if (SetProperty(ref _showPasswordInput, value))
+                {
+                    RaisePropertyChanged("HasInputSection");
+                    RaisePropertyChanged("ShowPromptFields");
+                    RaisePropertyChanged("PasswordFieldLabel");
+                    RaisePropertyChanged("ShowPasswordOptionalHint");
+                }
+            }
+        }
+
+        public bool RequirePassword
+        {
+            get { return _requirePassword; }
+            set
+            {
+                if (SetProperty(ref _requirePassword, value))
+                    RaisePropertyChanged("ShowPasswordOptionalHint");
+            }
+        }
+
+        /// <summary>선택 입력(비밀번호 미변경 허용)일 때만 "비워두면 변경 안 함" 안내를 보여준다.</summary>
+        public bool ShowPasswordOptionalHint
+        {
+            get { return ShowPasswordInput && !RequirePassword; }
+        }
+
+        /// <summary>PasswordBox is synced from code-behind (not two-way bindable).</summary>
+        public string PasswordText
+        {
+            get { return _passwordText; }
+            set
+            {
+                if (SetProperty(ref _passwordText, value))
+                    InputError = null;
+            }
+        }
+
+        public bool ShowCurrentPasswordInput
+        {
+            get { return _showCurrentPasswordInput; }
+            set
+            {
+                if (SetProperty(ref _showCurrentPasswordInput, value))
+                {
+                    RaisePropertyChanged("HasInputSection");
+                    RaisePropertyChanged("ShowPromptFields");
+                    RaisePropertyChanged("PasswordFieldLabel");
+                }
+            }
+        }
+
+        public string CurrentPasswordText
+        {
+            get { return _currentPasswordText; }
+            set
+            {
+                if (SetProperty(ref _currentPasswordText, value))
+                    InputError = null;
+            }
+        }
+
+        public string PasswordFieldLabel
+        {
+            get { return ShowCurrentPasswordInput ? "새 비밀번호" : "비밀번호"; }
+        }
+
+        public bool ShowPasswordConfirm
+        {
+            get { return _showPasswordConfirm; }
+            set
+            {
+                if (SetProperty(ref _showPasswordConfirm, value))
+                {
+                    RaisePropertyChanged("HasInputSection");
+                    RaisePropertyChanged("ShowPromptFields");
+                }
+            }
+        }
+
+        public string PasswordConfirmText
+        {
+            get { return _passwordConfirmText; }
+            set
+            {
+                if (SetProperty(ref _passwordConfirmText, value))
+                    InputError = null;
+            }
+        }
+
         public string InputError
         {
             get { return _inputError; }
@@ -174,7 +307,25 @@ namespace GBCWorkHub.UI.ViewModels.Popup
 
         public bool HasInputSection
         {
-            get { return ShowInput || HasPromptInfo; }
+            get
+            {
+                return ShowInput
+                    || ShowPasswordInput
+                    || ShowCurrentPasswordInput
+                    || ShowPasswordConfirm
+                    || HasPromptInfo;
+            }
+        }
+
+        public bool ShowPromptFields
+        {
+            get
+            {
+                return ShowInput
+                    || ShowPasswordInput
+                    || ShowCurrentPasswordInput
+                    || ShowPasswordConfirm;
+            }
         }
 
         public ObservableCollection<PopupButtonDefinition> Buttons
@@ -210,8 +361,51 @@ namespace GBCWorkHub.UI.ViewModels.Popup
 
         public bool TryAcceptInput()
         {
+            if (ShowCurrentPasswordInput)
+            {
+                if (string.IsNullOrEmpty(CurrentPasswordText))
+                {
+                    InputError = "현재 비밀번호를 입력해 주세요.";
+                    return false;
+                }
+            }
+
+            bool passwordProvided = ShowPasswordInput && !string.IsNullOrEmpty(PasswordText);
+
+            if (ShowPasswordInput && RequirePassword)
+            {
+                if (!passwordProvided)
+                {
+                    InputError = ShowCurrentPasswordInput
+                        ? "새 비밀번호를 입력해 주세요."
+                        : "비밀번호를 입력해 주세요.";
+                    return false;
+                }
+            }
+
+            if (passwordProvided && !IsAsciiLetterOrDigitOnly(PasswordText))
+            {
+                InputError = "비밀번호는 영문과 숫자만 사용할 수 있습니다.";
+                return false;
+            }
+
+            if (ShowPasswordConfirm && (RequirePassword || passwordProvided))
+            {
+                if (string.IsNullOrEmpty(PasswordConfirmText))
+                {
+                    InputError = "비밀번호 확인을 입력해 주세요.";
+                    return false;
+                }
+                if (!string.Equals(PasswordText ?? string.Empty, PasswordConfirmText ?? string.Empty, System.StringComparison.Ordinal))
+                {
+                    InputError = "비밀번호가 일치하지 않습니다.";
+                    return false;
+                }
+            }
+
             if (!ShowInput)
                 return true;
+
             if (ShowAffiliationInput)
             {
                 string affiliation = AffiliationText != null ? AffiliationText.Trim() : string.Empty;
@@ -222,13 +416,36 @@ namespace GBCWorkHub.UI.ViewModels.Popup
                 }
                 AffiliationText = affiliation;
             }
+            if (ShowSecondaryInput)
+            {
+                string secondary = SecondaryInputText != null ? SecondaryInputText.Trim() : string.Empty;
+                if (RequireSecondaryInput && string.IsNullOrWhiteSpace(secondary))
+                {
+                    InputError = (SecondaryInputLabel ?? "값") + "을(를) 입력해 주세요.";
+                    return false;
+                }
+                SecondaryInputText = secondary;
+            }
             string name = InputText != null ? InputText.Trim() : string.Empty;
             if (string.IsNullOrWhiteSpace(name))
             {
-                InputError = "사용자명을 입력해 주세요.";
+                InputError = "이름을 입력해 주세요.";
                 return false;
             }
             InputText = name;
+            return true;
+        }
+
+        private static bool IsAsciiLetterOrDigitOnly(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return false;
+            for (int i = 0; i < value.Length; i++)
+            {
+                char c = value[i];
+                if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')))
+                    return false;
+            }
             return true;
         }
 
@@ -252,6 +469,17 @@ namespace GBCWorkHub.UI.ViewModels.Popup
             ShowAffiliationInput = request.ShowAffiliationInput;
             RequireAffiliation = request.RequireAffiliation;
             AffiliationText = request.AffiliationText ?? string.Empty;
+            ShowSecondaryInput = request.ShowSecondaryInput;
+            RequireSecondaryInput = request.RequireSecondaryInput;
+            SecondaryInputLabel = request.SecondaryInputLabel ?? string.Empty;
+            SecondaryInputText = request.SecondaryInputText ?? string.Empty;
+            ShowPasswordInput = request.ShowPasswordInput;
+            RequirePassword = request.RequirePassword;
+            PasswordText = request.PasswordText ?? string.Empty;
+            ShowCurrentPasswordInput = request.ShowCurrentPasswordInput;
+            CurrentPasswordText = request.CurrentPasswordText ?? string.Empty;
+            ShowPasswordConfirm = request.ShowPasswordConfirm;
+            PasswordConfirmText = request.PasswordConfirmText ?? string.Empty;
             InputError = null;
             InfoIp = request.InfoIp ?? string.Empty;
             InfoWindowsAccount = request.InfoWindowsAccount ?? string.Empty;

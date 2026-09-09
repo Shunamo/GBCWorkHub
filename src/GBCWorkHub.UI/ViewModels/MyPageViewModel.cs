@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using GBCWorkHub.BIZ;
+using GBCWorkHub.DTO;
 using GBCWorkHub.DTO.WorkLog;
 using GBCWorkHub.UI.Services;
 using GBCWorkHub.UI.Services.TfsSync;
@@ -25,6 +26,7 @@ namespace GBCWorkHub.UI.ViewModels
         private readonly WorkLogListViewModel _workLogList;
         private readonly Action<WorkLogListItemViewModel> _openWorkLog;
         private readonly Func<Task> _changeName;
+        private readonly Func<Task> _changePassword;
         private readonly WorkLogPersistenceService _persistence =
             new WorkLogPersistenceService(new GBCWorkHub.BIZ.WorkLog.WorkLogBiz());
         private readonly RemotePcShareBiz _share = new RemotePcShareBiz();
@@ -52,17 +54,18 @@ namespace GBCWorkHub.UI.ViewModels
         private int _draftEndMinute;
         private DateTime? _appliedFrom;
         private DateTime? _appliedTo;
-
         public MyPageViewModel(
             WorkLogListViewModel workLogList,
             Action<WorkLogListItemViewModel> openWorkLog,
-            Func<Task> changeName = null)
+            Func<Task> changeName = null,
+            Func<Task> changePassword = null)
         {
             if (workLogList == null)
                 throw new ArgumentNullException("workLogList");
             _workLogList = workLogList;
             _openWorkLog = openWorkLog;
             _changeName = changeName;
+            _changePassword = changePassword;
             WorkLogs = new ObservableCollection<WorkLogListItemViewModel>();
             WorkLogDateGroups = new ObservableCollection<WorkLogDateGroupViewModel>();
             Sessions = new ObservableCollection<RemotePcUsageLogItemViewModel>();
@@ -71,6 +74,7 @@ namespace GBCWorkHub.UI.ViewModels
             OpenWorkLogCommand = new RelayCommand<WorkLogListItemViewModel>(OpenWorkLog);
             OpenAllWorkLogsCommand = new RelayCommand(OpenAllWorkLogs);
             ChangeNameCommand = new RelayCommand(() => { var ignored = ChangeNameAsync(); });
+            ChangePasswordCommand = new RelayCommand(() => { var ignored = ChangePasswordAsync(); }, () => _changePassword != null && IsLoggedIn);
             CloseInboxCommand = new RelayCommand(() => { });
             SelectSharedSiteCommand = new RelayCommand<string>(SelectSharedSite);
             ToggleExpandCommand = new RelayCommand<string>(ToggleExpand);
@@ -118,6 +122,7 @@ namespace GBCWorkHub.UI.ViewModels
         public ICommand OpenWorkLogCommand { get; private set; }
         public ICommand OpenAllWorkLogsCommand { get; private set; }
         public ICommand ChangeNameCommand { get; private set; }
+        public ICommand ChangePasswordCommand { get; private set; }
         public ICommand CloseInboxCommand { get; private set; }
         public ICommand SelectSharedSiteCommand { get; private set; }
         public ICommand ToggleExpandCommand { get; private set; }
@@ -305,6 +310,11 @@ namespace GBCWorkHub.UI.ViewModels
         public bool IsReady
         {
             get { return !IsLoading; }
+        }
+
+        public bool IsLoggedIn
+        {
+            get { return OccupancyNameStore.HasName; }
         }
 
         public string OccupancyDisplayName
@@ -514,6 +524,10 @@ namespace GBCWorkHub.UI.ViewModels
             RaisePropertyChanged("OccupancyDisplayName");
             RaisePropertyChanged("OccupancyInitial");
             RaisePropertyChanged("OccupancySubtext");
+            RaisePropertyChanged("IsLoggedIn");
+            var changePassword = ChangePasswordCommand as RelayCommand;
+            if (changePassword != null)
+                changePassword.RaiseCanExecuteChanged();
         }
 
         public async Task ReloadAsync()
@@ -555,7 +569,9 @@ namespace GBCWorkHub.UI.ViewModels
                 AuthorName = string.IsNullOrWhiteSpace(WorkHubUserProfile.OccupancyName)
                     ? null
                     : WorkHubUserProfile.OccupancyName,
-                AuthorLocalPcIp = string.IsNullOrWhiteSpace(WorkHubUserProfile.LocalIp)
+                // Logged-in: do not OR-match same PC IP (other users on this machine).
+                AuthorLocalPcIp = OccupancyNameStore.HasName
+                    || string.IsNullOrWhiteSpace(WorkHubUserProfile.LocalIp)
                     ? null
                     : WorkHubUserProfile.LocalIp
             };
@@ -1195,6 +1211,13 @@ namespace GBCWorkHub.UI.ViewModels
             if (_changeName == null)
                 return;
             await _changeName().ConfigureAwait(true);
+        }
+
+        private async Task ChangePasswordAsync()
+        {
+            if (_changePassword == null)
+                return;
+            await _changePassword().ConfigureAwait(true);
         }
 
         private void OpenWorkLog(WorkLogListItemViewModel item)

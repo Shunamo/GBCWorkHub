@@ -141,6 +141,21 @@ namespace GBCWorkHub.BIZ
             return _repository.ReleaseAsync(remoteIp, sessionToken, endSource);
         }
 
+        /// <summary>관리자: 점유 강제 해제 (세션 토큰 필요).</summary>
+        public async Task<string> ForceReleaseForAdminAsync(string remoteIp, string sessionToken)
+        {
+            if (!OccupancyNameStore.IsAdmin)
+                return "관리자만 사용할 수 있습니다.";
+            if (string.IsNullOrWhiteSpace(remoteIp))
+                return "원격 PC를 지정해 주세요.";
+            if (string.IsNullOrWhiteSpace(sessionToken))
+                return "세션 토큰이 없어 해제할 수 없습니다.";
+
+            bool ok = await ReleaseAsync(remoteIp.Trim(), sessionToken.Trim(), "ADMIN_FORCE")
+                .ConfigureAwait(false);
+            return ok ? null : "점유 해제에 실패했습니다. 이미 해제됐거나 상태가 바뀌었습니다.";
+        }
+
         public Task<bool> MarkCheckRequiredAsync(string remoteIp, string sessionToken)
         {
             return _repository.MarkCheckRequiredAsync(remoteIp, sessionToken);
@@ -161,8 +176,23 @@ namespace GBCWorkHub.BIZ
             int fetch = take <= 0 ? 20 : take;
             if (fetch > 200)
                 fetch = 200;
+
+            // Logged-in: query by app login id only (not Windows account / machine name).
+            string occupancy = OccupancyNameStore.TryGet();
+            if (!string.IsNullOrWhiteSpace(occupancy))
+            {
+                return _repository.GetRecentUsageLogsForOccupantAsync(
+                    occupancy,
+                    null,
+                    null,
+                    null,
+                    fetch,
+                    fromAt,
+                    toAt);
+            }
+
             return _repository.GetRecentUsageLogsForOccupantAsync(
-                OccupancyNameStore.TryGet(),
+                null,
                 LocalWindowsAccount,
                 Environment.UserName,
                 LocalClientPc,
@@ -209,6 +239,45 @@ namespace GBCWorkHub.BIZ
                 _lastPurgeUtc = DateTime.UtcNow;
             }
             return _repository.PurgeUsageLogsOlderThanMonthsAsync(1);
+        }
+
+        /// <summary>관리자: 전체 접속 이력 조회.</summary>
+        public Task<IList<RemotePcUsageLogDto>> GetUsageLogsForAdminAsync(string search, int take)
+        {
+            if (!OccupancyNameStore.IsAdmin)
+                return Task.FromResult((IList<RemotePcUsageLogDto>)new List<RemotePcUsageLogDto>());
+            return _repository.GetUsageLogsForAdminAsync(search, take);
+        }
+
+        /// <summary>관리자: 접속 이력 수정.</summary>
+        public async Task<string> UpdateUsageLogForAdminAsync(
+            long logId,
+            string accessUserId,
+            string sessionStatus,
+            DateTime? endedAt,
+            string resultMessage)
+        {
+            if (!OccupancyNameStore.IsAdmin)
+                return "관리자만 사용할 수 있습니다.";
+            if (logId <= 0)
+                return "이력을 지정해 주세요.";
+
+            bool ok = await _repository.UpdateUsageLogForAdminAsync(
+                    logId, accessUserId, sessionStatus, endedAt, resultMessage)
+                .ConfigureAwait(false);
+            return ok ? null : "접속 이력 수정에 실패했습니다.";
+        }
+
+        /// <summary>관리자: 접속 이력 삭제.</summary>
+        public async Task<string> DeleteUsageLogForAdminAsync(long logId)
+        {
+            if (!OccupancyNameStore.IsAdmin)
+                return "관리자만 사용할 수 있습니다.";
+            if (logId <= 0)
+                return "이력을 지정해 주세요.";
+
+            bool ok = await _repository.DeleteUsageLogForAdminAsync(logId).ConfigureAwait(false);
+            return ok ? null : "접속 이력 삭제에 실패했습니다.";
         }
     }
 }
