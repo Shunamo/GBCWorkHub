@@ -106,6 +106,7 @@ jobs:
           name: GBCWorkHub ${{ steps.ver.outputs.tag }}
           files: |
             artifacts/release/GBCWorkHub-${{ steps.ver.outputs.tag }}.zip
+            artifacts/release/GBCWorkHub-SiteSetup-${{ steps.ver.outputs.tag }}.zip
             artifacts/release/version.json
           generate_release_notes: true
           fail_on_unmatched_files: true

@@ -79,3 +79,14 @@ Write-Host "Manifest $manifestPath"
 
 Copy-Item $uiExe (Join-Path $out "GBCWorkHub.UI.exe")
 Copy-Item $updaterExe (Join-Path $out "GBCWorkHubUpdater.exe")
+
+# 사이트별 SessionAgent 설치 스크립트 — 앱 자동 업데이트 zip과는 별개로,
+# 릴리즈에 부가 자산으로 첨부한다 (IT 담당자가 사이트 PC 설치 시 다운로드).
+$siteSetupDir = Join-Path $root "tools\site-setup"
+if (Test-Path $siteSetupDir) {
+    $siteSetupZipName = "GBCWorkHub-SiteSetup-$tag.zip"
+    $siteSetupZipPath = Join-Path $out $siteSetupZipName
+    if (Test-Path $siteSetupZipPath) { Remove-Item $siteSetupZipPath -Force }
+    [System.IO.Compression.ZipFile]::CreateFromDirectory($siteSetupDir, $siteSetupZipPath)
+    Write-Host "Packed $siteSetupZipPath"
+}
