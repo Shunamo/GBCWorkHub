@@ -11,6 +11,8 @@
                 <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogGlassStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
+            <!-- 노션 스타일 세모 토글 — 이전엔 헤더의 ON/OFF 스위치와 같은 모양이었는데,
+                 여닫는 느낌이 드는 세모 화살표(펼치면 아래, 접으면 오른쪽) 방식으로 바꿔달라는 요청. -->
             <Style x:Key="CheckinMessageSwitch" TargetType="ToggleButton">
                 <Setter Property="Cursor" Value="Hand" />
                 <Setter Property="Focusable" Value="False" />
@@ -22,36 +24,21 @@
                     <Setter.Value>
                         <ControlTemplate TargetType="ToggleButton">
                             <StackPanel Orientation="Horizontal" Background="Transparent">
-                                <TextBlock Text="Check-in message"
-                                           FontSize="{StaticResource FontSize.Sm}"
+                                <Image x:Name="Chevron" Source="{StaticResource ExpandRightIcon}"
+                                       Width="9" Height="9" Opacity="0.6"
+                                       VerticalAlignment="Center" Margin="0,0,3,0" />
+                                <TextBlock Text="TFS 체크인 메시지"
+                                           FontSize="{StaticResource FontSize.Xs}"
                                            FontWeight="SemiBold"
                                            Foreground="#64748B"
-                                           VerticalAlignment="Center"
-                                           Margin="0,0,8,0" />
-                                <Grid Width="36" Height="20" VerticalAlignment="Center">
-                                    <Border x:Name="Track"
-                                            CornerRadius="10"
-                                            Background="#D1D5DB"
-                                            SnapsToDevicePixels="True" />
-                                    <Ellipse x:Name="Thumb"
-                                             Width="16" Height="16"
-                                             Fill="White"
-                                             HorizontalAlignment="Left"
-                                             Margin="2,0,0,0">
-                                        <Ellipse.Effect>
-                                            <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.18" Color="#1E293B" />
-                                        </Ellipse.Effect>
-                                    </Ellipse>
-                                </Grid>
+                                           VerticalAlignment="Center" />
                             </StackPanel>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsChecked" Value="True">
-                                    <Setter TargetName="Track" Property="Background" Value="#4F67D8" />
-                                    <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right" />
-                                    <Setter TargetName="Thumb" Property="Margin" Value="0,0,2,0" />
+                                    <Setter TargetName="Chevron" Property="Source" Value="{StaticResource ExpandDownIcon}" />
                                 </Trigger>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Opacity" Value="0.92" />
+                                    <Setter Property="Opacity" Value="0.85" />
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -785,17 +772,9 @@
                                                Visibility="{Binding HasHeaderComment, Converter={StaticResource BoolToVis}}" />
                                     <ToggleButton Style="{StaticResource CheckinMessageSwitch}"
                                                   IsChecked="{Binding ShowTfsOriginal, Mode=TwoWay}"
-                                                  Margin="0,0,0,14"
-                                                  Visibility="{Binding HasChangeset, Converter={StaticResource BoolToVis}}"
-                                                  ToolTip="TFS 체크인 메시지" />
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding DetailPersonMeta}" FontSize="{StaticResource FontSize.Base}" Foreground="#64748B"
-                                                   VerticalAlignment="Center" />
-                                        <Border Width="1" Height="12" Background="#E2E8F0" Margin="12,0" VerticalAlignment="Center" />
-                                        <TextBlock Text="{Binding DetailPeriodMeta}" FontSize="{StaticResource FontSize.Base}" Foreground="#64748B"
-                                                   VerticalAlignment="Center" />
-                                    </StackPanel>
-                                    <StackPanel Margin="0,8,0,0"
+                                                  Margin="0,0,0,6"
+                                                  Visibility="{Binding HasChangeset, Converter={StaticResource BoolToVis}}" />
+                                    <StackPanel Margin="0,0,0,14"
                                                 Visibility="{Binding ShowTfsOriginal, Converter={StaticResource BoolToVis}}">
                                         <TextBlock FontSize="{StaticResource FontSize.Base}" Foreground="#94A3B8">
                                             <Run Text="{Binding ChangesetDisplay, Mode=OneWay}" FontWeight="SemiBold" />
@@ -806,6 +785,13 @@
                                                    FontSize="{StaticResource FontSize.Base}" Foreground="#475569"
                                                    TextWrapping="Wrap" Margin="0,6,0,0"
                                                    Visibility="{Binding HasOriginalTfsComment, Converter={StaticResource BoolToVis}}" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding DetailPersonMeta}" FontSize="{StaticResource FontSize.Base}" Foreground="#64748B"
+                                                   VerticalAlignment="Center" />
+                                        <Border Width="1" Height="12" Background="#E2E8F0" Margin="12,0" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding DetailPeriodMeta}" FontSize="{StaticResource FontSize.Base}" Foreground="#64748B"
+                                                   VerticalAlignment="Center" />
                                     </StackPanel>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top"

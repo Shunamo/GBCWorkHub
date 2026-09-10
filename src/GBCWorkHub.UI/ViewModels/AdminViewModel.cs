@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using System.Windows.Threading;
 using GBCWorkHub.BIZ;
 using GBCWorkHub.BIZ.WorkLog;
 using GBCWorkHub.DTO;
@@ -19,10 +20,20 @@ public sealed class AdminViewModel : ViewModelBase
 	private Action<WorkLogListItemViewModel> _openWorkLog;
 	private WorkLogListViewModel _workLogListHost;
 
-	private DateTime _calendarMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+	private DateTime _calendarMonth = new DateTime(KoreaTime.Today.Year, KoreaTime.Today.Month, 1);
 	private DateTime? _draftStartDate;
 	private DateTime? _draftEndDate;
 	private bool _isWorkLogDatePickerOpen;
+
+	private DateTime _usageLogCalendarMonth = new DateTime(KoreaTime.Today.Year, KoreaTime.Today.Month, 1);
+	private DateTime? _usageLogDraftStartDate;
+	private DateTime? _usageLogDraftEndDate;
+	private DateTime? _usageLogFilterFrom;
+	private DateTime? _usageLogFilterTo;
+	private bool _isUsageLogDatePickerOpen;
+	/// <summary>접속 이력 탭을 보고 있는 동안만 주기적으로 새로고침 — "사용 중" 상태가
+	/// 실시간으로 갱신되고, 새로 시작된 세션도 곧바로 목록에 나타나게 한다.</summary>
+	private DispatcherTimer _usageLogRefreshTimer;
 
 	private string _selectedSection = "Pcs";
 
@@ -73,6 +84,8 @@ public sealed class AdminViewModel : ViewModelBase
 	private string _adminDraftExtraPw = string.Empty;
 
 	private string _adminDraftPcComment = string.Empty;
+
+	private bool _adminDraftAgentInstalled;
 
 	private string _adminOriginalPcName;
 
@@ -199,6 +212,22 @@ public sealed class AdminViewModel : ViewModelBase
 	public ICommand ApplyWorkLogDateFilterCommand { get; private set; }
 
 	public ICommand ClearWorkLogDateFilterCommand { get; private set; }
+
+	public ICommand OpenUsageLogDatePickerCommand { get; private set; }
+
+	public ICommand CloseUsageLogDatePickerCommand { get; private set; }
+
+	public ICommand PrevUsageLogCalendarMonthCommand { get; private set; }
+
+	public ICommand NextUsageLogCalendarMonthCommand { get; private set; }
+
+	public ICommand SelectUsageLogCalendarDayCommand { get; private set; }
+
+	public ICommand ApplyUsageLogDateFilterCommand { get; private set; }
+
+	public ICommand ClearUsageLogDateFilterCommand { get; private set; }
+
+	public ObservableCollection<CalendarDayItem> UsageLogCalendarDays { get; private set; }
 
 	public WorkLogListViewModel WorkLogListHost
 	{
@@ -426,6 +455,36 @@ public sealed class AdminViewModel : ViewModelBase
 				&& !string.IsNullOrWhiteSpace(WorkLogListHost.FilterFromText)
 				&& !string.IsNullOrWhiteSpace(WorkLogListHost.FilterToText);
 		}
+	}
+
+	public bool IsUsageLogDatePickerOpen
+	{
+		get { return _isUsageLogDatePickerOpen; }
+		private set
+		{
+			if (SetProperty(ref _isUsageLogDatePickerOpen, value, "IsUsageLogDatePickerOpen"))
+				RaisePropertyChanged("UsageLogDateChipText");
+		}
+	}
+
+	public string UsageLogCalendarMonthTitle
+	{
+		get { return _usageLogCalendarMonth.ToString("yyyy년 M월"); }
+	}
+
+	public string UsageLogDateChipText
+	{
+		get
+		{
+			if (_usageLogFilterFrom.HasValue && _usageLogFilterTo.HasValue)
+				return _usageLogFilterFrom.Value.ToString("yyyy-MM-dd") + " ~ " + _usageLogFilterTo.Value.ToString("yyyy-MM-dd");
+			return "기간";
+		}
+	}
+
+	public bool HasUsageLogDateFilter
+	{
+		get { return _usageLogFilterFrom.HasValue && _usageLogFilterTo.HasValue; }
 	}
 
 	public string AdminStatusMessage
@@ -851,6 +910,18 @@ public sealed class AdminViewModel : ViewModelBase
 		}
 	}
 
+	public bool AdminDraftAgentInstalled
+	{
+		get
+		{
+			return _adminDraftAgentInstalled;
+		}
+		set
+		{
+			SetProperty(ref _adminDraftAgentInstalled, value, "AdminDraftAgentInstalled");
+		}
+	}
+
 	public bool SuppressPcListSelection => _suppressPcListSelection;
 
 	public AdminViewModel()
@@ -865,6 +936,7 @@ public sealed class AdminViewModel : ViewModelBase
 		WorkLogs = new ObservableCollection<AdminWorkLogItemViewModel>();
 		WorkLogSiteGroups = new ObservableCollection<AdminWorkLogSiteGroupViewModel>();
 		WorkLogCalendarDays = new ObservableCollection<CalendarDayItem>();
+		UsageLogCalendarDays = new ObservableCollection<CalendarDayItem>();
 		UsageLogSites = CreateSiteChips();
 		WorkLogSites = CreateSiteChips();
 		AdminPcSites = new ObservableCollection<AdminSiteChipItemViewModel>
@@ -929,6 +1001,7 @@ public sealed class AdminViewModel : ViewModelBase
 				AdminDraftExtraPw = string.Empty;
 				AdminDraftPcDomain = string.Empty;
 				AdminDraftPcComment = string.Empty;
+				AdminDraftAgentInstalled = false;
 			}
 			AdminPcStatusMessage = string.Empty;
 			ApplyPcFilter();
@@ -993,6 +1066,21 @@ public sealed class AdminViewModel : ViewModelBase
 		ApplyWorkLogDateFilterCommand = new RelayCommand(ApplyWorkLogDateFilter);
 		ClearWorkLogDateFilterCommand = new RelayCommand(ClearWorkLogDateFilter);
 		RebuildWorkLogCalendarDays();
+
+		OpenUsageLogDatePickerCommand = new RelayCommand(OpenUsageLogDatePicker);
+		CloseUsageLogDatePickerCommand = new RelayCommand(() => IsUsageLogDatePickerOpen = false);
+		PrevUsageLogCalendarMonthCommand = new RelayCommand(PrevUsageLogCalendarMonth);
+		NextUsageLogCalendarMonthCommand = new RelayCommand(NextUsageLogCalendarMonth);
+		SelectUsageLogCalendarDayCommand = new RelayCommand<DateTime>(SelectUsageLogCalendarDay);
+		ApplyUsageLogDateFilterCommand = new RelayCommand(ApplyUsageLogDateFilter);
+		ClearUsageLogDateFilterCommand = new RelayCommand(ClearUsageLogDateFilter);
+		RebuildUsageLogCalendarDays();
+
+		_usageLogRefreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
+		_usageLogRefreshTimer.Tick += delegate
+		{
+			Task task = ReloadUsageLogsAsync();
+		};
 	}
 
 	private static ObservableCollection<AdminSiteChipItemViewModel> CreateSiteChips()
@@ -1095,6 +1183,7 @@ public sealed class AdminViewModel : ViewModelBase
 		AdminDraftExtraPw = string.Empty;
 		AdminDraftPcDomain = string.Empty;
 		AdminDraftPcComment = string.Empty;
+		AdminDraftAgentInstalled = false;
 	}
 
 	public void EnterShell()
@@ -1106,6 +1195,8 @@ public sealed class AdminViewModel : ViewModelBase
 
 	public void LeaveShell()
 	{
+		if (_usageLogRefreshTimer != null)
+			_usageLogRefreshTimer.Stop();
 		_allUsers.Clear();
 		_allPcs.Clear();
 		_allOccupancies.Clear();
@@ -1178,6 +1269,11 @@ public sealed class AdminViewModel : ViewModelBase
 					Task task6 = WorkLogListHost.ReloadFromDbAsync(true);
 				}
 			}
+
+			if (IsUsageLogsSection && _usageLogRefreshTimer != null)
+				_usageLogRefreshTimer.Start();
+			else if (_usageLogRefreshTimer != null)
+				_usageLogRefreshTimer.Stop();
 		}
 	}
 
@@ -1497,6 +1593,7 @@ public sealed class AdminViewModel : ViewModelBase
 		AdminDraftPcIp = item.PcIp;
 		AdminDraftShareKey = item.ShareKey;
 		AdminDraftTeamName = item.TeamName;
+		AdminDraftAgentInstalled = item.AgentInstalled;
 		LoadAccessDraftFromPc(item);
 		AdminPcStatusMessage = string.Empty;
 		for (int i = 0; i < AdminPcs.Count; i++)
@@ -1661,6 +1758,7 @@ public sealed class AdminViewModel : ViewModelBase
 		AdminDraftExtraPw = string.Empty;
 		AdminDraftPcDomain = string.Empty;
 		AdminDraftPcComment = string.Empty;
+		AdminDraftAgentInstalled = false;
 		AdminPcStatusMessage = string.Empty;
 		for (int i = 0; i < AdminPcs.Count; i++)
 		{
@@ -1687,6 +1785,7 @@ public sealed class AdminViewModel : ViewModelBase
 		AdminDraftExtraPw = string.Empty;
 		AdminDraftPcDomain = string.Empty;
 		AdminDraftPcComment = string.Empty;
+		AdminDraftAgentInstalled = false;
 	}
 
 	private async Task SaveAdminPcAsync()
@@ -1748,7 +1847,8 @@ public sealed class AdminViewModel : ViewModelBase
 			TeamName = team,
 			PcDomain = AdminDraftPcDomain,
 			PcNote = note,
-			PcComment = AdminDraftPcComment
+			PcComment = AdminDraftPcComment,
+			AgentInstalled = AdminDraftAgentInstalled
 		};
 		string err = await Task.Run(() => new DirectoryBiz().UpsertPcMapForAdmin(map, _adminOriginalPcName)).ConfigureAwait(continueOnCapturedContext: true);
 		if (!string.IsNullOrWhiteSpace(err))
@@ -2127,6 +2227,8 @@ public sealed class AdminViewModel : ViewModelBase
 				continue;
 			if (!MatchesSiteFilter(row.SiteCode, siteFilter))
 				continue;
+			if (!MatchesUsageLogDateFilter(row))
+				continue;
 			matched.Add(row);
 			UsageLogs.Add(row);
 		}
@@ -2155,12 +2257,32 @@ public sealed class AdminViewModel : ViewModelBase
 		if (matched == null || matched.Count == 0)
 			return;
 
+		bool isAllSites = string.IsNullOrWhiteSpace(UsageLogSiteFilter)
+			|| string.Equals(UsageLogSiteFilter, "ALL", StringComparison.OrdinalIgnoreCase);
+
+		if (isAllSites)
+		{
+			// "전체" 선택 시에는 사이트별로 묶지 않고 시간순 하나의 목록으로 보여준다 —
+			// 각 항목의 사이트는 카드에 작은 라벨(ShowSiteBadge)로만 표시한다.
+			for (int i = 0; i < matched.Count; i++)
+			{
+				if (matched[i] != null)
+					matched[i].ShowSiteBadge = true;
+			}
+			var flatGroup = new AdminUsageLogSiteGroupViewModel(null) { ShowHeader = false };
+			BuildUsageLogDateGroups(matched, flatGroup.DateGroups);
+			if (flatGroup.DateGroups.Count > 0)
+				UsageLogSiteGroups.Add(flatGroup);
+			return;
+		}
+
 		var bySite = new Dictionary<string, List<AdminUsageLogItemViewModel>>(StringComparer.OrdinalIgnoreCase);
 		for (int i = 0; i < matched.Count; i++)
 		{
 			AdminUsageLogItemViewModel row = matched[i];
 			if (row == null)
 				continue;
+			row.ShowSiteBadge = false;
 			string site = NormalizeSiteKey(row.SiteCode);
 			List<AdminUsageLogItemViewModel> list;
 			if (!bySite.TryGetValue(site, out list))
@@ -2177,39 +2299,51 @@ public sealed class AdminViewModel : ViewModelBase
 		{
 			string site = sites[s];
 			var siteGroup = new AdminUsageLogSiteGroupViewModel(site);
-			List<AdminUsageLogItemViewModel> rows = bySite[site];
-			var byDate = new Dictionary<DateTime, AdminUsageLogDateGroupViewModel>();
-			AdminUsageLogDateGroupViewModel unknown = null;
-			for (int i = 0; i < rows.Count; i++)
-			{
-				AdminUsageLogItemViewModel row = rows[i];
-				if (row == null)
-					continue;
-				if (!row.RequestedAt.HasValue)
-				{
-					if (unknown == null)
-						unknown = new AdminUsageLogDateGroupViewModel(null);
-					unknown.Items.Add(row);
-					continue;
-				}
-				DateTime day = row.RequestedAt.Value.Date;
-				AdminUsageLogDateGroupViewModel dayGroup;
-				if (!byDate.TryGetValue(day, out dayGroup))
-				{
-					dayGroup = new AdminUsageLogDateGroupViewModel(day);
-					byDate[day] = dayGroup;
-				}
-				dayGroup.Items.Add(row);
-			}
-
-			List<DateTime> days = new List<DateTime>(byDate.Keys);
-			days.Sort((a, b) => b.CompareTo(a));
-			for (int d = 0; d < days.Count; d++)
-				siteGroup.DateGroups.Add(byDate[days[d]]);
-			if (unknown != null && unknown.Items.Count > 0)
-				siteGroup.DateGroups.Add(unknown);
+			BuildUsageLogDateGroups(bySite[site], siteGroup.DateGroups);
 			UsageLogSiteGroups.Add(siteGroup);
 		}
+	}
+
+	private static void BuildUsageLogDateGroups(List<AdminUsageLogItemViewModel> rows, ObservableCollection<AdminUsageLogDateGroupViewModel> target)
+	{
+		var byDate = new Dictionary<DateTime, AdminUsageLogDateGroupViewModel>();
+		AdminUsageLogDateGroupViewModel unknown = null;
+		for (int i = 0; i < rows.Count; i++)
+		{
+			AdminUsageLogItemViewModel row = rows[i];
+			if (row == null)
+				continue;
+			if (!row.RequestedAt.HasValue)
+			{
+				if (unknown == null)
+					unknown = new AdminUsageLogDateGroupViewModel(null);
+				unknown.Items.Add(row);
+				continue;
+			}
+			DateTime day = row.RequestedAt.Value.Date;
+			AdminUsageLogDateGroupViewModel dayGroup;
+			if (!byDate.TryGetValue(day, out dayGroup))
+			{
+				dayGroup = new AdminUsageLogDateGroupViewModel(day);
+				byDate[day] = dayGroup;
+			}
+			dayGroup.Items.Add(row);
+		}
+
+		List<DateTime> days = new List<DateTime>(byDate.Keys);
+		days.Sort((a, b) => b.CompareTo(a));
+		for (int d = 0; d < days.Count; d++)
+		{
+			AdminUsageLogDateGroupViewModel dayGroup = byDate[days[d]];
+			List<AdminUsageLogItemViewModel> ordered = new List<AdminUsageLogItemViewModel>(dayGroup.Items);
+			ordered.Sort((a, b) => Nullable.Compare(b.RequestedAt, a.RequestedAt));
+			dayGroup.Items.Clear();
+			for (int k = 0; k < ordered.Count; k++)
+				dayGroup.Items.Add(ordered[k]);
+			target.Add(dayGroup);
+		}
+		if (unknown != null && unknown.Items.Count > 0)
+			target.Add(unknown);
 	}
 
 	private void SelectUsageLog(AdminUsageLogItemViewModel item)
@@ -2423,7 +2557,7 @@ public sealed class AdminViewModel : ViewModelBase
 				Date = d,
 				DayText = currentMonth ? d.Day.ToString() : string.Empty,
 				IsCurrentMonth = currentMonth,
-				IsToday = currentMonth && d.Date == DateTime.Today,
+				IsToday = currentMonth && d.Date == KoreaTime.Today,
 				IsSunday = d.DayOfWeek == DayOfWeek.Sunday,
 				IsSaturday = d.DayOfWeek == DayOfWeek.Saturday,
 				IsRangeStart = isStart,
@@ -2435,6 +2569,125 @@ public sealed class AdminViewModel : ViewModelBase
 			});
 		}
 		RaisePropertyChanged("WorkLogCalendarMonthTitle");
+	}
+
+	private void OpenUsageLogDatePicker()
+	{
+		_usageLogDraftStartDate = _usageLogFilterFrom;
+		_usageLogDraftEndDate = _usageLogFilterTo ?? _usageLogFilterFrom;
+		if (_usageLogDraftStartDate.HasValue)
+			_usageLogCalendarMonth = new DateTime(_usageLogDraftStartDate.Value.Year, _usageLogDraftStartDate.Value.Month, 1);
+		RebuildUsageLogCalendarDays();
+		IsUsageLogDatePickerOpen = true;
+	}
+
+	private void PrevUsageLogCalendarMonth()
+	{
+		_usageLogCalendarMonth = _usageLogCalendarMonth.AddMonths(-1);
+		RaisePropertyChanged("UsageLogCalendarMonthTitle");
+		RebuildUsageLogCalendarDays();
+	}
+
+	private void NextUsageLogCalendarMonth()
+	{
+		_usageLogCalendarMonth = _usageLogCalendarMonth.AddMonths(1);
+		RaisePropertyChanged("UsageLogCalendarMonthTitle");
+		RebuildUsageLogCalendarDays();
+	}
+
+	private void SelectUsageLogCalendarDay(DateTime day)
+	{
+		DateTime d = day.Date;
+		if (!_usageLogDraftStartDate.HasValue || (_usageLogDraftStartDate.HasValue && _usageLogDraftEndDate.HasValue))
+		{
+			_usageLogDraftStartDate = d;
+			_usageLogDraftEndDate = null;
+		}
+		else if (d < _usageLogDraftStartDate.Value.Date)
+		{
+			_usageLogDraftEndDate = _usageLogDraftStartDate;
+			_usageLogDraftStartDate = d;
+		}
+		else
+		{
+			_usageLogDraftEndDate = d;
+		}
+		RebuildUsageLogCalendarDays();
+	}
+
+	private void ApplyUsageLogDateFilter()
+	{
+		if (!_usageLogDraftStartDate.HasValue)
+			return;
+		DateTime start = _usageLogDraftStartDate.Value.Date;
+		DateTime end = (_usageLogDraftEndDate ?? _usageLogDraftStartDate).Value.Date;
+		if (end < start)
+		{
+			DateTime swap = start;
+			start = end;
+			end = swap;
+		}
+		_usageLogFilterFrom = start;
+		_usageLogFilterTo = end;
+		IsUsageLogDatePickerOpen = false;
+		RaisePropertyChanged("UsageLogDateChipText");
+		RaisePropertyChanged("HasUsageLogDateFilter");
+		ApplyUsageLogFilter();
+	}
+
+	private void ClearUsageLogDateFilter()
+	{
+		_usageLogDraftStartDate = null;
+		_usageLogDraftEndDate = null;
+		_usageLogFilterFrom = null;
+		_usageLogFilterTo = null;
+		IsUsageLogDatePickerOpen = false;
+		RebuildUsageLogCalendarDays();
+		RaisePropertyChanged("UsageLogDateChipText");
+		RaisePropertyChanged("HasUsageLogDateFilter");
+		ApplyUsageLogFilter();
+	}
+
+	private void RebuildUsageLogCalendarDays()
+	{
+		if (UsageLogCalendarDays == null)
+			return;
+		UsageLogCalendarDays.Clear();
+		DateTime first = new DateTime(_usageLogCalendarMonth.Year, _usageLogCalendarMonth.Month, 1);
+		DateTime start = first.AddDays(-(int)first.DayOfWeek);
+		int daysInMonth = DateTime.DaysInMonth(_usageLogCalendarMonth.Year, _usageLogCalendarMonth.Month);
+		int cellCount = (((int)first.DayOfWeek + daysInMonth + 6) / 7) * 7;
+		DateTime? rangeStart = _usageLogDraftStartDate;
+		DateTime? rangeEnd = _usageLogDraftEndDate ?? _usageLogDraftStartDate;
+		for (int i = 0; i < cellCount; i++)
+		{
+			DateTime d = start.AddDays(i);
+			bool currentMonth = d.Month == _usageLogCalendarMonth.Month;
+			bool inRange = rangeStart.HasValue
+				&& rangeEnd.HasValue
+				&& d.Date >= rangeStart.Value.Date
+				&& d.Date <= rangeEnd.Value.Date;
+			bool isStart = rangeStart.HasValue && d.Date == rangeStart.Value.Date;
+			bool isEnd = rangeEnd.HasValue && d.Date == rangeEnd.Value.Date;
+			bool multi = rangeStart.HasValue && rangeEnd.HasValue
+				&& rangeStart.Value.Date != rangeEnd.Value.Date;
+			UsageLogCalendarDays.Add(new CalendarDayItem
+			{
+				Date = d,
+				DayText = currentMonth ? d.Day.ToString() : string.Empty,
+				IsCurrentMonth = currentMonth,
+				IsToday = currentMonth && d.Date == KoreaTime.Today,
+				IsSunday = d.DayOfWeek == DayOfWeek.Sunday,
+				IsSaturday = d.DayOfWeek == DayOfWeek.Saturday,
+				IsRangeStart = isStart,
+				IsRangeEnd = isEnd,
+				IsInRange = inRange,
+				RangeFillMid = inRange && multi && !isStart && !isEnd,
+				RangeFillFromStart = inRange && multi && isStart && !isEnd,
+				RangeFillToEnd = inRange && multi && isEnd && !isStart
+			});
+		}
+		RaisePropertyChanged("UsageLogCalendarMonthTitle");
 	}
 
 	private void RebuildWorkLogSiteGroups(List<AdminWorkLogItemViewModel> matched)
@@ -2599,6 +2852,16 @@ public sealed class AdminViewModel : ViewModelBase
 		if (string.IsNullOrWhiteSpace(filter) || string.Equals(filter, "ALL", StringComparison.OrdinalIgnoreCase))
 			return true;
 		return string.Equals(NormalizeSiteKey(siteCode), filter.Trim(), StringComparison.OrdinalIgnoreCase);
+	}
+
+	private bool MatchesUsageLogDateFilter(AdminUsageLogItemViewModel row)
+	{
+		if (!_usageLogFilterFrom.HasValue || !_usageLogFilterTo.HasValue)
+			return true;
+		if (row == null || !row.RequestedAt.HasValue)
+			return false;
+		DateTime d = row.RequestedAt.Value.Date;
+		return d >= _usageLogFilterFrom.Value.Date && d <= _usageLogFilterTo.Value.Date;
 	}
 
 	private static int CompareSiteKeys(string a, string b)

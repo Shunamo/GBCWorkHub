@@ -39,6 +39,75 @@ namespace GBCWorkHub.UI.Views.Improvement
                 ApplyGlassOverrides();
 
             DataContextChanged += OnDataContextChanged;
+            DataObject.AddPastingHandler(ContentRichTextBox, OnContentPasting);
+            ContentRichTextBox.PreviewKeyDown += ContentRichTextBox_PreviewKeyDown;
+        }
+
+        /// <summary>
+        /// 이미지(BlockUIContainer)를 사이에 두고 위/아래로 방향키 이동하면 RichTextBox가 캐럿을
+        /// 이미지 내부의 애매한 위치(타이핑도 안 되고, 시각적으로도 엉뚱한 곳)에 놓는 경우가 있다.
+        /// 문단 경계(맨 끝/맨 앞)에서 이미지를 향해 이동하려는 순간만 가로채서, 이미지 반대편에 있는
+        /// 실제 문단으로 캐럿을 직접 옮겨준다 — 문단 내부 이동은 건드리지 않는다.
+        /// </summary>
+        private void ContentRichTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (_vm == null || _vm.IsContentReadOnly)
+                return;
+
+            var caret = ContentRichTextBox.CaretPosition;
+            var paragraph = caret != null ? caret.Paragraph : null;
+            if (paragraph == null)
+                return;
+
+            // Left/Right는 문자 단위 이동이라 "문단의 맨 끝/맨 앞 문자냐"만 보면 정확하다.
+            if (e.Key == Key.Right && caret.CompareTo(paragraph.ContentEnd) == 0)
+                e.Handled = JumpToParagraphAfterImage(paragraph.NextBlock as BlockUIContainer);
+            else if (e.Key == Key.Left && caret.CompareTo(paragraph.ContentStart) == 0)
+                e.Handled = JumpToParagraphBeforeImage(paragraph.PreviousBlock as BlockUIContainer);
+            // Up/Down은 "문단의 마지막 줄이냐"를 봐야 한다 — 문단이 여러 줄로 줄바꿈됐을 때
+            // 캐럿이 문단 끝 문자가 아니라 마지막 줄의 중간에 있어도 이미지로 내려가려는 시도이기
+            // 때문에, 정확한 문자 위치가 아니라 같은 줄인지(화면 Y좌표)를 비교해서 판단한다.
+            // TextPointer.GetLineStartPosition류 API는 이미지 경계 근처에서 이미 신뢰할 수 없다는
+            // 게 이 버그의 원인이라, 여기서는 그 API를 쓰지 않고 순수 좌표 비교로만 판단한다.
+            else if (e.Key == Key.Down && IsOnSameLine(caret, paragraph.ContentEnd))
+                e.Handled = JumpToParagraphAfterImage(paragraph.NextBlock as BlockUIContainer);
+            else if (e.Key == Key.Up && IsOnSameLine(caret, paragraph.ContentStart))
+                e.Handled = JumpToParagraphBeforeImage(paragraph.PreviousBlock as BlockUIContainer);
+        }
+
+        private static bool IsOnSameLine(TextPointer a, TextPointer b)
+        {
+            double topA = a.GetCharacterRect(LogicalDirection.Forward).Top;
+            double topB = b.GetCharacterRect(LogicalDirection.Backward).Top;
+            return Math.Abs(topA - topB) < 0.5;
+        }
+
+        private bool JumpToParagraphAfterImage(BlockUIContainer imageBlock)
+        {
+            var afterImage = imageBlock != null ? imageBlock.NextBlock as Paragraph : null;
+            if (afterImage == null)
+                return false;
+            ContentRichTextBox.CaretPosition = afterImage.ContentStart;
+            return true;
+        }
+
+        private bool JumpToParagraphBeforeImage(BlockUIContainer imageBlock)
+        {
+            var beforeImage = imageBlock != null ? imageBlock.PreviousBlock as Paragraph : null;
+            if (beforeImage == null)
+                return false;
+            ContentRichTextBox.CaretPosition = beforeImage.ContentEnd;
+            return true;
+        }
+
+        /// <summary>이미지(사진 자체 또는 그 배경 프레임)를 마우스로 클릭했을 때도 캐럿이 그 안에
+        /// 머물지 않도록, 클릭을 가로채서 이미지 바로 다음(없으면 이전) 문단으로 캐럿을 옮긴다.</summary>
+        private void RedirectCaretAwayFromImage(BlockUIContainer container)
+        {
+            var target = (container.NextBlock as Paragraph) ?? (container.PreviousBlock as Paragraph);
+            if (target != null)
+                ContentRichTextBox.CaretPosition = target.ContentStart;
+            ContentRichTextBox.Focus();
         }
 
         private void ApplyGlassOverrides()
@@ -84,7 +153,7 @@ namespace GBCWorkHub.UI.Views.Improvement
 
             _imageContainers.Clear();
             var document = new FlowDocument { PagePadding = new Thickness(0) };
-            bool editable = _vm.IsNewRecord;
+            bool editable = _vm.IsContentEditable;
 
             foreach (var block in _vm.ContentBlocks)
             {
@@ -113,26 +182,68 @@ namespace GBCWorkHub.UI.Views.Improvement
                 HorizontalAlignment = HorizontalAlignment.Left
             };
 
-            var grid = new Grid { Margin = new Thickness(0, 4, 0, 4) };
-            grid.Children.Add(image);
+            // 사진에 테두리를 둘러서 "사진 블록"의 경계를 눈에 보이게 하고, 위아래 여백을 넉넉히
+            // 줘서 그 위/아래에 글을 쓸 수 있는 빈 줄이 실제로 존재한다는 걸 시각적으로 알 수 있게
+            // 한다 — 안 그러면 사진과 그 앞뒤 빈 문단이 시각적으로 구분이 안 돼서 어디를 클릭해야
+            // 위/아래에 타이핑되는지 애매해진다.
+            var imageFrame = new Border
+            {
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E2E8F0")),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F8FAFC")),
+                Padding = new Thickness(4),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Child = image
+            };
+
+            // 클릭 시점에는 아직 container가 없으므로, 클로저로 나중에 채워질 변수를 참조하게 해두고
+            // 실제 대입은 이 메서드 끝에서 한다 — 핸들러는 사용자가 클릭할 때(그 이후 시점)에만 실행되므로 안전하다.
+            BlockUIContainer container = null;
+            imageFrame.PreviewMouseLeftButtonDown += (s, e) =>
+            {
+                e.Handled = true;
+                if (container != null)
+                    RedirectCaretAwayFromImage(container);
+            };
+
+            // HorizontalAlignment.Left — 그리드가 텍스트 칸 전체 너비로 늘어나면 우측 정렬한
+            // 삭제 버튼이 사진이 아니라 문서 오른쪽 끝에 붙어버린다. 사진 실제 너비만큼만 차지하게
+            // 해야 버튼이 사진 우측 상단 모서리에 정확히 겹쳐 보인다.
+            var grid = new Grid { Margin = new Thickness(0, 10, 0, 10), HorizontalAlignment = HorizontalAlignment.Left };
+            grid.Children.Add(imageFrame);
 
             if (editable)
             {
                 var removeButton = new Button
                 {
-                    Content = "✕",
+                    Content = new Image
+                    {
+                        Source = TryFindResource("ImageDeleteSquareIcon") as ImageSource,
+                        Width = 20,
+                        Height = 20
+                    },
                     Width = 24,
                     Height = 24,
                     Padding = new Thickness(0),
-                    HorizontalAlignment = HorizontalAlignment.Left,
+                    Background = Brushes.Transparent,
+                    BorderThickness = new Thickness(0),
+                    Cursor = Cursors.Hand,
+                    HorizontalAlignment = HorizontalAlignment.Right,
                     VerticalAlignment = VerticalAlignment.Top,
-                    Tag = block
+                    Margin = new Thickness(0, 6, 6, 0),
+                    Tag = block,
+                    // 이 버튼이 포커스를 받을 수 있으면 방향키로 커서를 위/아래로 옮길 때 텍스트 줄이
+                    // 아니라 이 버튼에서 멈춰버린다 — 마우스 클릭 삭제는 Focusable과 무관하게 동작하므로
+                    // 키보드 탐색 대상에서만 빼서 텍스트 이동이 이미지를 그냥 건너뛰게 한다.
+                    Focusable = false,
+                    IsTabStop = false
                 };
                 removeButton.Click += RemoveImageButton_Click;
                 grid.Children.Add(removeButton);
             }
 
-            var container = new BlockUIContainer(grid);
+            container = new BlockUIContainer(grid);
             _imageContainers[block] = container;
             return container;
         }
@@ -170,11 +281,124 @@ namespace GBCWorkHub.UI.Views.Improvement
             foreach (var path in dialog.FileNames)
             {
                 int currentImageCount = _imageContainers.Count;
-                var block = _vm.TryStageImageBlock(path, currentImageCount);
+                byte[] bytes;
+                string fileName;
+                try
+                {
+                    bytes = FitImageFileToAttachmentLimit(path, out fileName);
+                }
+                catch (Exception)
+                {
+                    bytes = null;
+                    fileName = System.IO.Path.GetFileName(path);
+                }
+                if (bytes == null)
+                    continue;
+
+                var block = _vm.TryStagePastedImageBlock(bytes, fileName, currentImageCount);
                 if (block == null)
                     continue;
 
                 InsertImageBlockAtCaret(block);
+            }
+        }
+
+        /// <summary>
+        /// 파일로 고른 이미지도 붙여넣기와 동일하게 처리한다 — 이미 용량 제한 안쪽이면 원본 그대로
+        /// 쓰고(불필요한 재인코딩으로 화질을 낮추지 않도록), 넘으면 붙여넣기와 같은 압축/축소 경로를 탄다.
+        /// </summary>
+        private static byte[] FitImageFileToAttachmentLimit(string path, out string fileName)
+        {
+            const long maxBytes = 5 * 1024 * 1024 - 64 * 1024;
+            fileName = System.IO.Path.GetFileName(path);
+            byte[] raw = System.IO.File.ReadAllBytes(path);
+            if (raw.Length <= maxBytes)
+                return raw;
+
+            var decoded = new System.Windows.Media.Imaging.BitmapImage();
+            decoded.BeginInit();
+            decoded.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            decoded.UriSource = new Uri(path);
+            decoded.EndInit();
+            decoded.Freeze();
+
+            fileName = System.IO.Path.GetFileNameWithoutExtension(path) + ".jpg";
+            return EncodeImageForAttachment(decoded);
+        }
+
+        /// <summary>
+        /// 클립보드에 있는 이미지(스크린샷 등)를 붙여넣을 때 가로챈다. RichTextBox의 기본 붙여넣기는
+        /// 원본 비트맵을 그대로 문서에 꽂아 넣어 우리 첨부 추적(_imageContainers)에 잡히지 않고,
+        /// 용량 제한(5MB)도 거치지 않아 저장 시 통째로 누락되거나 너무 커서 실패한다 — 그래서
+        /// 여기서 직접 JPEG로 인코딩(필요하면 해상도까지 축소)해 파일 첨부와 동일한 경로로 태운다.
+        /// </summary>
+        private void OnContentPasting(object sender, DataObjectPastingEventArgs e)
+        {
+            if (_vm == null || !_vm.IsContentEditable)
+                return;
+            if (!e.SourceDataObject.GetDataPresent(DataFormats.Bitmap))
+                return;
+
+            var bitmapSource = e.SourceDataObject.GetData(DataFormats.Bitmap) as System.Windows.Media.Imaging.BitmapSource;
+            if (bitmapSource == null)
+                return;
+
+            e.CancelCommand();
+
+            byte[] encoded = EncodeImageForAttachment(bitmapSource);
+            int currentImageCount = _imageContainers.Count;
+            var block = _vm.TryStagePastedImageBlock(encoded, "clipboard.jpg", currentImageCount);
+            if (block != null)
+                InsertImageBlockAtCaret(block);
+        }
+
+        /// <summary>클립보드 비트맵을 JPEG로 인코딩하고, 화질을 낮춰도 5MB를 넘으면 해상도까지 줄여 재시도한다.</summary>
+        private static byte[] EncodeImageForAttachment(System.Windows.Media.Imaging.BitmapSource source)
+        {
+            const long maxBytes = 5 * 1024 * 1024 - 64 * 1024;
+            const int maxDimension = 2000;
+
+            var working = DownscaleIfLarger(source, maxDimension);
+
+            for (int quality = 90; quality >= 40; quality -= 12)
+            {
+                byte[] data = EncodeJpeg(working, quality);
+                if (data.Length <= maxBytes)
+                    return data;
+            }
+
+            byte[] last = EncodeJpeg(working, 40);
+            for (int attempt = 0; attempt < 4 && last.Length > maxBytes; attempt++)
+            {
+                int nextDimension = (int)(Math.Max(working.PixelWidth, working.PixelHeight) * 0.7);
+                working = DownscaleIfLarger(working, nextDimension);
+                last = EncodeJpeg(working, 60);
+            }
+
+            return last;
+        }
+
+        private static System.Windows.Media.Imaging.BitmapSource DownscaleIfLarger(
+            System.Windows.Media.Imaging.BitmapSource source, int maxDimension)
+        {
+            int longest = Math.Max(source.PixelWidth, source.PixelHeight);
+            if (longest <= maxDimension)
+                return source;
+
+            double scale = (double)maxDimension / longest;
+            var transformed = new System.Windows.Media.Imaging.TransformedBitmap(source, new ScaleTransform(scale, scale));
+            transformed.Freeze();
+            return transformed;
+        }
+
+        private static byte[] EncodeJpeg(System.Windows.Media.Imaging.BitmapSource source, int quality)
+        {
+            var encoder = new System.Windows.Media.Imaging.JpegBitmapEncoder { QualityLevel = quality };
+            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(source));
+            using (var ms = new System.IO.MemoryStream())
+            {
+                encoder.Save(ms);
+                return ms.ToArray();
             }
         }
 
@@ -210,7 +434,7 @@ namespace GBCWorkHub.UI.Views.Improvement
         /// <summary>등록 직전(SaveCommand 실행 전) FlowDocument를 순서대로 읽어 ViewModel에 반영한다.</summary>
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_vm == null || !_vm.IsNewRecord)
+            if (_vm == null || !(_vm.IsNewRecord || _vm.IsEditingContent))
                 return;
 
             var blocks = new List<ImprovementContentBlockViewModel>();

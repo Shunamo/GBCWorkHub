@@ -1242,4 +1242,36 @@
             </DrawingGroup>
         </DrawingImage.Drawing>
     </DrawingImage>
+
+    <!-- dell_square (1).svg — 개선사항 편집: 본문에 삽입한 이미지 삭제 배지(사진 위에 겹쳐 보이므로 배경 없음) -->
+    <DrawingImage x:Key="ImageDeleteSquareIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#F86C6C" Thickness="1" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M7,3.5H17C18.933,3.5 20.5,5.067 20.5,7V17C20.5,18.933 18.933,20.5 17,20.5H7C5.067,20.5 3.5,18.933 3.5,17V7C3.5,5.067 5.067,3.5 7,3.5Z" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#F86C6C" Thickness="1.2" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M9.00009,14.9997L15.0001,8.99966" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#F86C6C" Thickness="1.2" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M15,15L9,9" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
 </ResourceDictionary>

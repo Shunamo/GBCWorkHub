@@ -24,6 +24,8 @@ namespace GBCWorkHub.DTO
         public string PcNote { get; set; }
         /// <summary>접속 코멘트(사용자 수정 가능).</summary>
         public string PcComment { get; set; }
+        /// <summary>AGENT 설치까지 완료된 PC — 목록/갤러리에서 아이콘 우측 상단 노란 점 배지로 표시.</summary>
+        public bool AgentInstalled { get; set; }
         public int RdpPort { get; set; } = 3389;
         public Enums.RemotePcStatus Status { get; set; } = Enums.RemotePcStatus.Unknown;
         public string CurrentUser { get; set; }

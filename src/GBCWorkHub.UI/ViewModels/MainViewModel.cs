@@ -819,11 +819,38 @@ namespace GBCWorkHub.UI.ViewModels
             if (!ok)
                 return;
 
+            ResetSharedNavigationState();
             NotifyIdentityChanged();
             IsLogoutMenuOpen = false;
             if (IsAdminShellVisible)
                 return;
             ShowLoginGreeting();
+        }
+
+        /// <summary>
+        /// 로그인/로그아웃 경계에서 이전 세션이 열어 둔 상세/작성 화면을 강제로 닫는다.
+        /// WorkLogList/Improvement는 관리자 셸과 사용자 셸이 같은 인스턴스를 공유하므로, 여기서
+        /// 정리하지 않으면 "사용자로 상세 보던 중 로그아웃 후 관리자로 로그인"했을 때 관리자 셸이
+        /// 목록 대신 그 남아있던 상세 화면을 그대로 보여주는 문제가 생긴다.
+        /// </summary>
+        private void ResetSharedNavigationState()
+        {
+            if (WorkLogList != null)
+            {
+                if (WorkLogList.IsEditOpen && WorkLogList.CloseEditCommand != null && WorkLogList.CloseEditCommand.CanExecute(null))
+                    WorkLogList.CloseEditCommand.Execute(null);
+                if (WorkLogList.IsImportOpen && WorkLogList.CloseImportCommand != null && WorkLogList.CloseImportCommand.CanExecute(null))
+                    WorkLogList.CloseImportCommand.Execute(null);
+                if (WorkLogList.IsInboxOpen && WorkLogList.CloseInboxCommand != null && WorkLogList.CloseInboxCommand.CanExecute(null))
+                    WorkLogList.CloseInboxCommand.Execute(null);
+            }
+            if (Improvement != null && Improvement.IsEditOpen)
+            {
+                var editDialog = Improvement.EditDialog;
+                if (editDialog != null && editDialog.CloseCommand != null && editDialog.CloseCommand.CanExecute(null))
+                    editDialog.CloseCommand.Execute(null);
+            }
+            _workLogBackTab = null;
         }
 
         private async Task LogoutAsync()
@@ -833,6 +860,7 @@ namespace GBCWorkHub.UI.ViewModels
             IsLoginGreetingVisible = false;
             LoginGreetingText = string.Empty;
             OccupancyNameStore.Clear();
+            ResetSharedNavigationState();
             NotifyIdentityChanged();
 
             // 갤러리로 복귀 (사이트 PC 목록 선택 해제)

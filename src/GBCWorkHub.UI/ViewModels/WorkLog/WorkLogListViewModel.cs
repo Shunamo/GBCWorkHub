@@ -2045,6 +2045,7 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
 
             int gen = ++_teamOptionsGeneration;
             IList<string> names = null;
+            IList<string> registeredNames = null;
             try
             {
                 names = await _persistence.GetDistinctTeamNamesAsync().ConfigureAwait(true);
@@ -2052,6 +2053,17 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             catch
             {
                 names = null;
+            }
+            try
+            {
+                // 업무기록(WRK)에 아직 아무것도 안 쓴 사람의 소속도 필터에서 바로 보이도록,
+                // 가입 시 실제로 입력한 소속(USR.TEAM_NM)도 같이 합친다 — 기록을 써야만
+                // 필터에 뜨는 게 아니라 가입만 해도 뜨게.
+                registeredNames = await _directory.GetDistinctTeamNamesAsync().ConfigureAwait(true);
+            }
+            catch
+            {
+                registeredNames = null;
             }
             if (gen != _teamOptionsGeneration)
                 return;
@@ -2065,6 +2077,11 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
                 if (names != null)
                 {
                     foreach (string name in names)
+                        AddTeamFilterOption(name);
+                }
+                if (registeredNames != null)
+                {
+                    foreach (string name in registeredNames)
                         AddTeamFilterOption(name);
                 }
                 AddTeamFilterOption(OccupancyNameStore.TryGetAffiliation());

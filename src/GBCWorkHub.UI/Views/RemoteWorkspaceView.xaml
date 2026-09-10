@@ -20,32 +20,38 @@
                     HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                     MouseLeftButtonUp="RemoteComputerCard_MouseLeftButtonUp">
                 <StackPanel HorizontalAlignment="Stretch">
-                    <Image Width="96" Height="96" Stretch="Uniform" HorizontalAlignment="Center" Margin="0,0,0,10">
-                        <Image.Style>
-                            <Style TargetType="Image">
-                                <Setter Property="Source" Value="{StaticResource PcMonitorIcon}" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsInUse}" Value="True">
-                                        <Setter Property="Source" Value="{StaticResource PcMonitorIconInUse}" />
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding IsConnecting}" Value="True">
-                                        <Setter Property="Source" Value="{StaticResource PcMonitorIconInUse}" />
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding IsOwnedByOtherUser}" Value="True">
-                                        <Setter Property="Opacity" Value="0.55" />
-                                    </DataTrigger>
-                                    <MultiDataTrigger>
-                                        <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsSelected}" Value="True" />
-                                            <Condition Binding="{Binding IsInUse}" Value="False" />
-                                            <Condition Binding="{Binding IsConnecting}" Value="False" />
-                                        </MultiDataTrigger.Conditions>
-                                        <Setter Property="Opacity" Value="0.52" />
-                                    </MultiDataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Image.Style>
-                    </Image>
+                    <Grid Width="96" Height="96" HorizontalAlignment="Center" Margin="0,0,0,10">
+                        <Image Width="96" Height="96" Stretch="Uniform">
+                            <Image.Style>
+                                <Style TargetType="Image">
+                                    <Setter Property="Source" Value="{StaticResource PcMonitorIcon}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsInUse}" Value="True">
+                                            <Setter Property="Source" Value="{StaticResource PcMonitorIconInUse}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsConnecting}" Value="True">
+                                            <Setter Property="Source" Value="{StaticResource PcMonitorIconInUse}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsOwnedByOtherUser}" Value="True">
+                                            <Setter Property="Opacity" Value="0.55" />
+                                        </DataTrigger>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding IsSelected}" Value="True" />
+                                                <Condition Binding="{Binding IsInUse}" Value="False" />
+                                                <Condition Binding="{Binding IsConnecting}" Value="False" />
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Opacity" Value="0.52" />
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Image.Style>
+                        </Image>
+                        <Ellipse Width="10" Height="10" Fill="#FACC15"
+                                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-3,-3,0"
+                                 ToolTip="AGENT 설치 완료"
+                                 Visibility="{Binding AgentInstalled, Converter={StaticResource BoolToVis}}" />
+                    </Grid>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                         <Ellipse Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center">
                             <Ellipse.Style>
@@ -125,29 +131,35 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <Image Width="36" Height="36" Margin="0,0,12,0" VerticalAlignment="Center">
-                        <Image.Style>
-                            <Style TargetType="Image">
-                                <Setter Property="Source" Value="{StaticResource PcMonitorIcon}" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsInUse}" Value="True">
-                                        <Setter Property="Source" Value="{StaticResource PcMonitorIconInUse}" />
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding IsConnecting}" Value="True">
-                                        <Setter Property="Source" Value="{StaticResource PcMonitorIconInUse}" />
-                                    </DataTrigger>
-                                    <MultiDataTrigger>
-                                        <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsSelected}" Value="True" />
-                                            <Condition Binding="{Binding IsInUse}" Value="False" />
-                                            <Condition Binding="{Binding IsConnecting}" Value="False" />
-                                        </MultiDataTrigger.Conditions>
-                                        <Setter Property="Opacity" Value="0.52" />
-                                    </MultiDataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Image.Style>
-                    </Image>
+                    <Grid Width="36" Height="36" Margin="0,0,12,0" VerticalAlignment="Center">
+                        <Image Width="36" Height="36">
+                            <Image.Style>
+                                <Style TargetType="Image">
+                                    <Setter Property="Source" Value="{StaticResource PcMonitorIcon}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsInUse}" Value="True">
+                                            <Setter Property="Source" Value="{StaticResource PcMonitorIconInUse}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsConnecting}" Value="True">
+                                            <Setter Property="Source" Value="{StaticResource PcMonitorIconInUse}" />
+                                        </DataTrigger>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding IsSelected}" Value="True" />
+                                                <Condition Binding="{Binding IsInUse}" Value="False" />
+                                                <Condition Binding="{Binding IsConnecting}" Value="False" />
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Opacity" Value="0.52" />
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Image.Style>
+                        </Image>
+                        <Ellipse Width="6" Height="6" Fill="#FACC15"
+                                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-2,-2,0"
+                                 ToolTip="AGENT 설치 완료"
+                                 Visibility="{Binding AgentInstalled, Converter={StaticResource BoolToVis}}" />
+                    </Grid>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal">
                             <Ellipse Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center">

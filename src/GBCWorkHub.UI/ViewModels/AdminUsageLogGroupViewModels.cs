@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using GBCWorkHub.DTO;
 
 namespace GBCWorkHub.UI.ViewModels
 {
@@ -30,7 +31,11 @@ namespace GBCWorkHub.UI.ViewModels
             {
                 if (IsUnknownDate)
                     return "일시 미확인";
-                DateTime today = DateTime.Today;
+                // Date는 이미 KoreaTime 기준으로 정규화된 값이라, 로컬 PC 시계가 한국 시간이
+                // 아니면(해외 사이트 PC, 다른 타임존 서버 등) DateTime.Today와 비교했을 때
+                // "오늘"이 어긋나 실제로는 최신 항목인데도 날짜 그룹이 안 맞아 못 찾는 것처럼
+                // 보일 수 있다 — 항상 KoreaTime.Today와 비교해야 한다.
+                DateTime today = KoreaTime.Today;
                 if (Date.Date == today)
                     return "오늘";
                 if (Date.Date == today.AddDays(-1))
@@ -51,8 +56,10 @@ namespace GBCWorkHub.UI.ViewModels
         {
             SiteCode = string.IsNullOrWhiteSpace(siteCode) ? "미지정" : siteCode.Trim().ToUpperInvariant();
             DateGroups = new ObservableCollection<AdminUsageLogDateGroupViewModel>();
+            ShowHeader = true;
         }
 
+        public bool ShowHeader { get; set; }
         public string SiteCode { get; private set; }
         public ObservableCollection<AdminUsageLogDateGroupViewModel> DateGroups { get; private set; }
 

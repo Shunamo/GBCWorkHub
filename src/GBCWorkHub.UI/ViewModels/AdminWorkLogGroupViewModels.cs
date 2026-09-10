@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using GBCWorkHub.DTO;
 using GBCWorkHub.UI.ViewModels.WorkLog;
 
 namespace GBCWorkHub.UI.ViewModels
@@ -202,7 +203,7 @@ namespace GBCWorkHub.UI.ViewModels
             {
                 if (IsUnknownDate)
                     return "일시 미확인";
-                DateTime today = DateTime.Today;
+                DateTime today = KoreaTime.Today;
                 if (Date.Date == today)
                     return "오늘";
                 if (Date.Date == today.AddDays(-1))

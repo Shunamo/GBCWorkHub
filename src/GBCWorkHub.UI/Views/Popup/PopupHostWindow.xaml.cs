@@ -213,8 +213,12 @@ namespace GBCWorkHub.UI.Views.Popup
 
             if (key >= Key.A && key <= Key.Z)
             {
+                // Caps Lock도 대문자 전환에 반영 — Shift만 보면 Caps Lock 켜진 상태에서
+                // 계속 소문자로 강제되고, Caps Lock+Shift 조합(소문자 의도)은 반대로 대문자가 된다.
+                bool capsOn = Keyboard.IsKeyToggled(Key.CapsLock);
+                bool upper = shift ^ capsOn;
                 int offset = key - Key.A;
-                ch = (char)((shift ? 'A' : 'a') + offset);
+                ch = (char)((upper ? 'A' : 'a') + offset);
                 return true;
             }
 

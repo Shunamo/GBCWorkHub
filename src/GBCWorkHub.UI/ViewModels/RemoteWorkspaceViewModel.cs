@@ -1987,6 +1987,7 @@ namespace GBCWorkHub.UI.ViewModels
                         existing.PcDomain = dto.PcDomain;
                         existing.PcNote = dto.PcNote;
                         existing.PcComment = dto.PcComment;
+                        existing.AgentInstalled = dto.AgentInstalled;
                         existing.SiteCode = dto.HospitalCode ?? site;
                         existing.CurrentLocalUser = localUser;
                         continue;

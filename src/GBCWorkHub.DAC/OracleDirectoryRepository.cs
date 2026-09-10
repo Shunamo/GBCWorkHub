@@ -31,6 +31,8 @@ namespace GBCWorkHub.DAC
         private bool _hasPcMapNote;
         private bool _pcMapCommentProbed;
         private bool _hasPcMapComment;
+        private bool _pcMapAgentInstalledProbed;
+        private bool _hasPcMapAgentInstalled;
         private bool _userAuthProbed;
         private bool _hasUserAuthColumns;
         private bool _userDeletedProbed;
@@ -118,6 +120,11 @@ namespace GBCWorkHub.DAC
         public Task<int> DeletePcMapAsync(string siteCode, string pcName)
         {
             return Task.Run(() => DeletePcMap(siteCode, pcName));
+        }
+
+        public Task<IList<string>> GetDistinctTeamNamesAsync()
+        {
+            return Task.Run(() => GetDistinctTeamNames());
         }
 
         public int UpsertUser(DirectoryUserDto user)
@@ -737,6 +744,7 @@ namespace GBCWorkHub.DAC
                     EnsurePcMapDomainColumn(conn);
                     EnsurePcMapNoteColumn(conn);
                     EnsurePcMapCommentColumn(conn);
+                    EnsurePcMapAgentInstalledColumn(conn);
 
                     using (var cmd = CreateCommand(conn))
                     {
@@ -768,6 +776,14 @@ namespace GBCWorkHub.DAC
                             updateCols.Append(", t.PC_COMMENT = NVL(:pcComment, t.PC_COMMENT)");
                             insertCols.Append(", PC_COMMENT");
                             insertVals.Append(", :pcComment");
+                        }
+                        if (_hasPcMapAgentInstalled)
+                        {
+                            // map.AgentInstalled가 null이면(자동 동기화 등 이 개념을 모르는 호출) 기존 값을
+                            // 그대로 두고, 값이 있으면(관리자가 명시적으로 체크/해제) 그 값으로 덮어쓴다.
+                            updateCols.Append(", t.AGENT_INSTALLED = NVL(:agentInstalled, t.AGENT_INSTALLED)");
+                            insertCols.Append(", AGENT_INSTALLED");
+                            insertVals.Append(", NVL(:agentInstalled, 0)");
                         }
                         updateCols.Append(", t.UPDT_DTM = SYSTIMESTAMP");
                         insertCols.Append(", UPDT_DTM");
@@ -807,6 +823,11 @@ namespace GBCWorkHub.DAC
                         {
                             cmd.Parameters.Add("pcComment", OracleDbType.Varchar2).Value =
                                 (object)Trim(map.PcComment, 2000) ?? DBNull.Value;
+                        }
+                        if (_hasPcMapAgentInstalled)
+                        {
+                            cmd.Parameters.Add("agentInstalled", OracleDbType.Int32).Value =
+                                map.AgentInstalled.HasValue ? (object)(map.AgentInstalled.Value ? 1 : 0) : DBNull.Value;
                         }
                         return cmd.ExecuteNonQuery();
                     }
@@ -1061,6 +1082,66 @@ namespace GBCWorkHub.DAC
             return list;
         }
 
+        /// <summary>
+        /// 가입 시 사용자가 실제로 입력한 소속(TEAM_NM) 중 유니크한 값만 뽑는다. 업무기록의
+        /// GetDistinctTeamNamesCore(OracleWorkLogRepository)와 동일하게 공백/가운뎃점 차이는
+        /// 같은 소속으로 묶어(정규화 키로 GROUP BY) 중복 표시를 막는다.
+        /// </summary>
+        public IList<string> GetDistinctTeamNames()
+        {
+            var list = new List<string>();
+            if (!IsConfigured)
+                return list;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                {
+                    EnsureUserTable(conn);
+                    if (!_hasUserTable)
+                        return list;
+
+                    using (var cmd = CreateCommand(conn))
+                    {
+                        cmd.CommandText =
+                            @"SELECT MIN(TRIM(TEAM_NM))
+                                FROM " + UserTable + @"
+                               WHERE TEAM_NM IS NOT NULL
+                                 AND TRIM(TEAM_NM) IS NOT NULL
+                               GROUP BY " + SqlTeamKeyCol("TEAM_NM") + @"
+                               ORDER BY MIN(TRIM(TEAM_NM))";
+                        using (var reader = cmd.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                if (reader.IsDBNull(0))
+                                    continue;
+                                string name = Convert.ToString(reader.GetValue(0));
+                                if (!string.IsNullOrWhiteSpace(name))
+                                    list.Add(name.Trim());
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WorkHubFileLogger.Warn("DIRECTORY", "GetDistinctTeamNames failed: " + SafeError(ex));
+            }
+
+            return list;
+        }
+
+        private static string SqlTeamKeyCol(string column)
+        {
+            return SqlTeamKeyExpr("NVL(TRIM(" + column + "), '')");
+        }
+
+        private static string SqlTeamKeyExpr(string expr)
+        {
+            return "REPLACE(REPLACE(REPLACE(" + expr + ", ' ', ''), UNISTR('\\00B7'), ''), UNISTR('\\2022'), '')";
+        }
+
         public int SetUserActive(string loginOrName, bool isActive)
         {
             if (string.IsNullOrWhiteSpace(loginOrName) || !IsConfigured)
@@ -1227,6 +1308,7 @@ namespace GBCWorkHub.DAC
                     EnsurePcMapDomainColumn(conn);
                     EnsurePcMapNoteColumn(conn);
                     EnsurePcMapCommentColumn(conn);
+                    EnsurePcMapAgentInstalledColumn(conn);
 
                     using (var cmd = CreateCommand(conn))
                     {
@@ -1239,6 +1321,8 @@ namespace GBCWorkHub.DAC
                             select.Append(", PC_NOTE");
                         if (_hasPcMapComment)
                             select.Append(", PC_COMMENT");
+                        if (_hasPcMapAgentInstalled)
+                            select.Append(", AGENT_INSTALLED");
                         select.Append(" FROM ").Append(PcMapTable)
                             .Append(" WHERE UPPER(TRIM(SITE_CD)) = UPPER(:siteCd) ORDER BY PC_NM");
                         cmd.CommandText = select.ToString();
@@ -1263,6 +1347,8 @@ namespace GBCWorkHub.DAC
                                     row.PcNote = reader.IsDBNull(++i) ? null : Convert.ToString(reader.GetValue(i));
                                 if (_hasPcMapComment)
                                     row.PcComment = reader.IsDBNull(++i) ? null : Convert.ToString(reader.GetValue(i));
+                                if (_hasPcMapAgentInstalled)
+                                    row.AgentInstalled = reader.IsDBNull(++i) ? (bool?)false : Convert.ToInt32(reader.GetValue(i)) != 0;
                                 list.Add(row);
                             }
                         }
@@ -1493,6 +1579,35 @@ namespace GBCWorkHub.DAC
                     _hasPcMapComment = false;
                     WorkHubFileLogger.Warn("DIRECTORY",
                         "MSDWHTKD_PCMAP.PC_COMMENT missing; skip. Apply sql/19_ALTER_PCMAP_PC_DOMAIN.sql when DBA can.");
+                    return;
+                }
+                throw;
+            }
+        }
+
+        private void EnsurePcMapAgentInstalledColumn(OracleConnection conn)
+        {
+            if (_pcMapAgentInstalledProbed)
+                return;
+            _pcMapAgentInstalledProbed = true;
+            if (!_hasPcMapTable)
+                return;
+            try
+            {
+                using (var cmd = CreateCommand(conn))
+                {
+                    cmd.CommandText = "SELECT AGENT_INSTALLED FROM " + PcMapTable + " WHERE ROWNUM = 0";
+                    cmd.ExecuteScalar();
+                }
+                _hasPcMapAgentInstalled = true;
+            }
+            catch (OracleException ex)
+            {
+                if (ex.Number == 904)
+                {
+                    _hasPcMapAgentInstalled = false;
+                    WorkHubFileLogger.Warn("DIRECTORY",
+                        "MSDWHTKD_PCMAP.AGENT_INSTALLED missing; skip. Apply sql/32_MSDWHTKD_PCMAP_AGENT_INSTALLED.sql when DBA can.");
                     return;
                 }
                 throw;

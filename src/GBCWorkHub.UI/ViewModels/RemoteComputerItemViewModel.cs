@@ -16,6 +16,7 @@ namespace GBCWorkHub.UI.ViewModels
         private string _pcDomain;
         private string _pcNote;
         private string _pcComment;
+        private bool _agentInstalled;
         private string _siteCode;
         private string _statusCode = RemotePcDbStatuses.Available;
         private string _accessUserId;
@@ -163,6 +164,13 @@ namespace GBCWorkHub.UI.ViewModels
         {
             get { return _pcComment; }
             set { SetProperty(ref _pcComment, value); }
+        }
+
+        /// <summary>AGENT 설치까지 완료된 PC — 아이콘 우측 상단 노란 점 배지.</summary>
+        public bool AgentInstalled
+        {
+            get { return _agentInstalled; }
+            set { SetProperty(ref _agentInstalled, value); }
         }
 
         public string SiteCode
@@ -587,6 +595,7 @@ namespace GBCWorkHub.UI.ViewModels
                 PcDomain = dto != null ? dto.PcDomain : null,
                 PcNote = dto != null ? dto.PcNote : null,
                 PcComment = dto != null ? dto.PcComment : null,
+                AgentInstalled = dto != null && dto.AgentInstalled,
                 SiteCode = dto != null ? dto.HospitalCode : null,
                 CurrentLocalUser = currentLocalUser,
                 StatusCode = RemotePcDbStatuses.Available

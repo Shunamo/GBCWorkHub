@@ -15,6 +15,8 @@ namespace GBCWorkHub.UI.ViewModels
         public string PcDomain { get; set; }
         public string PcNote { get; set; }
         public string PcComment { get; set; }
+        /// <summary>AGENT 설치까지 완료된 PC — 목록에서 아이콘 우측 상단 노란 점 배지로 표시.</summary>
+        public bool AgentInstalled { get; set; }
 
         public bool IsSelected
         {
@@ -80,7 +82,8 @@ namespace GBCWorkHub.UI.ViewModels
                 TeamName = dto.TeamName,
                 PcDomain = dto.PcDomain,
                 PcNote = dto.PcNote,
-                PcComment = dto.PcComment
+                PcComment = dto.PcComment,
+                AgentInstalled = dto.AgentInstalled.GetValueOrDefault()
             };
         }
     }

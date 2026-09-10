@@ -56,8 +56,10 @@ namespace GBCWorkHub.UI.ViewModels.Improvement
         private IPopupService _popup;
 
         private bool _isNewRecord;
+        private bool _isEditingContent;
         private long _reqId;
         private long _authorUserId;
+        private ImprovementRequestDto _loadedDto;
         private static readonly Regex ImageTokenRegex = new Regex(@"\{\{img:([A-Za-z0-9]+)\}\}", RegexOptions.Compiled);
 
         private string _requestType = ImprovementRequestTypes.Bug;
@@ -106,6 +108,15 @@ namespace GBCWorkHub.UI.ViewModels.Improvement
 
             SaveCommand = new RelayCommand(() => { var _ = SaveAsync(); }, () => !IsBusy && IsNewRecord);
             DeleteCommand = new RelayCommand(() => { var _ = DeleteAsync(); }, () => !IsBusy && !IsNewRecord && CanManageRequest);
+            BeginEditRequestCommand = new RelayCommand(() =>
+            {
+                IsEditingContent = true;
+                // RichTextBox 문서는 읽기 전용 상태로 이미 구성돼 있어 기존 이미지에 삭제 버튼이
+                // 없다 — 수정 모드 진입 시 다시 구성해야 기존 이미지에도 삭제 버튼이 붙는다.
+                var reloaded = ContentReloaded; if (reloaded != null) reloaded();
+            }, () => !IsBusy && !IsNewRecord && !IsEditingContent && CanManageRequest);
+            CancelEditRequestCommand = new RelayCommand(() => { if (_loadedDto != null) LoadExisting(_loadedDto); }, () => !IsBusy && IsEditingContent);
+            SaveEditRequestCommand = new RelayCommand(() => { var _ = SaveEditRequestAsync(); }, () => !IsBusy && IsEditingContent);
             CloseCommand = new RelayCommand(() => { var h = CloseRequested; if (h != null) h(); });
             ReactReproducedCommand = new RelayCommand(() => { var _ = ReactAsync(ImprovementReactionTypes.Reproduced); }, () => !IsBusy && !IsNewRecord);
             ReactNotReproducedCommand = new RelayCommand(() => { var _ = ReactAsync(ImprovementReactionTypes.NotReproduced); }, () => !IsBusy && !IsNewRecord);
@@ -151,6 +162,9 @@ namespace GBCWorkHub.UI.ViewModels.Improvement
             get { return ImprovementOwnership.CanManage(ImprovementBiz.CurrentUserId, _authorUserId, IsAdmin); }
         }
 
+        /// <summary>수정/삭제 아이콘 버튼 노출 — 편집 중에는 숨겨서 상태를 명확히 한다.</summary>
+        public bool ShowRequestActions { get { return CanManageRequest && !IsEditingContent; } }
+
         public bool IsNewRecord
         {
             get { return _isNewRecord; }
@@ -161,12 +175,42 @@ namespace GBCWorkHub.UI.ViewModels.Improvement
                     RaisePropertyChanged("IsDetailMode");
                     RaisePropertyChanged("ShowReproductionCard");
                     RaisePropertyChanged("ReproductionFieldLabel");
+                    RaisePropertyChanged("IsContentEditable");
+                    RaisePropertyChanged("IsContentReadOnly");
+                    RaisePropertyChanged("IsViewingDetail");
                     RaiseAllCanExecuteChanged();
                 }
             }
         }
 
         public bool IsDetailMode { get { return !IsNewRecord; } }
+
+        /// <summary>반응/댓글처럼 "내용을 다 갖춘 글을 보는" 화면 — 본문 수정 중에는 글쓰기에만
+        /// 집중하도록 숨긴다.</summary>
+        public bool IsViewingDetail { get { return IsDetailMode && !IsEditingContent; } }
+
+        /// <summary>기존 요청 상세를 보다가 "수정" 버튼으로 진입하는 본문 편집 모드.</summary>
+        public bool IsEditingContent
+        {
+            get { return _isEditingContent; }
+            private set
+            {
+                if (SetProperty(ref _isEditingContent, value))
+                {
+                    RaisePropertyChanged("IsContentEditable");
+                    RaisePropertyChanged("IsContentReadOnly");
+                    RaisePropertyChanged("ShowRequestActions");
+                    RaisePropertyChanged("ShowReproductionCard");
+                    RaisePropertyChanged("ReproductionFieldLabel");
+                    RaisePropertyChanged("IsViewingDetail");
+                    RaiseAllCanExecuteChanged();
+                }
+            }
+        }
+
+        /// <summary>제목/유형/사이트/PC/본문 입력창을 보여줄지 — 신규 작성 중이거나 기존 글 수정 중.</summary>
+        public bool IsContentEditable { get { return IsNewRecord || IsEditingContent; } }
+        public bool IsContentReadOnly { get { return !IsContentEditable; } }
 
         public string RequestType
         {
@@ -200,9 +244,9 @@ namespace GBCWorkHub.UI.ViewModels.Improvement
 
         /// <summary>재현 방법은 선택 항목 — 상세에서는 값이 있을 때만 카드 자체를 보여준다.</summary>
         public bool HasReproductionSteps { get { return !string.IsNullOrWhiteSpace(_reproductionSteps); } }
-        public bool ShowReproductionCard { get { return IsNewRecord || HasReproductionSteps; } }
-        /// <summary>작성 중에만 "(선택)"을 붙인다 — 상세에서는 이미 적힌 값을 보여줄 뿐이라 불필요.</summary>
-        public string ReproductionFieldLabel { get { return IsNewRecord ? "재현 방법 (선택)" : "재현 방법"; } }
+        public bool ShowReproductionCard { get { return IsContentEditable || HasReproductionSteps; } }
+        /// <summary>작성/수정 중에만 "(선택)"을 붙인다 — 읽기 전용 상세에서는 이미 적힌 값을 보여줄 뿐이라 불필요.</summary>
+        public string ReproductionFieldLabel { get { return IsContentEditable ? "재현 방법 (선택)" : "재현 방법"; } }
 
         public string SiteCode
         {
@@ -393,6 +437,9 @@ namespace GBCWorkHub.UI.ViewModels.Improvement
 
         public ICommand SaveCommand { get; private set; }
         public ICommand DeleteCommand { get; private set; }
+        public ICommand BeginEditRequestCommand { get; private set; }
+        public ICommand CancelEditRequestCommand { get; private set; }
+        public ICommand SaveEditRequestCommand { get; private set; }
         public ICommand CloseCommand { get; private set; }
         public ICommand ReactReproducedCommand { get; private set; }
         public ICommand ReactNotReproducedCommand { get; private set; }
@@ -454,6 +501,8 @@ namespace GBCWorkHub.UI.ViewModels.Improvement
         public void LoadNew()
         {
             IsNewRecord = true;
+            IsEditingContent = false;
+            _loadedDto = null;
             _reqId = 0;
             RaisePropertyChanged("TicketNoText");
             _authorUserId = 0;
@@ -482,6 +531,8 @@ namespace GBCWorkHub.UI.ViewModels.Improvement
         public void LoadExisting(ImprovementRequestDto dto)
         {
             IsNewRecord = false;
+            IsEditingContent = false;
+            _loadedDto = dto;
             _reqId = dto.ReqId;
             RaisePropertyChanged("TicketNoText");
             _authorUserId = dto.UserId;
@@ -520,6 +571,7 @@ namespace GBCWorkHub.UI.ViewModels.Improvement
                 ContentBlocks.Add(block);
 
             RaisePropertyChanged("CanManageRequest");
+            RaisePropertyChanged("ShowRequestActions");
             RaiseAllCanExecuteChanged();
 
             var reloaded = ContentReloaded; if (reloaded != null) reloaded();
@@ -540,29 +592,19 @@ namespace GBCWorkHub.UI.ViewModels.Improvement
         }
 
         /// <summary>
-        /// "이미지 삽입" 시 파일을 검증하고 블록을 만들어 반환한다. 실패하면 팝업으로 안내하고 null.
-        /// 이미지 개수 상한은 서버 저장 전(작성 중)에도 바로 알 수 있도록 여기서 먼저 검사한다.
+        /// "이미지 삽입"(파일 선택/클립보드 붙여넣기 공통) 시 이미 메모리에 올라온 바이트로 블록을
+        /// 만든다. 실패하면 팝업으로 안내하고 null. 개수 상한은 서버 저장 전(작성 중)에도 바로 알 수
+        /// 있도록 여기서 먼저 검사한다. 용량 제한에 맞춘 인코딩/축소는 코드비하인드가 이 메서드를
+        /// 부르기 전에 이미 끝낸 상태여야 한다(여기서는 개수 상한/확장자/용량만 검증).
         /// </summary>
-        public ImprovementContentBlockViewModel TryStageImageBlock(string path, int currentImageCount)
+        public ImprovementContentBlockViewModel TryStagePastedImageBlock(byte[] bytes, string fileName, int currentImageCount)
         {
             if (currentImageCount >= ImprovementBiz.MaxAttachmentsPerRequest)
             {
-                ShowAttachmentError(System.IO.Path.GetFileName(path), "요청 하나에는 이미지를 최대 " + ImprovementBiz.MaxAttachmentsPerRequest + "장까지 첨부할 수 있습니다.");
+                ShowAttachmentError(fileName, "요청 하나에는 이미지를 최대 " + ImprovementBiz.MaxAttachmentsPerRequest + "장까지 첨부할 수 있습니다.");
                 return null;
             }
 
-            byte[] bytes;
-            try
-            {
-                bytes = System.IO.File.ReadAllBytes(path);
-            }
-            catch (Exception ex)
-            {
-                ShowAttachmentError(System.IO.Path.GetFileName(path), ex.Message);
-                return null;
-            }
-
-            string fileName = System.IO.Path.GetFileName(path);
             string error = _biz.ValidateAttachment(fileName, bytes);
             if (error != null)
             {
@@ -622,7 +664,31 @@ namespace GBCWorkHub.UI.ViewModels.Improvement
             if (result.Count == 0)
                 result.Add(new ImprovementContentBlockViewModel(string.Empty));
 
+            EnsureTextBlocksAroundImages(result);
             return result;
+        }
+
+        /// <summary>
+        /// 이미지 앞뒤에 빈 문단이 하나도 없으면(연속된 이미지 사이, 문서 맨 앞/뒤) 저장 시 빈
+        /// 텍스트 블록이 잘려나가 다시 불러왔을 때 이미지끼리 바로 붙어버린다 — 클릭해서 타이핑할
+        /// 자리가 안 보이는 원인이라, 로드 시점에 항상 빈 문단을 다시 채워 넣는다.
+        /// </summary>
+        private static void EnsureTextBlocksAroundImages(List<ImprovementContentBlockViewModel> blocks)
+        {
+            if (blocks.Count == 0)
+                return;
+
+            if (blocks[0].IsImage)
+                blocks.Insert(0, new ImprovementContentBlockViewModel(string.Empty));
+
+            for (int i = 1; i < blocks.Count; i++)
+            {
+                if (blocks[i - 1].IsImage && blocks[i].IsImage)
+                    blocks.Insert(i, new ImprovementContentBlockViewModel(string.Empty));
+            }
+
+            if (blocks[blocks.Count - 1].IsImage)
+                blocks.Add(new ImprovementContentBlockViewModel(string.Empty));
         }
 
         private static int ResolveAttachmentIndex(string token, IList<ImprovementAttachmentDto> attachments, ISet<int> consumedIndexes)
@@ -824,6 +890,57 @@ namespace GBCWorkHub.UI.ViewModels.Improvement
             }
         }
 
+        /// <summary>기존 요청의 본문(제목/유형/사이트/PC/설명/재현방법) 수정 저장. 새 이미지만 업로드하고,
+        /// 이미 저장된 첨부는 SerializeBlocksToDescription이 그대로 토큰만 재사용하므로 재업로드하지 않는다.</summary>
+        private async System.Threading.Tasks.Task SaveEditRequestAsync()
+        {
+            List<ImprovementContentBlockViewModel> imageBlocks;
+            string descriptionText = SerializeBlocksToDescription(out imageBlocks);
+
+            var edited = new ImprovementRequestDto
+            {
+                ReqId = _reqId,
+                UserId = _authorUserId,
+                RequestType = ImprovementTypeCodeFromLabel(RequestType),
+                Title = Title,
+                Description = descriptionText,
+                ReproductionSteps = string.IsNullOrWhiteSpace(ReproductionSteps) ? null : ReproductionSteps,
+                SiteCode = string.Equals(SiteCode, "전체", StringComparison.Ordinal) ? null : SiteCode,
+                PcName = string.IsNullOrWhiteSpace(PcName) ? null : PcName
+            };
+
+            IsBusy = true;
+            try
+            {
+                string error = await _biz.UpdateAsync(edited).ConfigureAwait(true);
+                if (error != null)
+                {
+                    ValidationError = error;
+                    return;
+                }
+                ValidationError = null;
+
+                foreach (var imageBlock in imageBlocks)
+                {
+                    if (imageBlock.IsExistingAttachment)
+                        continue;
+                    string attachError = await _biz.AddAttachmentAsync(_reqId, imageBlock.FileName, imageBlock.ImageData, imageBlock.ContentKey).ConfigureAwait(true);
+                    if (attachError != null && _popup != null)
+                        await _popup.ShowResultAsync(new PopupRequest { Title = "이미지 첨부 실패", Message = imageBlock.FileName + ": " + attachError, Icon = PopupIconKind.Error }).ConfigureAwait(true);
+                }
+
+                var changed = DataChanged; if (changed != null) changed();
+
+                var reloaded = await _biz.GetByIdAsync(_reqId).ConfigureAwait(true);
+                if (reloaded != null)
+                    LoadExisting(reloaded);
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
         private async System.Threading.Tasks.Task DeleteAsync()
         {
             if (_popup != null)
@@ -1014,7 +1131,8 @@ namespace GBCWorkHub.UI.ViewModels.Improvement
             foreach (var cmd in new[]
             {
                 SaveCommand, DeleteCommand, ReactReproducedCommand, ReactNotReproducedCommand,
-                AddCommentCommand, SaveAdminCommand
+                AddCommentCommand, SaveAdminCommand,
+                BeginEditRequestCommand, CancelEditRequestCommand, SaveEditRequestCommand
             })
             {
                 var relay = cmd as RelayCommand;

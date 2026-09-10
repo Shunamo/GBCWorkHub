@@ -15,5 +15,9 @@ namespace GBCWorkHub.DTO
         public string PcNote { get; set; }
         /// <summary>사용자 수정 가능 코멘트(엑셀 Comment 시드 + 앱 편집).</summary>
         public string PcComment { get; set; }
+        /// <summary>관리자 페이지에서 체크: 이 PC에 AGENT 설치까지 완료됐는지. null이면 저장 시
+        /// 기존 값을 건드리지 않는다 — 자동 PC 동기화(UpsertPcMap 정기 호출)가 이 필드를 모른 채
+        /// 매번 값을 덮어써서 체크를 초기화해 버리는 걸 막기 위함.</summary>
+        public bool? AgentInstalled { get; set; }
     }
 }

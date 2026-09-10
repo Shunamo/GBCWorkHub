@@ -319,8 +319,14 @@
             <Border Style="{StaticResource AdminPcCardBorder}"
                     MouseLeftButtonUp="AdminPcCard_MouseLeftButtonUp">
                 <StackPanel HorizontalAlignment="Stretch">
-                    <Image Width="72" Height="72" Stretch="Uniform" HorizontalAlignment="Center" Margin="0,0,0,8"
-                           Source="{StaticResource PcMonitorIcon}" />
+                    <Grid Width="72" Height="72" HorizontalAlignment="Center" Margin="0,0,0,8">
+                        <Image Width="72" Height="72" Stretch="Uniform"
+                               Source="{StaticResource PcMonitorIcon}" />
+                        <Ellipse Width="9" Height="9" Fill="#FACC15"
+                                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-3,-3,0"
+                                 ToolTip="AGENT 설치 완료"
+                                 Visibility="{Binding AgentInstalled, Converter={StaticResource BoolToVis}}" />
+                    </Grid>
                     <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" Foreground="#1E293B"
                                TextAlignment="Center" TextTrimming="CharacterEllipsis" />
                     <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="#64748B" Margin="0,4,0,0"
@@ -458,6 +464,11 @@
                     </StackPanel>
                     <StackPanel>
                         <DockPanel LastChildFill="False">
+                            <Border Background="#EEF2FF" CornerRadius="6" Padding="6,2" Margin="0,0,8,0"
+                                    VerticalAlignment="Center"
+                                    Visibility="{Binding ShowSiteBadge, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="{Binding SiteDisplay}" FontSize="10.5" FontWeight="SemiBold" Foreground="#4338CA" />
+                            </Border>
                             <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" Foreground="#1E293B"
                                        TextTrimming="CharacterEllipsis" />
                         </DockPanel>
@@ -618,7 +629,7 @@
                 <Border Style="{StaticResource GlassSurfaceStyle}" Padding="0"
                         HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ClipToBounds="True">
                     <imp:ImprovementListView DataContext="{Binding DataContext.Improvement, RelativeSource={RelativeSource AncestorType=Window}}"
-                                              Margin="-8" />
+                                              Margin="-8,-52,-8,-8" />
                 </Border>
             </Grid>
 
@@ -795,6 +806,10 @@
                                                      Text="{Binding AdminDraftPcComment, UpdateSourceTrigger=PropertyChanged}" MinHeight="56" Height="Auto" />
                                         </StackPanel>
                                     </Border>
+
+                                    <CheckBox Content="AGENT 설치 완료" FontSize="12.5" FontWeight="SemiBold" Foreground="#64748B"
+                                              Margin="0,10,0,0"
+                                              IsChecked="{Binding AdminDraftAgentInstalled, Mode=TwoWay}" />
                                 </StackPanel>
                             </ScrollViewer>
 
@@ -881,6 +896,49 @@
                                     ToolTip="새로고침" Command="{Binding ReloadUsageLogsCommand}">
                                 <Image Source="{StaticResource RefreshLightIcon}" Width="18" Height="18" />
                             </Button>
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0">
+                                <Button Command="{Binding OpenUsageLogDatePickerCommand}"
+                                        Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="8,4">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border x:Name="Bd" Background="#A6FFFFFF" BorderBrush="#F2FFFFFF"
+                                                                BorderThickness="1" CornerRadius="10" Padding="{TemplateBinding Padding}">
+                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter TargetName="Bd" Property="Background" Value="#CCE8F0FF" />
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </Button.Style>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Source="{StaticResource DateRangeFillIcon}" Width="16" Height="16"
+                                               Margin="0,0,6,0" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding UsageLogDateChipText}" FontSize="12" FontWeight="SemiBold"
+                                                   Foreground="#334155" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Margin="2,0,0,0" Padding="0" Width="22" Height="22"
+                                        VerticalAlignment="Center"
+                                        Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                        ToolTip="기간 조건 지우기"
+                                        Command="{Binding ClearUsageLogDateFilterCommand}"
+                                        Visibility="{Binding HasUsageLogDateFilter, Converter={StaticResource BoolToVis}}">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <TextBlock Text="×" FontSize="13" Foreground="#64748B"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </StackPanel>
                             <TextBlock DockPanel.Dock="Right" VerticalAlignment="Center" Margin="0,0,8,0"
                                        FontSize="12.5" Foreground="#64748B">
                                 <Run Text="{Binding UsageLogCount, Mode=OneWay}" FontWeight="SemiBold" Foreground="#1E293B" />
@@ -918,7 +976,8 @@
                                     <DataTemplate>
                                         <StackPanel Margin="0,0,0,16">
                                             <TextBlock Text="{Binding Header}" FontSize="14" FontWeight="SemiBold"
-                                                       Foreground="#1E293B" Margin="4,0,4,8" />
+                                                       Foreground="#1E293B" Margin="4,0,4,8"
+                                                       Visibility="{Binding ShowHeader, Converter={StaticResource BoolToVis}}" />
                                             <ItemsControl ItemsSource="{Binding DateGroups}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
@@ -942,70 +1001,188 @@
                                    Visibility="{Binding HasUsageLogStatusMessage, Converter={StaticResource BoolToVis}}" />
                     </Grid>
                 </Border>
+
+                <!-- MyPage-style date range calendar -->
+                <Grid Panel.ZIndex="80"
+                      Visibility="{Binding IsUsageLogDatePickerOpen, Converter={StaticResource BoolToVis}}">
+                    <Border Background="#660F172A"
+                            MouseLeftButtonDown="UsageLogDatePickerScrim_MouseLeftButtonDown" />
+                    <Border Style="{StaticResource AdminPickerCard}" Width="268"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <StackPanel>
+                            <DockPanel Margin="0,0,0,6" LastChildFill="True">
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Style="{StaticResource HeaderIconButton}"
+                                            Width="24" Height="24" ToolTip="이전 달"
+                                            Command="{Binding PrevUsageLogCalendarMonthCommand}">
+                                        <Image Source="{StaticResource ExpandLeftIcon}" Width="9" Height="9" Opacity="0.45" />
+                                    </Button>
+                                    <Button Style="{StaticResource HeaderIconButton}"
+                                            Width="24" Height="24" ToolTip="다음 달"
+                                            Command="{Binding NextUsageLogCalendarMonthCommand}">
+                                        <Image Source="{StaticResource ExpandRightIcon}" Width="9" Height="9" Opacity="0.45" />
+                                    </Button>
+                                </StackPanel>
+                                <TextBlock Text="{Binding UsageLogCalendarMonthTitle}"
+                                           FontSize="15" FontWeight="SemiBold"
+                                           Foreground="{StaticResource WlGlassInk}"
+                                           VerticalAlignment="Center" />
+                            </DockPanel>
+                            <UniformGrid Columns="7" Margin="0,0,0,2">
+                                <TextBlock Text="일" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource WlGlassMuted}" HorizontalAlignment="Center" />
+                                <TextBlock Text="월" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource WlGlassMuted}" HorizontalAlignment="Center" />
+                                <TextBlock Text="화" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource WlGlassMuted}" HorizontalAlignment="Center" />
+                                <TextBlock Text="수" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource WlGlassMuted}" HorizontalAlignment="Center" />
+                                <TextBlock Text="목" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource WlGlassMuted}" HorizontalAlignment="Center" />
+                                <TextBlock Text="금" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource WlGlassMuted}" HorizontalAlignment="Center" />
+                                <TextBlock Text="토" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource WlGlassMuted}" HorizontalAlignment="Center" />
+                            </UniformGrid>
+                            <ItemsControl ItemsSource="{Binding UsageLogCalendarDays}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="7" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource AdminCalendarDayButton}"
+                                                Width="32" Height="32"
+                                                IsEnabled="{Binding IsCurrentMonth}"
+                                                Command="{Binding DataContext.SelectUsageLogCalendarDayCommand, ElementName=AdminRoot}"
+                                                CommandParameter="{Binding Date}">
+                                            <Grid Width="32" Height="32">
+                                                <Border Margin="1,4" Background="#3376ADFF">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding RangeFillMid}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                    <Setter Property="CornerRadius" Value="0" />
+                                                                    <Setter Property="Margin" Value="0,4" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding RangeFillFromStart}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                    <Setter Property="CornerRadius" Value="4,0,0,4" />
+                                                                    <Setter Property="Margin" Value="1,4,0,4" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding RangeFillToEnd}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                    <Setter Property="CornerRadius" Value="0,4,4,0" />
+                                                                    <Setter Property="Margin" Value="0,4,1,4" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                </Border>
+                                                <Border Width="26" Height="26" CornerRadius="4"
+                                                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="Transparent" />
+                                                            <Setter Property="BorderBrush" Value="Transparent" />
+                                                            <Setter Property="BorderThickness" Value="1.5" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsTodayOnly}" Value="True">
+                                                                    <Setter Property="BorderBrush" Value="#76ADFF" />
+                                                                    <Setter Property="Background" Value="#2276ADFF" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding IsEndpoint}" Value="True">
+                                                                    <Setter Property="Background" Value="#76ADFF" />
+                                                                    <Setter Property="BorderBrush" Value="#76ADFF" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                </Border>
+                                                <TextBlock Text="{Binding DayText}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           FontSize="13">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="{StaticResource WlGlassInk}" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsTodayOnly}" Value="True">
+                                                                    <Setter Property="Foreground" Value="#76ADFF" />
+                                                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding IsEndpoint}" Value="True">
+                                                                    <Setter Property="Foreground" Value="#FFFFFF" />
+                                                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Grid>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+                                <Button Content="취소" Style="{StaticResource AdminPickerGhostButton}" Margin="0,0,8,0"
+                                        Command="{Binding CloseUsageLogDatePickerCommand}" />
+                                <Button Content="적용" Style="{StaticResource AdminPickerAccentButton}"
+                                        Command="{Binding ApplyUsageLogDateFilterCommand}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Grid>
             </Grid>
 
-            <!-- Work Logs -->
+            <!-- Work Logs: 요청사항(Requests) 섹션과 동일하게 큰 헤더 카드 없이 그냥 임베드만 하되,
+                 달력 필터 버튼만 그 위(별도 행)에 얇게 둔다 — 떠 있는(Z겹침) 방식은 창 크기가
+                 좁아지면 임베드 뷰 자체 툴바와 겹쳐 보이므로, 겹치지 않는 일반 레이아웃(Row) 사용. -->
             <Grid Visibility="{Binding IsWorkLogsSection, Converter={StaticResource BoolToVis}}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <Border Grid.Row="0" Style="{StaticResource GlassSurfaceStyle}" Padding="16" Margin="0,0,0,12">
-                    <StackPanel>
-                        <DockPanel LastChildFill="True" Margin="0,0,0,10">
-                            <Button DockPanel.Dock="Right" Style="{StaticResource HeaderIconButton}" Margin="8,0,0,0"
-                                    ToolTip="새로고침" Command="{Binding ReloadWorkLogsCommand}">
-                                <Image Source="{StaticResource RefreshLightIcon}" Width="18" Height="18" />
-                            </Button>
-                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0">
-                                <Button Command="{Binding OpenWorkLogDatePickerCommand}"
-                                        Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="8,4">
-                                    <Button.Style>
-                                        <Style TargetType="Button">
-                                            <Setter Property="Template">
-                                                <Setter.Value>
-                                                    <ControlTemplate TargetType="Button">
-                                                        <Border x:Name="Bd" Background="#A6FFFFFF" BorderBrush="#F2FFFFFF"
-                                                                BorderThickness="1" CornerRadius="10" Padding="{TemplateBinding Padding}">
-                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                        </Border>
-                                                        <ControlTemplate.Triggers>
-                                                            <Trigger Property="IsMouseOver" Value="True">
-                                                                <Setter TargetName="Bd" Property="Background" Value="#CCE8F0FF" />
-                                                            </Trigger>
-                                                        </ControlTemplate.Triggers>
-                                                    </ControlTemplate>
-                                                </Setter.Value>
-                                            </Setter>
-                                        </Style>
-                                    </Button.Style>
-                                    <StackPanel Orientation="Horizontal">
-                                        <Image Source="{StaticResource DateRangeFillIcon}" Width="16" Height="16"
-                                               Margin="0,0,6,0" VerticalAlignment="Center" />
-                                        <TextBlock Text="{Binding WorkLogDateChipText}" FontSize="12" FontWeight="SemiBold"
-                                                   Foreground="#334155" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </Button>
-                                <Button Margin="2,0,0,0" Padding="0" Width="22" Height="22"
-                                        VerticalAlignment="Center"
-                                        Background="Transparent" BorderThickness="0" Cursor="Hand"
-                                        ToolTip="기간 조건 지우기"
-                                        Command="{Binding ClearWorkLogDateFilterCommand}"
-                                        Visibility="{Binding HasWorkLogDateFilter, Converter={StaticResource BoolToVis}}">
-                                    <Button.Template>
+                <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right"
+                            Margin="0,0,0,6">
+                    <Button Command="{Binding OpenWorkLogDatePickerCommand}"
+                            Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="8,4">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Template">
+                                    <Setter.Value>
                                         <ControlTemplate TargetType="Button">
-                                            <TextBlock Text="×" FontSize="13" Foreground="#64748B"
-                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            <Border x:Name="Bd" Background="#E6FFFFFF" BorderBrush="#F2FFFFFF"
+                                                    BorderThickness="1" CornerRadius="10" Padding="{TemplateBinding Padding}">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#CCE8F0FF" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
                                         </ControlTemplate>
-                                    </Button.Template>
-                                </Button>
-                            </StackPanel>
-                            <TextBlock Text="업무 기록" FontSize="15" FontWeight="SemiBold"
-                                       Foreground="#1E293B" VerticalAlignment="Center" />
-                        </DockPanel>
-                    </StackPanel>
-                </Border>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Button.Style>
+                        <StackPanel Orientation="Horizontal">
+                            <Image Source="{StaticResource DateRangeFillIcon}" Width="16" Height="16"
+                                   Margin="0,0,6,0" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding WorkLogDateChipText}" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="#334155" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Margin="2,0,0,0" Padding="0" Width="22" Height="22"
+                            VerticalAlignment="Center"
+                            Background="Transparent" BorderThickness="0" Cursor="Hand"
+                            ToolTip="기간 조건 지우기"
+                            Command="{Binding ClearWorkLogDateFilterCommand}"
+                            Visibility="{Binding HasWorkLogDateFilter, Converter={StaticResource BoolToVis}}">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <TextBlock Text="×" FontSize="13" Foreground="#64748B"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </StackPanel>
 
                 <Border Grid.Row="1" Style="{StaticResource GlassSurfaceStyle}" Padding="0"
                         HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ClipToBounds="True">

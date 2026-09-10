@@ -25,6 +25,13 @@ namespace GBCWorkHub.UI.ViewModels
             set { SetProperty(ref _isSelected, value, "IsSelected"); }
         }
 
+        public bool ShowSiteBadge { get; set; }
+
+        public string SiteDisplay
+        {
+            get { return string.IsNullOrWhiteSpace(SiteCode) ? "미지정" : SiteCode.Trim().ToUpperInvariant(); }
+        }
+
         public string Title
         {
             get
@@ -39,11 +46,9 @@ namespace GBCWorkHub.UI.ViewModels
         {
             get
             {
-                string site = string.IsNullOrWhiteSpace(SiteCode) ? "-" : SiteCode.Trim();
-                string ip = string.IsNullOrWhiteSpace(RemoteAccessIpAddress) ? "-" : RemoteAccessIpAddress.Trim();
                 string status = StatusDisplay;
                 string span = OccupancySpanDisplay;
-                return site + " · " + ip + " · " + status + " · " + span;
+                return status + "  ·  " + span;
             }
         }
 

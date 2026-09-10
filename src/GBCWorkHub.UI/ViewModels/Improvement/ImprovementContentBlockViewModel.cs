@@ -27,6 +27,9 @@ namespace GBCWorkHub.UI.ViewModels.Improvement
         public string FileName { get; private set; }
         public string ContentKey { get; private set; }
 
+        /// <summary>이미 서버에 업로드되어 있는 첨부를 감싼 블록이면 true — 수정 저장 시 재업로드하지 않는다.</summary>
+        public bool IsExistingAttachment { get; private set; }
+
         public ImprovementContentBlockViewModel(string text)
         {
             IsText = true;
@@ -47,6 +50,7 @@ namespace GBCWorkHub.UI.ViewModels.Improvement
             ImageData = attachment.FileData;
             FileName = attachment.FileName;
             ContentKey = attachment.ContentKey;
+            IsExistingAttachment = true;
         }
 
         /// <summary>

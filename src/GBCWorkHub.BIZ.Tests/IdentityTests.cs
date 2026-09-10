@@ -231,6 +231,7 @@ namespace GBCWorkHub.BIZ.Tests
             public bool LoginIdExists(string loginId, long excludeUserId) { return false; }
             public IList<PcMapDto> GetPcMapsBySite(string siteCode) { return new List<PcMapDto>(); }
             public int DeletePcMap(string siteCode, string pcName) { return 0; }
+            public IList<string> GetDistinctTeamNames() { return new List<string>(); }
 
             public Task<int> UpsertUserAsync(DirectoryUserDto user) { return Task.FromResult(UpsertUser(user)); }
             public Task<DirectoryUserDto> FindUserForAuthAsync(string loginOrName) { return Task.FromResult(FindUserForAuth(loginOrName)); }
@@ -242,6 +243,7 @@ namespace GBCWorkHub.BIZ.Tests
             public Task<IList<DirectoryUserDto>> GetUsersAsync() { return Task.FromResult(GetUsers()); }
             public Task<IList<PcMapDto>> GetPcMapsBySiteAsync(string siteCode) { return Task.FromResult((IList<PcMapDto>)new List<PcMapDto>()); }
             public Task<int> DeletePcMapAsync(string siteCode, string pcName) { return Task.FromResult(0); }
+            public Task<IList<string>> GetDistinctTeamNamesAsync() { return Task.FromResult((IList<string>)new List<string>()); }
 
             private static DirectoryUserDto Clone(DirectoryUserDto d)
             {

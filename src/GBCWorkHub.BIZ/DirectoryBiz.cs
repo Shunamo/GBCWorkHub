@@ -244,6 +244,7 @@ namespace GBCWorkHub.BIZ
                     dto.PcComment = map.PcComment.Trim();
                 else if (!string.IsNullOrWhiteSpace(map.PcNote))
                     dto.PcComment = PcAccessNoteParser.ParseCommentFromNote(map.PcNote);
+                dto.AgentInstalled = map.AgentInstalled.GetValueOrDefault();
                 ApplyPcMapIdentity(dto, map);
             }
         }
@@ -321,6 +322,14 @@ namespace GBCWorkHub.BIZ
             {
                 return new List<PcMapDto>();
             }
+        }
+
+        /// <summary>가입한 사용자들이 실제로 입력한 소속(TEAM_NM) 중복 제거 목록. 업무기록 소속 필터용.</summary>
+        public Task<IList<string>> GetDistinctTeamNamesAsync()
+        {
+            if (!IsConfigured)
+                return Task.FromResult<IList<string>>(new List<string>());
+            return _repository.GetDistinctTeamNamesAsync();
         }
 
         /// <summary>관리자: 사이트별(또는 전체) PCMAP 목록.</summary>
@@ -454,6 +463,7 @@ namespace GBCWorkHub.BIZ
                     PcDomain = map.PcDomain,
                     PcNote = map.PcNote,
                     PcComment = map.PcComment,
+                    AgentInstalled = map.AgentInstalled.GetValueOrDefault(),
                     IpAddress = !string.IsNullOrWhiteSpace(map.ShareKey) ? map.ShareKey.Trim() : map.PcName.Trim(),
                     HostAddress = LooksLikeIpv4(map.PcIp) ? map.PcIp.Trim() : null
                 };

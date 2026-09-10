@@ -78,5 +78,15 @@ namespace GBCWorkHub.UI.Views
                 vm.CloseWorkLogDatePickerCommand.Execute(null);
             e.Handled = true;
         }
+
+        private void UsageLogDatePickerScrim_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var vm = DataContext as AdminViewModel;
+            if (vm == null || vm.CloseUsageLogDatePickerCommand == null)
+                return;
+            if (vm.CloseUsageLogDatePickerCommand.CanExecute(null))
+                vm.CloseUsageLogDatePickerCommand.Execute(null);
+            e.Handled = true;
+        }
     }
 }

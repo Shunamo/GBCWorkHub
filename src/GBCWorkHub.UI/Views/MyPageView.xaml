@@ -240,12 +240,12 @@
                             <Image Source="{StaticResource EditFillIcon}" Width="13" Height="13" />
                         </Button>
                         <Button Style="{StaticResource GlassToolbarIconButton}"
-                                Width="Auto" MinWidth="72" Height="26" Margin="6,0,0,0" Padding="8,0"
-                                ToolTip="비밀번호 재설정"
+                                Width="Auto" Height="26" Margin="6,0,0,0" Padding="10,0"
+                                ToolTip="비밀번호 변경"
                                 Command="{Binding ChangePasswordCommand}"
                                 Visibility="{Binding IsLoggedIn, Converter={StaticResource BoolToVis}}"
                                 VerticalAlignment="Center">
-                            <TextBlock Text="비밀번호" FontSize="11" Foreground="#475569" VerticalAlignment="Center" />
+                            <TextBlock Text="비밀번호 변경" FontSize="11" Foreground="#475569" VerticalAlignment="Center" />
                         </Button>
                     </StackPanel>
                 </StackPanel>

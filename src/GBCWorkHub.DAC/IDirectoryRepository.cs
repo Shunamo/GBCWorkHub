@@ -41,6 +41,8 @@ namespace GBCWorkHub.DAC
         IList<PcMapDto> GetPcMapsBySite(string siteCode);
         /// <summary>사이트+PC명으로 PCMAP 행 삭제.</summary>
         int DeletePcMap(string siteCode, string pcName);
+        /// <summary>가입한 사용자들이 실제로 입력한 소속(TEAM_NM) 중복 제거 목록. 업무기록 소속 필터에 사용.</summary>
+        IList<string> GetDistinctTeamNames();
 
         Task<int> UpsertUserAsync(DirectoryUserDto user);
         Task<DirectoryUserDto> FindUserForAuthAsync(string loginOrName);
@@ -52,5 +54,6 @@ namespace GBCWorkHub.DAC
         Task<IList<DirectoryUserDto>> GetUsersAsync();
         Task<IList<PcMapDto>> GetPcMapsBySiteAsync(string siteCode);
         Task<int> DeletePcMapAsync(string siteCode, string pcName);
+        Task<IList<string>> GetDistinctTeamNamesAsync();
     }
 }
