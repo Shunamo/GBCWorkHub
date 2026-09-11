@@ -52,6 +52,37 @@ namespace GBCWorkHub.DAC
             return Task.Run(() => (IList<RemotePcStatus>)GetAllCore());
         }
 
+        public Task<DateTime?> GetMaxUpdatedAtAsync()
+        {
+            return Task.Run(() => GetMaxUpdatedAtCore());
+        }
+
+        private DateTime? GetMaxUpdatedAtCore()
+        {
+            if (!EnsureConfigured())
+                return null;
+
+            try
+            {
+                using (var conn = OpenConnection())
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT MAX(UPDT_DTM) FROM " + TableName;
+                    object result = cmd.ExecuteScalar();
+                    _lastConnectionOk = true;
+                    if (result == null || result == DBNull.Value)
+                        return null;
+                    return Convert.ToDateTime(result);
+                }
+            }
+            catch (Exception ex)
+            {
+                FailConnection(ex);
+                WorkHubFileLogger.Error("DB_MAXUPDT_FAILED", _lastConnectionError);
+                return null;
+            }
+        }
+
         public Task<RemotePcStatus> GetByRemoteIpAsync(string remoteIp)
         {
             return Task.Run(() => GetByRemoteIpCore(remoteIp));

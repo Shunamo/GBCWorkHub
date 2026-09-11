@@ -13,6 +13,8 @@ namespace GBCWorkHub.DAC
 
         Task<bool> TestConnectionAsync();
         Task<IList<RemotePcStatus>> GetAllAsync();
+        /// <summary>가벼운 폴링 체크용 — 전체 로우를 안 긁고 MAX(UPDT_DTM)만 본다.</summary>
+        Task<DateTime?> GetMaxUpdatedAtAsync();
         Task<RemotePcStatus> GetByRemoteIpAsync(string remoteIp);
         Task<bool> TryReserveAsync(RemotePcReserveParams parameters);
         Task<bool> ConfirmConnectionAsync(string remoteIp, string sessionToken);

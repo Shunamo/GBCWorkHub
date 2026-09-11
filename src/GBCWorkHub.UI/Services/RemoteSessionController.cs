@@ -56,6 +56,8 @@ namespace GBCWorkHub.UI.Services
         private System.Timers.Timer _occupancyWatch;
         private int _occupancyWatchInFlight;
         private bool _pollInFlight;
+        private DateTime? _lastKnownMaxUpdatedAt;
+        private bool _hasLastKnownMaxUpdatedAt;
         private DateTime _userSessionStartedAt;
         private int _userSessionReleaseGate;
         private string _pendingTakeoverShareKey;
@@ -1044,7 +1046,34 @@ namespace GBCWorkHub.UI.Services
             _pollInFlight = true;
             try
             {
+                // 매번 전체 로우를 긁지 않고, 바뀐 게 없으면(MAX(UPDT_DTM) 동일) 이번 주기는 건너뛴다.
+                // forceUi(수동 새로고침)는 항상 전체 조회.
+                if (!forceUi && _hasLastKnownMaxUpdatedAt)
+                {
+                    DateTime? currentMax = await _share.GetMaxUpdatedAtAsync().ConfigureAwait(true);
+                    if (_share.LastConnectionOk && currentMax == _lastKnownMaxUpdatedAt)
+                        return;
+                    if (_share.LastConnectionOk)
+                        _lastKnownMaxUpdatedAt = currentMax;
+                }
+
                 IList<RemotePcStatus> list = await _share.GetAllAsync().ConfigureAwait(true);
+                if (_share.LastConnectionOk)
+                {
+                    _hasLastKnownMaxUpdatedAt = true;
+                    DateTime? maxNow = null;
+                    if (list != null)
+                    {
+                        foreach (var row in list)
+                        {
+                            if (row == null)
+                                continue;
+                            if (!maxNow.HasValue || (row.UpdatedDateTime.HasValue && row.UpdatedDateTime.Value > maxNow.Value))
+                                maxNow = row.UpdatedDateTime;
+                        }
+                    }
+                    _lastKnownMaxUpdatedAt = maxNow;
+                }
                 bool ok = _share.LastConnectionOk;
                 _ui.IsCentralDbConnected = ok;
                 _ui.IsCentralShareEnabled = ok;

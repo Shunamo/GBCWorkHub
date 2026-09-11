@@ -83,6 +83,11 @@ namespace GBCWorkHub.BIZ
             return _repository.GetAllAsync();
         }
 
+        public Task<DateTime?> GetMaxUpdatedAtAsync()
+        {
+            return _repository.GetMaxUpdatedAtAsync();
+        }
+
         public Task<RemotePcStatus> GetByRemoteIpAsync(string remoteIp)
         {
             return _repository.GetByRemoteIpAsync(remoteIp);
