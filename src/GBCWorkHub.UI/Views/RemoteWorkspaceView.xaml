@@ -3,7 +3,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:GBCWorkHub.UI.ViewModels"
              xmlns:ctrl="clr-namespace:GBCWorkHub.UI.Controls"
-             xmlns:conv="clr-namespace:GBCWorkHub.UI.Converters">
+             xmlns:conv="clr-namespace:GBCWorkHub.UI.Converters"
+             x:Name="RemoteWorkspaceRoot">
     <UserControl.Resources>
         <conv:StringEqualsMultiConverter x:Key="GroupFilterEquals" />
         <Style TargetType="ScrollBar" BasedOn="{StaticResource GlassScrollBar}">
@@ -487,61 +488,6 @@
 
                             <Border Height="1" Background="#E2E8F0" Margin="16,10,16,8" Opacity="0.7" />
 
-                            <!-- PC의 소속 그룹(진료지원/진료간호/원무 등) 필터. 옵션이 "전체"만 있으면(그룹 정보 없는 사이트) 숨김 -->
-                            <TextBlock Text="그룹" FontSize="11" FontWeight="SemiBold" Foreground="#94A3B8"
-                                       Margin="16,0,0,4">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding GroupFilterOptions.Count}" Value="1">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                            <ItemsControl ItemsSource="{Binding GroupFilterOptions}">
-                                <ItemsControl.Style>
-                                    <Style TargetType="ItemsControl">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding GroupFilterOptions.Count}" Value="1">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </ItemsControl.Style>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <RadioButton Style="{StaticResource RemoteComputerSidebarButtonStyle}"
-                                                     Command="{Binding DataContext.SelectGroupFilterCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                     CommandParameter="{Binding}">
-                                            <RadioButton.IsChecked>
-                                                <MultiBinding Converter="{StaticResource GroupFilterEquals}" Mode="OneWay">
-                                                    <Binding Path="DataContext.SelectedGroupFilter" RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
-                                                    <Binding />
-                                                </MultiBinding>
-                                            </RadioButton.IsChecked>
-                                            <TextBlock Text="{Binding}" Foreground="#1E293B" />
-                                        </RadioButton>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-
-                            <Border Height="1" Background="#E2E8F0" Margin="16,10,16,8" Opacity="0.7">
-                                <Border.Style>
-                                    <Style TargetType="Border">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding GroupFilterOptions.Count}" Value="1">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Border.Style>
-                            </Border>
-
                             <ItemsControl ItemsSource="{Binding SiteShortcuts}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -628,6 +574,55 @@
                                      VerticalContentAlignment="Center" FontSize="13" />
                         </Grid>
                     </Border>
+
+                    <!-- PC의 소속 그룹(진료지원/진료간호/원무 등) 필터. 사이드바 대신 검색창 옆에 둬서
+                         옵션이 많아져도 스크롤 없이 항상 바로 보이게 한다. -->
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"
+                                Margin="0,0,8,0"
+                                Visibility="{Binding HasGroupFilterOptions, Converter={StaticResource BoolToVis}}">
+                        <Button x:Name="GroupFilterButton" Style="{StaticResource GlassSiteLabelButton}"
+                                Command="{Binding ToggleGroupFilterCommand}" ToolTip="그룹 필터">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding SelectedGroupFilter}"
+                                           FontSize="13" FontWeight="SemiBold"
+                                           Foreground="#1E293B" VerticalAlignment="Center" />
+                                <Image Width="8" Height="8" Margin="5,1,0,0" VerticalAlignment="Center" Opacity="0.7" Stretch="Uniform">
+                                    <Image.Style>
+                                        <Style TargetType="Image">
+                                            <Setter Property="Source" Value="{StaticResource ExpandDownIcon}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsGroupFilterOpen}" Value="True">
+                                                    <Setter Property="Source" Value="{StaticResource ExpandUpIcon}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Image.Style>
+                                </Image>
+                            </StackPanel>
+                        </Button>
+                        <Popup IsOpen="{Binding IsGroupFilterOpen, Mode=TwoWay}"
+                               PlacementTarget="{Binding ElementName=GroupFilterButton}"
+                               Placement="Bottom" HorizontalOffset="-4" VerticalOffset="6"
+                               AllowsTransparency="True" PopupAnimation="None" StaysOpen="False">
+                            <Border Background="Transparent" BorderThickness="0" Padding="2,4,0,6">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.16" Color="#3B5070" />
+                                </Border.Effect>
+                                <ItemsControl ItemsSource="{Binding GroupFilterOptions}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource GlassSiteChipButton}" Content="{Binding}"
+                                                    Command="{Binding DataContext.SelectGroupFilterCommand, ElementName=RemoteWorkspaceRoot}"
+                                                    CommandParameter="{Binding}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Border>
+                        </Popup>
+                    </StackPanel>
                 </DockPanel>
 
                 <!-- PC gallery skeleton -->

@@ -54,6 +54,7 @@ namespace GBCWorkHub.UI.ViewModels
         private string _selectedStatusFilter = "ALL";
         private string _selectedGroupFilter = "전체";
         private ObservableCollection<string> _groupFilterOptions;
+        private bool _isGroupFilterOpen;
         private RemoteComputerViewMode _selectedViewMode = RemoteComputerViewMode.Card;
         private int _totalCount;
         private int _availableCount;
@@ -137,6 +138,7 @@ namespace GBCWorkHub.UI.ViewModels
             RefreshCommand = new RelayCommand(() => { var _ = RefreshFromDbAsync(); }, () => !IsRefreshing);
             SelectStatusFilterCommand = new RelayCommand<string>(SelectStatusFilter);
             SelectGroupFilterCommand = new RelayCommand<string>(SelectGroupFilter);
+            ToggleGroupFilterCommand = new RelayCommand(() => IsGroupFilterOpen = !IsGroupFilterOpen);
             ConnectRemoteComputerCommand = new RelayCommand<RemoteComputerItemViewModel>(item => { var _ = ConnectRemoteComputerAsync(item); });
             CheckRemoteComputerCommand = new RelayCommand<RemoteComputerItemViewModel>(item => { var _ = CheckRemoteComputerAsync(item); });
             ChangeViewModeCommand = new RelayCommand<string>(SetViewMode);
@@ -451,6 +453,17 @@ namespace GBCWorkHub.UI.ViewModels
             get { return _groupFilterOptions; }
         }
 
+        public bool HasGroupFilterOptions
+        {
+            get { return _groupFilterOptions != null && _groupFilterOptions.Count > 1; }
+        }
+
+        public bool IsGroupFilterOpen
+        {
+            get { return _isGroupFilterOpen; }
+            set { SetProperty(ref _isGroupFilterOpen, value); }
+        }
+
         public RemoteComputerViewMode SelectedViewMode
         {
             get { return _selectedViewMode; }
@@ -553,6 +566,7 @@ namespace GBCWorkHub.UI.ViewModels
         public ICommand RefreshCommand { get; private set; }
         public ICommand SelectStatusFilterCommand { get; private set; }
         public ICommand SelectGroupFilterCommand { get; private set; }
+        public ICommand ToggleGroupFilterCommand { get; private set; }
         public ICommand ConnectRemoteComputerCommand { get; private set; }
         public ICommand CheckRemoteComputerCommand { get; private set; }
         public ICommand ChangeViewModeCommand { get; private set; }
@@ -2481,6 +2495,7 @@ namespace GBCWorkHub.UI.ViewModels
         private void SelectGroupFilter(string group)
         {
             SelectedGroupFilter = string.IsNullOrWhiteSpace(group) ? "전체" : group;
+            IsGroupFilterOpen = false;
         }
 
         /// <summary>현재 로드된 PC들의 GroupName 값들로 그룹 필터 목록을 갱신한다.</summary>
@@ -2529,6 +2544,7 @@ namespace GBCWorkHub.UI.ViewModels
             }
             if (!stillValid)
                 SelectedGroupFilter = "전체";
+            RaisePropertyChanged("HasGroupFilterOptions");
         }
 
         private void SetViewMode(string mode)
