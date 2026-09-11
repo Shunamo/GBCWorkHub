@@ -2482,6 +2482,16 @@ namespace GBCWorkHub.UI.ViewModels
             SelectedStatusFilter = string.IsNullOrWhiteSpace(filter) ? "ALL" : filter;
         }
 
+        /// <summary>가나다 순(한글 완성형은 코드값 순 = 가나다 순) 먼저, 영어 등 그 외 문자는 뒤로.</summary>
+        private static int CompareGroupNames(string a, string b)
+        {
+            bool aKorean = !string.IsNullOrEmpty(a) && a[0] >= 0xAC00 && a[0] <= 0xD7A3;
+            bool bKorean = !string.IsNullOrEmpty(b) && b[0] >= 0xAC00 && b[0] <= 0xD7A3;
+            if (aKorean != bKorean)
+                return aKorean ? -1 : 1;
+            return string.Compare(a, b, StringComparison.Ordinal);
+        }
+
         /// <summary>현재 로드된 PC들의 GroupName 값들로 그룹 필터 목록을 갱신한다.</summary>
         private void RebuildGroupFilterOptions()
         {
@@ -2506,7 +2516,7 @@ namespace GBCWorkHub.UI.ViewModels
                 if (!exists)
                     distinct.Add(name);
             }
-            distinct.Sort(StringComparer.Ordinal);
+            distinct.Sort(CompareGroupNames);
 
             string previousSelection = SelectedGroupFilter;
             _groupFilterOptions.Clear();

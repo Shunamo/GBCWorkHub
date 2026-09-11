@@ -593,6 +593,7 @@
                                 <Setter Property="Foreground" Value="#334155" />
                                 <Setter Property="FontSize" Value="12.5" />
                                 <Setter Property="FontWeight" Value="SemiBold" />
+                                <Setter Property="Cursor" Value="Hand" />
                                 <Setter Property="Template">
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListBoxItem">
