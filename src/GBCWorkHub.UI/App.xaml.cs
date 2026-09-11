@@ -1,7 +1,10 @@
 using System;
 using System.Configuration;
+using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Windows;
 using System.Windows.Markup;
 using System.Windows.Threading;
@@ -12,6 +15,20 @@ namespace GBCWorkHub.UI
 {
     public partial class App : Application
     {
+        private const string SingleInstanceMutexName = "GBCWorkHub_SingleInstance_9F3E2C7A";
+        private static Mutex _singleInstanceMutex;
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr hWnd);
+
+        private const int SW_RESTORE = 9;
+
         static App()
         {
             BundledConfig.EnsureExtracted();
@@ -21,6 +38,16 @@ namespace GBCWorkHub.UI
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+
+            bool createdNew;
+            _singleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out createdNew);
+            if (!createdNew)
+            {
+                ActivateExistingInstance();
+                Shutdown();
+                return;
+            }
+
             DispatcherUnhandledException += App_DispatcherUnhandledException;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
             BundledFonts.ApplyTo(this);
@@ -37,6 +64,30 @@ namespace GBCWorkHub.UI
                 WriteCrash(ex);
                 MessageBox.Show(ex.ToString(), "GBC WorkHub — 시작 실패", MessageBoxButton.OK, MessageBoxImage.Error);
                 Shutdown(-1);
+            }
+        }
+
+        /// <summary>이미 떠 있는 인스턴스의 창을 앞으로 가져온다 — 새 창은 안 띄우고 그냥 종료.</summary>
+        private static void ActivateExistingInstance()
+        {
+            try
+            {
+                Process current = Process.GetCurrentProcess();
+                foreach (Process p in Process.GetProcessesByName(current.ProcessName))
+                {
+                    if (p.Id == current.Id)
+                        continue;
+                    IntPtr hWnd = p.MainWindowHandle;
+                    if (hWnd == IntPtr.Zero)
+                        continue;
+                    if (IsIconic(hWnd))
+                        ShowWindow(hWnd, SW_RESTORE);
+                    SetForegroundWindow(hWnd);
+                    break;
+                }
+            }
+            catch
+            {
             }
         }
 
