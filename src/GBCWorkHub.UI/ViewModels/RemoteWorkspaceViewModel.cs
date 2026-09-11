@@ -2518,15 +2518,14 @@ namespace GBCWorkHub.UI.ViewModels
             }
             distinct.Sort(CompareGroupNames);
 
-            string previousSelection = SelectedGroupFilter;
             _groupFilterOptions.Clear();
             _groupFilterOptions.Add("전체");
             foreach (string name in distinct)
                 _groupFilterOptions.Add(name);
 
-            // 로그인한 사용자의 소속과 일치하는 그룹이 있으면 최초 1회만 자동 선택.
-            // 이후 사용자가 직접 "전체"로 바꾼 걸 되돌리지 않도록 한 번만 시도한다.
-            string autoAffiliationMatch = null;
+            // 그룹(진료지원/진료간호/원무 등)은 사이트마다 달라지는 카테고리가 아니므로,
+            // 사이트를 옮겨도 선택은 그대로 둔다 — 리셋하는 건 로그인한 사용자의 소속으로
+            // 최초 1회 자동 선택할 때뿐.
             if (!_didAutoApplyGroupFilter && distinct.Count > 0)
             {
                 _didAutoApplyGroupFilter = true;
@@ -2537,33 +2536,11 @@ namespace GBCWorkHub.UI.ViewModels
                     {
                         if (string.Equals(name, myAffiliation.Trim(), StringComparison.Ordinal))
                         {
-                            autoAffiliationMatch = name;
+                            SelectedGroupFilter = name;
                             break;
                         }
                     }
                 }
-            }
-
-            if (autoAffiliationMatch != null)
-            {
-                SelectedGroupFilter = autoAffiliationMatch;
-            }
-            else
-            {
-                bool stillValid = string.Equals(previousSelection, "전체", StringComparison.Ordinal);
-                if (!stillValid)
-                {
-                    foreach (string name in distinct)
-                    {
-                        if (string.Equals(name, previousSelection, StringComparison.Ordinal))
-                        {
-                            stillValid = true;
-                            break;
-                        }
-                    }
-                }
-                if (!stillValid)
-                    SelectedGroupFilter = "전체";
             }
             RaisePropertyChanged("HasGroupFilterOptions");
         }
