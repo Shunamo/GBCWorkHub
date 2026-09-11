@@ -63,18 +63,6 @@ namespace GBCWorkHub.UI.Controls
             RebuildDays();
         }
 
-        private void Today_Click(object sender, RoutedEventArgs e)
-        {
-            SelectedDate = KoreaTime.Today;
-            Toggle.IsChecked = false;
-        }
-
-        private void Clear_Click(object sender, RoutedEventArgs e)
-        {
-            SelectedDate = null;
-            Toggle.IsChecked = false;
-        }
-
         private void DayButton_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as Button;

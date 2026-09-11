@@ -15,33 +15,6 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <Style x:Key="DpGhostButton" TargetType="Button">
-            <Setter Property="Background" Value="#FFFFFFFF" />
-            <Setter Property="BorderBrush" Value="#D5DEE8" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Foreground" Value="#334155" />
-            <Setter Property="Padding" Value="14,6" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="1" CornerRadius="8"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#F1F5F9" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
         <Style x:Key="DpNavButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -184,10 +157,6 @@
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                     </ItemsControl>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-                        <Button Content="오늘" Style="{StaticResource DpGhostButton}" Margin="0,0,8,0" Click="Today_Click" />
-                        <Button Content="지우기" Style="{StaticResource DpGhostButton}" Click="Clear_Click" />
-                    </StackPanel>
                 </StackPanel>
             </Border>
         </Popup>
