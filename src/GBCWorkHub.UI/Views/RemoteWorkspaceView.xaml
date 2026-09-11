@@ -492,7 +492,7 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Button Style="{StaticResource SiteShortcutSidebarButtonStyle}"
-                                                IsEnabled="{Binding CanNavigate}"
+                                                IsEnabled="{Binding IsEnabled}"
                                                 Command="{Binding DataContext.OpenSiteCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                 CommandParameter="{Binding SiteCode}"
                                                 ToolTip="이 사이트로 이동">
@@ -502,9 +502,6 @@
                                                          Margin="0,0,8,0" VerticalAlignment="Center" />
                                                 <TextBlock Text="{Binding SiteCode}" Foreground="#1E293B"
                                                            FontWeight="SemiBold" VerticalAlignment="Center" />
-                                                <TextBlock Text="(현재)" FontSize="11" Foreground="#94A3B8"
-                                                           Margin="6,0,0,0" VerticalAlignment="Center"
-                                                           Visibility="{Binding IsCurrent, Converter={StaticResource BoolToVis}}" />
                                             </StackPanel>
                                         </Button>
                                     </DataTemplate>
@@ -575,54 +572,54 @@
                         </Grid>
                     </Border>
 
-                    <!-- PC의 소속 그룹(진료지원/진료간호/원무 등) 필터. 사이드바 대신 검색창 옆에 둬서
-                         옵션이 많아져도 스크롤 없이 항상 바로 보이게 한다. -->
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"
-                                Margin="0,0,8,0"
-                                Visibility="{Binding HasGroupFilterOptions, Converter={StaticResource BoolToVis}}">
-                        <Button x:Name="GroupFilterButton" Style="{StaticResource GlassSiteLabelButton}"
-                                Command="{Binding ToggleGroupFilterCommand}" ToolTip="그룹 필터">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding SelectedGroupFilter}"
-                                           FontSize="13" FontWeight="SemiBold"
-                                           Foreground="#1E293B" VerticalAlignment="Center" />
-                                <Image Width="8" Height="8" Margin="5,1,0,0" VerticalAlignment="Center" Opacity="0.7" Stretch="Uniform">
-                                    <Image.Style>
-                                        <Style TargetType="Image">
-                                            <Setter Property="Source" Value="{StaticResource ExpandDownIcon}" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsGroupFilterOpen}" Value="True">
-                                                    <Setter Property="Source" Value="{StaticResource ExpandUpIcon}" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Image.Style>
-                                </Image>
-                            </StackPanel>
-                        </Button>
-                        <Popup IsOpen="{Binding IsGroupFilterOpen, Mode=TwoWay}"
-                               PlacementTarget="{Binding ElementName=GroupFilterButton}"
-                               Placement="Bottom" HorizontalOffset="-4" VerticalOffset="6"
-                               AllowsTransparency="True" PopupAnimation="None" StaysOpen="False">
-                            <Border Background="Transparent" BorderThickness="0" Padding="2,4,0,6">
-                                <Border.Effect>
-                                    <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.16" Color="#3B5070" />
-                                </Border.Effect>
-                                <ItemsControl ItemsSource="{Binding GroupFilterOptions}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Button Style="{StaticResource GlassSiteChipButton}" Content="{Binding}"
-                                                    Command="{Binding DataContext.SelectGroupFilterCommand, ElementName=RemoteWorkspaceRoot}"
-                                                    CommandParameter="{Binding}" />
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </Border>
-                        </Popup>
-                    </StackPanel>
+                    <!-- PC의 소속 그룹(진료지원/진료간호/원무 등) 필터. 검색창 옆에 칩으로 항상 펼쳐두고
+                         (드롭다운으로 숨기지 않음), 로그인한 사용자의 소속으로 최초 1회 자동 선택된다. -->
+                    <ListBox DockPanel.Dock="Right" ItemsSource="{Binding GroupFilterOptions}"
+                             SelectedItem="{Binding SelectedGroupFilter, Mode=TwoWay}"
+                             Background="Transparent" BorderThickness="0" Padding="0"
+                             Margin="0,0,8,0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                             Visibility="{Binding HasGroupFilterOptions, Converter={StaticResource BoolToVis}}">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Margin" Value="0,0,6,0" />
+                                <Setter Property="Padding" Value="10,4" />
+                                <Setter Property="Foreground" Value="#334155" />
+                                <Setter Property="FontSize" Value="12.5" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="Chip" Background="#F5FFFFFF" BorderBrush="Transparent"
+                                                    BorderThickness="0" CornerRadius="14"
+                                                    Padding="{TemplateBinding Padding}">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="Chip" Property="Background" Value="{StaticResource WlGlassAccent}" />
+                                                </Trigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Chip" Property="Background" Value="{StaticResource WlGlassButtonHoverBg}" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Foreground" Value="White" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                    </ListBox>
                 </DockPanel>
 
                 <!-- PC gallery skeleton -->

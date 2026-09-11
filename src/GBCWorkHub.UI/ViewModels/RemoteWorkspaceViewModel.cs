@@ -54,7 +54,7 @@ namespace GBCWorkHub.UI.ViewModels
         private string _selectedStatusFilter = "ALL";
         private string _selectedGroupFilter = "전체";
         private ObservableCollection<string> _groupFilterOptions;
-        private bool _isGroupFilterOpen;
+        private bool _didAutoApplyGroupFilter;
         private RemoteComputerViewMode _selectedViewMode = RemoteComputerViewMode.Card;
         private int _totalCount;
         private int _availableCount;
@@ -137,8 +137,6 @@ namespace GBCWorkHub.UI.ViewModels
 
             RefreshCommand = new RelayCommand(() => { var _ = RefreshFromDbAsync(); }, () => !IsRefreshing);
             SelectStatusFilterCommand = new RelayCommand<string>(SelectStatusFilter);
-            SelectGroupFilterCommand = new RelayCommand<string>(SelectGroupFilter);
-            ToggleGroupFilterCommand = new RelayCommand(() => IsGroupFilterOpen = !IsGroupFilterOpen);
             ConnectRemoteComputerCommand = new RelayCommand<RemoteComputerItemViewModel>(item => { var _ = ConnectRemoteComputerAsync(item); });
             CheckRemoteComputerCommand = new RelayCommand<RemoteComputerItemViewModel>(item => { var _ = CheckRemoteComputerAsync(item); });
             ChangeViewModeCommand = new RelayCommand<string>(SetViewMode);
@@ -458,12 +456,6 @@ namespace GBCWorkHub.UI.ViewModels
             get { return _groupFilterOptions != null && _groupFilterOptions.Count > 1; }
         }
 
-        public bool IsGroupFilterOpen
-        {
-            get { return _isGroupFilterOpen; }
-            set { SetProperty(ref _isGroupFilterOpen, value); }
-        }
-
         public RemoteComputerViewMode SelectedViewMode
         {
             get { return _selectedViewMode; }
@@ -565,8 +557,6 @@ namespace GBCWorkHub.UI.ViewModels
 
         public ICommand RefreshCommand { get; private set; }
         public ICommand SelectStatusFilterCommand { get; private set; }
-        public ICommand SelectGroupFilterCommand { get; private set; }
-        public ICommand ToggleGroupFilterCommand { get; private set; }
         public ICommand ConnectRemoteComputerCommand { get; private set; }
         public ICommand CheckRemoteComputerCommand { get; private set; }
         public ICommand ChangeViewModeCommand { get; private set; }
@@ -2492,12 +2482,6 @@ namespace GBCWorkHub.UI.ViewModels
             SelectedStatusFilter = string.IsNullOrWhiteSpace(filter) ? "ALL" : filter;
         }
 
-        private void SelectGroupFilter(string group)
-        {
-            SelectedGroupFilter = string.IsNullOrWhiteSpace(group) ? "전체" : group;
-            IsGroupFilterOpen = false;
-        }
-
         /// <summary>현재 로드된 PC들의 GroupName 값들로 그룹 필터 목록을 갱신한다.</summary>
         private void RebuildGroupFilterOptions()
         {
@@ -2530,20 +2514,47 @@ namespace GBCWorkHub.UI.ViewModels
             foreach (string name in distinct)
                 _groupFilterOptions.Add(name);
 
-            bool stillValid = string.Equals(previousSelection, "전체", StringComparison.Ordinal);
-            if (!stillValid)
+            // 로그인한 사용자의 소속과 일치하는 그룹이 있으면 최초 1회만 자동 선택.
+            // 이후 사용자가 직접 "전체"로 바꾼 걸 되돌리지 않도록 한 번만 시도한다.
+            string autoAffiliationMatch = null;
+            if (!_didAutoApplyGroupFilter && distinct.Count > 0)
             {
-                foreach (string name in distinct)
+                _didAutoApplyGroupFilter = true;
+                string myAffiliation = OccupancyNameStore.TryGetAffiliation();
+                if (!string.IsNullOrWhiteSpace(myAffiliation))
                 {
-                    if (string.Equals(name, previousSelection, StringComparison.Ordinal))
+                    foreach (string name in distinct)
                     {
-                        stillValid = true;
-                        break;
+                        if (string.Equals(name, myAffiliation.Trim(), StringComparison.Ordinal))
+                        {
+                            autoAffiliationMatch = name;
+                            break;
+                        }
                     }
                 }
             }
-            if (!stillValid)
-                SelectedGroupFilter = "전체";
+
+            if (autoAffiliationMatch != null)
+            {
+                SelectedGroupFilter = autoAffiliationMatch;
+            }
+            else
+            {
+                bool stillValid = string.Equals(previousSelection, "전체", StringComparison.Ordinal);
+                if (!stillValid)
+                {
+                    foreach (string name in distinct)
+                    {
+                        if (string.Equals(name, previousSelection, StringComparison.Ordinal))
+                        {
+                            stillValid = true;
+                            break;
+                        }
+                    }
+                }
+                if (!stillValid)
+                    SelectedGroupFilter = "전체";
+            }
             RaisePropertyChanged("HasGroupFilterOptions");
         }
 
@@ -3108,18 +3119,7 @@ namespace GBCWorkHub.UI.ViewModels
         public bool IsCurrent
         {
             get { return _isCurrent; }
-            set
-            {
-                if (SetProperty(ref _isCurrent, value))
-                    RaisePropertyChanged("CanNavigate");
-            }
-        }
-
-        /// <summary>지금 들어와 있는 사이트는 목록엔 보이되(전체 사이트를 한눈에 보기 위해),
-        /// 눌러도 의미가 없으니 비활성화한다.</summary>
-        public bool CanNavigate
-        {
-            get { return IsEnabled && !IsCurrent; }
+            set { SetProperty(ref _isCurrent, value); }
         }
     }
 
