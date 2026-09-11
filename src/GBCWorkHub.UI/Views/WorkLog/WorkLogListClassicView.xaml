@@ -6,7 +6,7 @@
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogStyles.xaml" />
+                <ResourceDictionary Source="/GBCWorkHub;component/Assets/WorkLogStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <Style x:Key="ListSidebarLabel" TargetType="TextBlock">

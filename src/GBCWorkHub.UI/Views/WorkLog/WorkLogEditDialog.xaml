@@ -7,8 +7,8 @@
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogStyles.xaml" />
-                <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogGlassStyles.xaml" />
+                <ResourceDictionary Source="/GBCWorkHub;component/Assets/WorkLogStyles.xaml" />
+                <ResourceDictionary Source="/GBCWorkHub;component/Assets/WorkLogGlassStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <!-- 노션 스타일 세모 토글 — 이전엔 헤더의 ON/OFF 스위치와 같은 모양이었는데,

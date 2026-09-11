@@ -8,9 +8,9 @@
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogStyles.xaml" />
-                <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogGlassStyles.xaml" />
-                <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/SkeletonStyles.xaml" />
+                <ResourceDictionary Source="/GBCWorkHub;component/Assets/WorkLogStyles.xaml" />
+                <ResourceDictionary Source="/GBCWorkHub;component/Assets/WorkLogGlassStyles.xaml" />
+                <ResourceDictionary Source="/GBCWorkHub;component/Assets/SkeletonStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <!-- 업무일지와 같이 쓰는 GlassTicketRowStyle의 hover가 이 목록에서는 너무 어둡게 느껴져서
                  여기서만 옅게 override(업무일지 쪽 스타일은 그대로 둔다) -->

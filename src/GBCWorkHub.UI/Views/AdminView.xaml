@@ -10,7 +10,7 @@
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogEditGlassOverrides.xaml" />
+                <ResourceDictionary Source="/GBCWorkHub;component/Assets/WorkLogEditGlassOverrides.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
 

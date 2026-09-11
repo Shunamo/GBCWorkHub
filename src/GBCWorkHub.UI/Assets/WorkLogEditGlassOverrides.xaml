@@ -4,7 +4,7 @@
 
     <!-- WorkLogEditDialog 전용: 목록 Glass와 같은 톤으로 상세 스킨 -->
     <ResourceDictionary.MergedDictionaries>
-        <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogGlassStyles.xaml" />
+        <ResourceDictionary Source="/GBCWorkHub;component/Assets/WorkLogGlassStyles.xaml" />
     </ResourceDictionary.MergedDictionaries>
 
     <SolidColorBrush x:Key="EditChromeBg" Color="#99FFFFFF" po:Freeze="True" />
