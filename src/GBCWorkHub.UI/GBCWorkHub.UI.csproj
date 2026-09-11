@@ -156,8 +156,8 @@
     <Compile Include="Controls\CustomEditableDropdown.xaml.cs">
       <DependentUpon>CustomEditableDropdown.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Controls\DatePickerButton.xaml.cs">
-      <DependentUpon>DatePickerButton.xaml</DependentUpon>
+    <Compile Include="Controls\DateRangePickerButton.xaml.cs">
+      <DependentUpon>DateRangePickerButton.xaml</DependentUpon>
     </Compile>
     <Compile Include="Controls\InlineOptionPicker.xaml.cs">
       <DependentUpon>InlineOptionPicker.xaml</DependentUpon>
@@ -297,7 +297,7 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="Controls\DatePickerButton.xaml">
+    <Page Include="Controls\DateRangePickerButton.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

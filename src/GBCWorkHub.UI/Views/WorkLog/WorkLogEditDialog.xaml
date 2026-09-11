@@ -1150,14 +1150,13 @@
                                         <StackPanel Orientation="Horizontal">
                                             <TextBox Style="{DynamicResource WorkLogDateInput}"
                                                      Text="{Binding ActiveMenu.StartDateText, UpdateSourceTrigger=PropertyChanged}" />
-                                            <ctrl:DatePickerButton Margin="4,0,0,0"
-                                                                   SelectedDate="{Binding ActiveMenu.StartDate, Mode=TwoWay}" />
                                             <TextBlock Text="~" FontSize="{StaticResource FontSize.Base}" Foreground="#64748B"
                                                        Margin="8,0" VerticalAlignment="Center" />
                                             <TextBox Style="{DynamicResource WorkLogDateInput}"
                                                      Text="{Binding ActiveMenu.EndDateText, UpdateSourceTrigger=PropertyChanged}" />
-                                            <ctrl:DatePickerButton Margin="4,0,0,0"
-                                                                   SelectedDate="{Binding ActiveMenu.EndDate, Mode=TwoWay}" />
+                                            <ctrl:DateRangePickerButton Margin="4,0,0,0"
+                                                                        StartDate="{Binding ActiveMenu.StartDate, Mode=TwoWay}"
+                                                                        EndDate="{Binding ActiveMenu.EndDate, Mode=TwoWay}" />
                                         </StackPanel>
                                     </StackPanel>
                                 </StackPanel>
