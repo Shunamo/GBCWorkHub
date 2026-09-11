@@ -2385,6 +2385,7 @@ namespace GBCWorkHub.UI.ViewModels
                 || ContainsIgnoreCase(item.OccupantText, q)
                 || ContainsIgnoreCase(item.UserDisplayText, q)
                 || ContainsIgnoreCase(item.GroupName, q)
+                || ContainsIgnoreCase(item.PcDomain, q)
                 || (LooksLikeIpv4(item.IpAddress) && ContainsIgnoreCase(item.IpAddress, q));
         }
 
