@@ -67,6 +67,17 @@ jobs:
         shell: pwsh
         run: .\scripts\set-assembly-version.ps1 -Version "${{ steps.ver.outputs.version }}"
 
+      - name: Write App.config from secret (bundled into the exe so it works out of the box)
+        shell: pwsh
+        env:
+          APP_CONFIG_XML: ${{ secrets.APP_CONFIG_XML }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:APP_CONFIG_XML)) {
+            throw "APP_CONFIG_XML secret is not set. Add it in repo Settings > Secrets and variables > Actions."
+          }
+          $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+          [System.IO.File]::WriteAllText("src\GBCWorkHub.UI\App.config", $env:APP_CONFIG_XML, $utf8NoBom)
+
       - name: Build UI + Updater (Release)
         run: |
           msbuild src\GBCWorkHub.UI\GBCWorkHub.UI.csproj /p:Configuration=Release /p:Platform=AnyCPU /m /v:minimal
