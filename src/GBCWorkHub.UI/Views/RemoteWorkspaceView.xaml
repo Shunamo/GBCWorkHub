@@ -497,9 +497,6 @@
                                                 CommandParameter="{Binding SiteCode}"
                                                 ToolTip="이 사이트로 이동">
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <Ellipse Width="7" Height="7"
-                                                         Fill="{StaticResource RemoteAvailableBrush}"
-                                                         Margin="0,0,8,0" VerticalAlignment="Center" />
                                                 <TextBlock Text="{Binding SiteCode}" Foreground="#1E293B"
                                                            FontWeight="SemiBold" VerticalAlignment="Center" />
                                             </StackPanel>
