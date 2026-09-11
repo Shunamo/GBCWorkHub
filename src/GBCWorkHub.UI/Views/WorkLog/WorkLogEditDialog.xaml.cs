@@ -19,16 +19,6 @@ namespace GBCWorkHub.UI.Views.WorkLog
             DataContextChanged += OnDataContextChanged;
         }
 
-        private void StartDateCalendar_SelectedDatesChanged(object sender, SelectionChangedEventArgs e)
-        {
-            StartDateCalendarToggle.IsChecked = false;
-        }
-
-        private void EndDateCalendar_SelectedDatesChanged(object sender, SelectionChangedEventArgs e)
-        {
-            EndDateCalendarToggle.IsChecked = false;
-        }
-
         private void ApplyGlassOverrides()
         {
             var overrides = new ResourceDictionary

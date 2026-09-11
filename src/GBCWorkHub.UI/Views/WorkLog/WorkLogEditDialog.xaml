@@ -1150,68 +1150,14 @@
                                         <StackPanel Orientation="Horizontal">
                                             <TextBox Style="{DynamicResource WorkLogDateInput}"
                                                      Text="{Binding ActiveMenu.StartDateText, UpdateSourceTrigger=PropertyChanged}" />
-                                            <ToggleButton x:Name="StartDateCalendarToggle" Width="26" Height="26"
-                                                          Margin="4,0,0,0" Background="Transparent" BorderThickness="0" Cursor="Hand"
-                                                          ToolTip="달력에서 선택">
-                                                <ToggleButton.Template>
-                                                    <ControlTemplate TargetType="ToggleButton">
-                                                        <Border x:Name="Bd" Background="#F4F6F9" CornerRadius="8">
-                                                            <Image Source="{StaticResource DateRangeFillIcon}" Width="14" Height="14" />
-                                                        </Border>
-                                                        <ControlTemplate.Triggers>
-                                                            <Trigger Property="IsMouseOver" Value="True">
-                                                                <Setter TargetName="Bd" Property="Background" Value="#E8EEF5" />
-                                                            </Trigger>
-                                                        </ControlTemplate.Triggers>
-                                                    </ControlTemplate>
-                                                </ToggleButton.Template>
-                                            </ToggleButton>
-                                            <Popup IsOpen="{Binding IsChecked, ElementName=StartDateCalendarToggle, Mode=TwoWay}"
-                                                   PlacementTarget="{Binding ElementName=StartDateCalendarToggle}"
-                                                   Placement="Bottom" StaysOpen="False" AllowsTransparency="True"
-                                                   PopupAnimation="None">
-                                                <Border Background="White" BorderBrush="#D8DEE8" BorderThickness="1"
-                                                        CornerRadius="8" Padding="4">
-                                                    <Border.Effect>
-                                                        <DropShadowEffect BlurRadius="16" ShadowDepth="3" Opacity="0.15" Color="#1E293B" />
-                                                    </Border.Effect>
-                                                    <Calendar SelectedDate="{Binding ActiveMenu.StartDate, Mode=TwoWay}"
-                                                              SelectedDatesChanged="StartDateCalendar_SelectedDatesChanged" />
-                                                </Border>
-                                            </Popup>
+                                            <ctrl:DatePickerButton Margin="4,0,0,0"
+                                                                   SelectedDate="{Binding ActiveMenu.StartDate, Mode=TwoWay}" />
                                             <TextBlock Text="~" FontSize="{StaticResource FontSize.Base}" Foreground="#64748B"
                                                        Margin="8,0" VerticalAlignment="Center" />
                                             <TextBox Style="{DynamicResource WorkLogDateInput}"
                                                      Text="{Binding ActiveMenu.EndDateText, UpdateSourceTrigger=PropertyChanged}" />
-                                            <ToggleButton x:Name="EndDateCalendarToggle" Width="26" Height="26"
-                                                          Margin="4,0,0,0" Background="Transparent" BorderThickness="0" Cursor="Hand"
-                                                          ToolTip="달력에서 선택">
-                                                <ToggleButton.Template>
-                                                    <ControlTemplate TargetType="ToggleButton">
-                                                        <Border x:Name="Bd" Background="#F4F6F9" CornerRadius="8">
-                                                            <Image Source="{StaticResource DateRangeFillIcon}" Width="14" Height="14" />
-                                                        </Border>
-                                                        <ControlTemplate.Triggers>
-                                                            <Trigger Property="IsMouseOver" Value="True">
-                                                                <Setter TargetName="Bd" Property="Background" Value="#E8EEF5" />
-                                                            </Trigger>
-                                                        </ControlTemplate.Triggers>
-                                                    </ControlTemplate>
-                                                </ToggleButton.Template>
-                                            </ToggleButton>
-                                            <Popup IsOpen="{Binding IsChecked, ElementName=EndDateCalendarToggle, Mode=TwoWay}"
-                                                   PlacementTarget="{Binding ElementName=EndDateCalendarToggle}"
-                                                   Placement="Bottom" StaysOpen="False" AllowsTransparency="True"
-                                                   PopupAnimation="None">
-                                                <Border Background="White" BorderBrush="#D8DEE8" BorderThickness="1"
-                                                        CornerRadius="8" Padding="4">
-                                                    <Border.Effect>
-                                                        <DropShadowEffect BlurRadius="16" ShadowDepth="3" Opacity="0.15" Color="#1E293B" />
-                                                    </Border.Effect>
-                                                    <Calendar SelectedDate="{Binding ActiveMenu.EndDate, Mode=TwoWay}"
-                                                              SelectedDatesChanged="EndDateCalendar_SelectedDatesChanged" />
-                                                </Border>
-                                            </Popup>
+                                            <ctrl:DatePickerButton Margin="4,0,0,0"
+                                                                   SelectedDate="{Binding ActiveMenu.EndDate, Mode=TwoWay}" />
                                         </StackPanel>
                                     </StackPanel>
                                 </StackPanel>
