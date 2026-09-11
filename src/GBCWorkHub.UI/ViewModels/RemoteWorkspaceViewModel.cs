@@ -52,6 +52,8 @@ namespace GBCWorkHub.UI.ViewModels
         private RemoteComputerItemViewModel _selectedRemoteComputer;
         private string _searchText = string.Empty;
         private string _selectedStatusFilter = "ALL";
+        private string _selectedGroupFilter = "전체";
+        private ObservableCollection<string> _groupFilterOptions;
         private RemoteComputerViewMode _selectedViewMode = RemoteComputerViewMode.Card;
         private int _totalCount;
         private int _availableCount;
@@ -113,6 +115,7 @@ namespace GBCWorkHub.UI.ViewModels
             _recentUsageLogs = new ObservableCollection<RemotePcUsageLogItemViewModel>();
             _remoteComputers = new ObservableCollection<RemoteComputerItemViewModel>();
             _galleryGroups = new ObservableCollection<RemotePcTeamGroupViewModel>();
+            _groupFilterOptions = new ObservableCollection<string> { "전체" };
             _sites = new ObservableCollection<RemoteSiteDto>(_remotePcBiz.GetSiteList() ?? new List<RemoteSiteDto>());
             _siteShortcuts = new ObservableCollection<SiteShortcutItemViewModel>();
             foreach (var site in _sites)
@@ -133,6 +136,7 @@ namespace GBCWorkHub.UI.ViewModels
 
             RefreshCommand = new RelayCommand(() => { var _ = RefreshFromDbAsync(); }, () => !IsRefreshing);
             SelectStatusFilterCommand = new RelayCommand<string>(SelectStatusFilter);
+            SelectGroupFilterCommand = new RelayCommand<string>(SelectGroupFilter);
             ConnectRemoteComputerCommand = new RelayCommand<RemoteComputerItemViewModel>(item => { var _ = ConnectRemoteComputerAsync(item); });
             CheckRemoteComputerCommand = new RelayCommand<RemoteComputerItemViewModel>(item => { var _ = CheckRemoteComputerAsync(item); });
             ChangeViewModeCommand = new RelayCommand<string>(SetViewMode);
@@ -431,6 +435,22 @@ namespace GBCWorkHub.UI.ViewModels
             }
         }
 
+        /// <summary>PC의 소속 그룹(진료지원/진료간호/원무 등, PcMap.TeamNm 기반) 필터. "전체"면 미적용.</summary>
+        public string SelectedGroupFilter
+        {
+            get { return _selectedGroupFilter; }
+            set
+            {
+                if (SetProperty(ref _selectedGroupFilter, string.IsNullOrWhiteSpace(value) ? "전체" : value.Trim()))
+                    RefreshGalleryFilter();
+            }
+        }
+
+        public ObservableCollection<string> GroupFilterOptions
+        {
+            get { return _groupFilterOptions; }
+        }
+
         public RemoteComputerViewMode SelectedViewMode
         {
             get { return _selectedViewMode; }
@@ -532,6 +552,7 @@ namespace GBCWorkHub.UI.ViewModels
 
         public ICommand RefreshCommand { get; private set; }
         public ICommand SelectStatusFilterCommand { get; private set; }
+        public ICommand SelectGroupFilterCommand { get; private set; }
         public ICommand ConnectRemoteComputerCommand { get; private set; }
         public ICommand CheckRemoteComputerCommand { get; private set; }
         public ICommand ChangeViewModeCommand { get; private set; }
@@ -1997,6 +2018,7 @@ namespace GBCWorkHub.UI.ViewModels
                 }
 
                 RecalculateStatusCounts();
+                RebuildGroupFilterOptions();
                 RefreshGalleryFilter();
                 RefreshSiteShortcutCounts(_lastOccupancy);
                 if (SelectedRemoteComputer != null)
@@ -2368,6 +2390,12 @@ namespace GBCWorkHub.UI.ViewModels
                 }
             }
 
+            if (!string.Equals(SelectedGroupFilter, "전체", StringComparison.Ordinal)
+                && !string.Equals(item.GroupName, SelectedGroupFilter, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
             string q = (SearchText ?? string.Empty).Trim();
             if (q.Length == 0)
                 return true;
@@ -2448,6 +2476,59 @@ namespace GBCWorkHub.UI.ViewModels
         private void SelectStatusFilter(string filter)
         {
             SelectedStatusFilter = string.IsNullOrWhiteSpace(filter) ? "ALL" : filter;
+        }
+
+        private void SelectGroupFilter(string group)
+        {
+            SelectedGroupFilter = string.IsNullOrWhiteSpace(group) ? "전체" : group;
+        }
+
+        /// <summary>현재 로드된 PC들의 GroupName 값들로 그룹 필터 목록을 갱신한다.</summary>
+        private void RebuildGroupFilterOptions()
+        {
+            if (_groupFilterOptions == null || _remoteComputers == null)
+                return;
+
+            var distinct = new List<string>();
+            foreach (RemoteComputerItemViewModel item in _remoteComputers)
+            {
+                if (item == null || string.IsNullOrWhiteSpace(item.GroupName))
+                    continue;
+                string name = item.GroupName.Trim();
+                bool exists = false;
+                foreach (string g in distinct)
+                {
+                    if (string.Equals(g, name, StringComparison.Ordinal))
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists)
+                    distinct.Add(name);
+            }
+            distinct.Sort(StringComparer.Ordinal);
+
+            string previousSelection = SelectedGroupFilter;
+            _groupFilterOptions.Clear();
+            _groupFilterOptions.Add("전체");
+            foreach (string name in distinct)
+                _groupFilterOptions.Add(name);
+
+            bool stillValid = string.Equals(previousSelection, "전체", StringComparison.Ordinal);
+            if (!stillValid)
+            {
+                foreach (string name in distinct)
+                {
+                    if (string.Equals(name, previousSelection, StringComparison.Ordinal))
+                    {
+                        stillValid = true;
+                        break;
+                    }
+                }
+            }
+            if (!stillValid)
+                SelectedGroupFilter = "전체";
         }
 
         private void SetViewMode(string mode)

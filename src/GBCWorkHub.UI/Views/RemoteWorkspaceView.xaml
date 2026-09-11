@@ -2,8 +2,10 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:GBCWorkHub.UI.ViewModels"
-             xmlns:ctrl="clr-namespace:GBCWorkHub.UI.Controls">
+             xmlns:ctrl="clr-namespace:GBCWorkHub.UI.Controls"
+             xmlns:conv="clr-namespace:GBCWorkHub.UI.Converters">
     <UserControl.Resources>
+        <conv:StringEqualsMultiConverter x:Key="GroupFilterEquals" />
         <Style TargetType="ScrollBar" BasedOn="{StaticResource GlassScrollBar}">
             <Setter Property="Width" Value="10" />
             <Setter Property="MinWidth" Value="10" />
@@ -484,6 +486,61 @@
                             </RadioButton>
 
                             <Border Height="1" Background="#E2E8F0" Margin="16,10,16,8" Opacity="0.7" />
+
+                            <!-- PC의 소속 그룹(진료지원/진료간호/원무 등) 필터. 옵션이 "전체"만 있으면(그룹 정보 없는 사이트) 숨김 -->
+                            <TextBlock Text="그룹" FontSize="11" FontWeight="SemiBold" Foreground="#94A3B8"
+                                       Margin="16,0,0,4">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding GroupFilterOptions.Count}" Value="1">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <ItemsControl ItemsSource="{Binding GroupFilterOptions}">
+                                <ItemsControl.Style>
+                                    <Style TargetType="ItemsControl">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding GroupFilterOptions.Count}" Value="1">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ItemsControl.Style>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <RadioButton Style="{StaticResource RemoteComputerSidebarButtonStyle}"
+                                                     Command="{Binding DataContext.SelectGroupFilterCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                     CommandParameter="{Binding}">
+                                            <RadioButton.IsChecked>
+                                                <MultiBinding Converter="{StaticResource GroupFilterEquals}" Mode="OneWay">
+                                                    <Binding Path="DataContext.SelectedGroupFilter" RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
+                                                    <Binding />
+                                                </MultiBinding>
+                                            </RadioButton.IsChecked>
+                                            <TextBlock Text="{Binding}" Foreground="#1E293B" />
+                                        </RadioButton>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <Border Height="1" Background="#E2E8F0" Margin="16,10,16,8" Opacity="0.7">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding GroupFilterOptions.Count}" Value="1">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                            </Border>
 
                             <ItemsControl ItemsSource="{Binding SiteShortcuts}">
                                 <ItemsControl.ItemTemplate>
