@@ -34,6 +34,7 @@ namespace GBCWorkHub.DTO.Improvement
         public const string Checking = "CHECKING";
         public const string InProgress = "IN_PROGRESS";
         public const string Resolved = "RESOLVED";
+        public const string Rejected = "REJECTED";
     }
 
     public static class ImprovementStatusLabels
@@ -43,6 +44,7 @@ namespace GBCWorkHub.DTO.Improvement
         public const string Checking = "확인중";
         public const string InProgress = "수정중";
         public const string Resolved = "해결";
+        public const string Rejected = "반려";
 
         public static string ToLabel(string code)
         {
@@ -54,6 +56,8 @@ namespace GBCWorkHub.DTO.Improvement
                 return InProgress;
             if (string.Equals(code, ImprovementStatuses.Resolved, System.StringComparison.OrdinalIgnoreCase))
                 return Resolved;
+            if (string.Equals(code, ImprovementStatuses.Rejected, System.StringComparison.OrdinalIgnoreCase))
+                return Rejected;
             return code ?? string.Empty;
         }
     }

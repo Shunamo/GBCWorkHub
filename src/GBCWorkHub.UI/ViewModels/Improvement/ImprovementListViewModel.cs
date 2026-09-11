@@ -41,7 +41,7 @@ namespace GBCWorkHub.UI.ViewModels.Improvement
             StatusFilterOptions = new ObservableCollection<string>
             {
                 ImprovementStatusLabels.All, ImprovementStatusLabels.Open, ImprovementStatusLabels.Checking,
-                ImprovementStatusLabels.InProgress, ImprovementStatusLabels.Resolved
+                ImprovementStatusLabels.InProgress, ImprovementStatusLabels.Resolved, ImprovementStatusLabels.Rejected
             };
             SiteFilterOptions = new ObservableCollection<string> { "ALL", "AURORA", "CMC", "RC", "MNGHA" };
 
@@ -329,6 +329,7 @@ namespace GBCWorkHub.UI.ViewModels.Improvement
             if (string.Equals(label, ImprovementStatusLabels.Checking, StringComparison.Ordinal)) return ImprovementStatuses.Checking;
             if (string.Equals(label, ImprovementStatusLabels.InProgress, StringComparison.Ordinal)) return ImprovementStatuses.InProgress;
             if (string.Equals(label, ImprovementStatusLabels.Resolved, StringComparison.Ordinal)) return ImprovementStatuses.Resolved;
+            if (string.Equals(label, ImprovementStatusLabels.Rejected, StringComparison.Ordinal)) return ImprovementStatuses.Rejected;
             return null;
         }
     }

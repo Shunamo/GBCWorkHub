@@ -99,7 +99,8 @@ namespace GBCWorkHub.UI.ViewModels.Improvement
             AdminStatusOptions = new ObservableCollection<string>
             {
                 ImprovementStatusLabels.Open, ImprovementStatusLabels.Checking,
-                ImprovementStatusLabels.InProgress, ImprovementStatusLabels.Resolved
+                ImprovementStatusLabels.InProgress, ImprovementStatusLabels.Resolved,
+                ImprovementStatusLabels.Rejected
             };
             Comments = new ObservableCollection<ImprovementCommentItemViewModel>();
             ContentBlocks = new ObservableCollection<ImprovementContentBlockViewModel>();
@@ -1123,6 +1124,7 @@ namespace GBCWorkHub.UI.ViewModels.Improvement
             if (string.Equals(label, ImprovementStatusLabels.Checking, StringComparison.Ordinal)) return ImprovementStatuses.Checking;
             if (string.Equals(label, ImprovementStatusLabels.InProgress, StringComparison.Ordinal)) return ImprovementStatuses.InProgress;
             if (string.Equals(label, ImprovementStatusLabels.Resolved, StringComparison.Ordinal)) return ImprovementStatuses.Resolved;
+            if (string.Equals(label, ImprovementStatusLabels.Rejected, StringComparison.Ordinal)) return ImprovementStatuses.Rejected;
             return ImprovementStatuses.Open;
         }
 

@@ -430,6 +430,9 @@
                                                                 <DataTrigger Binding="{Binding StatusLabel}" Value="해결">
                                                                     <Setter Property="Background" Value="#D1FAE5" />
                                                                 </DataTrigger>
+                                                                <DataTrigger Binding="{Binding StatusLabel}" Value="반려">
+                                                                    <Setter Property="Background" Value="#FEE2E2" />
+                                                                </DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
                                                     </Border.Style>
@@ -446,6 +449,9 @@
                                                                     </DataTrigger>
                                                                     <DataTrigger Binding="{Binding StatusLabel}" Value="해결">
                                                                         <Setter Property="Foreground" Value="#047857" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding StatusLabel}" Value="반려">
+                                                                        <Setter Property="Foreground" Value="#B91C1C" />
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
