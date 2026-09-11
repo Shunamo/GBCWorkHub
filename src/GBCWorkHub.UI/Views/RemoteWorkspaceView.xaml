@@ -546,24 +546,20 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Button Style="{StaticResource SiteShortcutSidebarButtonStyle}"
-                                                IsEnabled="{Binding IsEnabled}"
+                                                IsEnabled="{Binding CanNavigate}"
                                                 Command="{Binding DataContext.OpenSiteCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                 CommandParameter="{Binding SiteCode}"
-                                                ToolTip="이 사이트로 이동"
-                                                Visibility="{Binding IsCurrent, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}">
-                                            <Grid>
-                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <Ellipse Width="7" Height="7"
-                                                             Fill="{StaticResource RemoteAvailableBrush}"
-                                                             Margin="0,0,8,0" VerticalAlignment="Center" />
-                                                    <TextBlock Text="{Binding SiteCode}" Foreground="#1E293B"
-                                                               FontWeight="SemiBold" VerticalAlignment="Center" />
-                                                </StackPanel>
-                                                <TextBlock Text="{Binding AvailableCount}"
-                                                           HorizontalAlignment="Right"
-                                                           Foreground="#64748B"
-                                                           VerticalAlignment="Center" />
-                                            </Grid>
+                                                ToolTip="이 사이트로 이동">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Ellipse Width="7" Height="7"
+                                                         Fill="{StaticResource RemoteAvailableBrush}"
+                                                         Margin="0,0,8,0" VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding SiteCode}" Foreground="#1E293B"
+                                                           FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <TextBlock Text="(현재)" FontSize="11" Foreground="#94A3B8"
+                                                           Margin="6,0,0,0" VerticalAlignment="Center"
+                                                           Visibility="{Binding IsCurrent, Converter={StaticResource BoolToVis}}" />
+                                            </StackPanel>
                                         </Button>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>

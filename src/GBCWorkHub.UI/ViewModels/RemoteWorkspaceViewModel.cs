@@ -3092,7 +3092,18 @@ namespace GBCWorkHub.UI.ViewModels
         public bool IsCurrent
         {
             get { return _isCurrent; }
-            set { SetProperty(ref _isCurrent, value); }
+            set
+            {
+                if (SetProperty(ref _isCurrent, value))
+                    RaisePropertyChanged("CanNavigate");
+            }
+        }
+
+        /// <summary>지금 들어와 있는 사이트는 목록엔 보이되(전체 사이트를 한눈에 보기 위해),
+        /// 눌러도 의미가 없으니 비활성화한다.</summary>
+        public bool CanNavigate
+        {
+            get { return IsEnabled && !IsCurrent; }
         }
     }
 
