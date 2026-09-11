@@ -8,7 +8,8 @@
     <ProjectGuid>{A1B2C3D4-E5F6-7890-ABCD-444444444444}</ProjectGuid>
     <OutputType>WinExe</OutputType>
     <RootNamespace>GBCWorkHub.UI</RootNamespace>
-    <AssemblyName>GBCWorkHub.UI</AssemblyName>
+    <AssemblyName>GBCWorkHub</AssemblyName>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
@@ -256,6 +257,7 @@
     <EmbeddedResource Include="Fonts\Pretendard-Bold.otf">
       <LogicalName>GBCWorkHub.UI.Fonts.Pretendard-Bold.otf</LogicalName>
     </EmbeddedResource>
+    <Resource Include="Assets\AppIcon.ico" />
     <Page Include="Assets\ThemeConfig.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>

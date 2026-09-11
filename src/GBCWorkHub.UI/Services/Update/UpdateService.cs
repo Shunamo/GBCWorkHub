@@ -13,7 +13,7 @@ namespace GBCWorkHub.UI.Services.Update
     public sealed class UpdateService : IUpdateService
     {
         public const string UpdaterFileName = "GBCWorkHubUpdater.exe";
-        public const string MainExeFileName = "GBCWorkHub.UI.exe";
+        public const string MainExeFileName = "GBCWorkHub.exe";
 
         private readonly IUpdateSource _source;
 

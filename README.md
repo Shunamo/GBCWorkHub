@@ -20,7 +20,7 @@ msbuild GBCWorkHub.sln /p:Configuration=Debug /p:Platform="Any CPU"
 
 Visual Studio에서 `GBCWorkHub.sln`을 연 뒤 **Restore NuGet Packages** → **빌드**해도 됩니다.
 
-실행 파일: `src\GBCWorkHub.UI\bin\Debug\GBCWorkHub.UI.exe`
+실행 파일: `src\GBCWorkHub.UI\bin\Debug\GBCWorkHub.exe`
 
 ## 배포 (DLL 없이)
 
@@ -28,9 +28,9 @@ Release 빌드하면 `Newtonsoft.Json`, `Oracle.ManagedDataAccess`, `GBCWorkHub.
 
 배포할 것:
 
-- `GBCWorkHub.UI.exe`
+- `GBCWorkHub.exe`
 - `GBCWorkHubUpdater.exe` (자동 업데이트 적용기 — 설치 폴더에 함께 둠)
-- `GBCWorkHub.UI.exe.config` (`App.config`가 빌드된 것 — DB/사이트 설정) 또는 BundledConfig
+- `GBCWorkHub.exe.config` (`App.config`가 빌드된 것 — DB/사이트 설정) 또는 BundledConfig
 - `Fonts\` 폴더 (Pretendard otf) — embed 시 LocalAppData로 추출
 
 zip에 DLL을 넣을 필요는 없습니다. PDB·XML 문서는 넣지 않아도 됩니다.

@@ -23,7 +23,7 @@ if ($v.StartsWith("v") -or $v.StartsWith("V")) { $v = $v.Substring(1) }
 $tag = "v$v"
 $zipName = "GBCWorkHub-$tag.zip"
 
-$uiExe = Join-Path $root "src\GBCWorkHub.UI\bin\$Configuration\GBCWorkHub.UI.exe"
+$uiExe = Join-Path $root "src\GBCWorkHub.UI\bin\$Configuration\GBCWorkHub.exe"
 $updaterExe = Join-Path $root "tools\GBCWorkHub.Updater\bin\$Configuration\GBCWorkHubUpdater.exe"
 
 if (-not (Test-Path $uiExe)) { throw "Missing UI exe: $uiExe" }
@@ -39,7 +39,7 @@ New-Item -ItemType Directory -Path $out | Out-Null
 
 $stage = Join-Path $out "stage"
 New-Item -ItemType Directory -Path $stage | Out-Null
-Copy-Item $uiExe (Join-Path $stage "GBCWorkHub.UI.exe")
+Copy-Item $uiExe (Join-Path $stage "GBCWorkHub.exe")
 Copy-Item $updaterExe (Join-Path $stage "GBCWorkHubUpdater.exe")
 
 $zipPath = Join-Path $out $zipName
@@ -77,7 +77,7 @@ Write-Host "SHA256 $sha"
 Write-Host "packageUrl $packageUrl"
 Write-Host "Manifest $manifestPath"
 
-Copy-Item $uiExe (Join-Path $out "GBCWorkHub.UI.exe")
+Copy-Item $uiExe (Join-Path $out "GBCWorkHub.exe")
 Copy-Item $updaterExe (Join-Path $out "GBCWorkHubUpdater.exe")
 
 # 사이트별 SessionAgent 설치 스크립트 — 앱 자동 업데이트 zip과는 별개로,

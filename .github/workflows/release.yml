@@ -76,7 +76,7 @@ jobs:
         shell: pwsh
         run: |
           $expected = "${{ steps.ver.outputs.version }}.0"
-          $ui = "src\GBCWorkHub.UI\bin\Release\GBCWorkHub.UI.exe"
+          $ui = "src\GBCWorkHub.UI\bin\Release\GBCWorkHub.exe"
           $up = "tools\GBCWorkHub.Updater\bin\Release\GBCWorkHubUpdater.exe"
           $uiFv = [System.Diagnostics.FileVersionInfo]::GetVersionInfo((Resolve-Path $ui)).FileVersion
           $upFv = [System.Diagnostics.FileVersionInfo]::GetVersionInfo((Resolve-Path $up)).FileVersion

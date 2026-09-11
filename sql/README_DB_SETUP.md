@@ -5,7 +5,7 @@ Work Hub는 **XSUP.MSDWHTKD** 테이블 하나로 원격 PC 상태를 공유합�
 
 ## Golden 접속 정보 넣는 위치
 
-**파일:** `src/GBCWorkHub.UI/App.config` (배포 후 `GBCWorkHub.UI.exe.config`)
+**파일:** `src/GBCWorkHub.UI/App.config` (배포 후 `GBCWorkHub.exe.config`)
 
 ```xml
 <connectionStrings>

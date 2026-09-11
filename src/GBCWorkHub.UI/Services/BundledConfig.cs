@@ -25,7 +25,7 @@ namespace GBCWorkHub.UI.Services
 
         public static string ConfigFilePath
         {
-            get { return Path.Combine(DataDirectory, "GBCWorkHub.UI.exe.config"); }
+            get { return Path.Combine(DataDirectory, "GBCWorkHub.exe.config"); }
         }
 
         public static string FontsDirectory

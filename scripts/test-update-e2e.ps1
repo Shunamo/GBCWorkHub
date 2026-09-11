@@ -43,7 +43,7 @@ function Build-Version([string]$ver) {
     & $msbuild "tools\GBCWorkHub.Updater\GBCWorkHub.Updater.csproj" /p:Configuration=Release /p:Platform=AnyCPU /m /v:minimal
     if ($LASTEXITCODE -ne 0) { throw "Updater build failed for $ver" }
 
-    $ui = "src\GBCWorkHub.UI\bin\Release\GBCWorkHub.UI.exe"
+    $ui = "src\GBCWorkHub.UI\bin\Release\GBCWorkHub.exe"
     $fv = Get-FileVersion $ui
     Write-Host "Built UI FileVersion=$fv (expected $ver.0 or $ver)"
     $normExpected = if ($ver -match '^\d+\.\d+\.\d+$') { "$ver.0" } else { $ver }
@@ -60,9 +60,9 @@ Build-Version "1.0.0"
 
 $install = Join-Path $work "install"
 New-Item -ItemType Directory -Path $install | Out-Null
-Copy-Item (Join-Path $work "pack-1.0.0\GBCWorkHub.UI.exe") $install
+Copy-Item (Join-Path $work "pack-1.0.0\GBCWorkHub.exe") $install
 Copy-Item (Join-Path $work "pack-1.0.0\GBCWorkHubUpdater.exe") $install
-Write-Host "Install FileVersion=$(Get-FileVersion (Join-Path $install 'GBCWorkHub.UI.exe'))"
+Write-Host "Install FileVersion=$(Get-FileVersion (Join-Path $install 'GBCWorkHub.exe'))"
 
 Write-Host "== Build v1.0.1 (update feed) =="
 Build-Version "1.0.1"
@@ -80,7 +80,7 @@ Copy-Item (Join-Path $install "GBCWorkHubUpdater.exe") (Join-Path $tempUpdaterDi
 $package = Join-Path $feed "GBCWorkHub-v1.0.1.zip"
 $sha = (Get-Content (Join-Path $feed "version.json") -Raw | ConvertFrom-Json).sha256
 $workDir = Join-Path $env:TEMP "GBCWorkHubUpdater\$session-work"
-$launch = Join-Path $install "GBCWorkHub.UI.exe"
+$launch = Join-Path $install "GBCWorkHub.exe"
 
 Write-Host "== Run TEMP updater =="
 $argStr = "--package `"$package`" --install-dir `"$install`" --sha256 $sha --work-dir `"$workDir`""

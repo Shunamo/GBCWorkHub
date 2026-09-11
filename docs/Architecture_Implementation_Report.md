@@ -78,7 +78,7 @@ protected override void OnStartup(StartupEventArgs e) {
 
 ## 1-5. 앱 시작 시 최초 실행 흐름 (정확한 호출 순서)
 
-1. **`App` 정적 생성자** — `BundledConfig.EnsureExtracted()`: exe에 임베딩된 App.config를 `%LocalAppData%\GBCWorkHub\GBCWorkHub.UI.exe.config`로 추출하고 `ConfigurationManager` 내부 static 필드를 리플렉션으로 리셋(`BundledConfig.cs:36-61`). `BundledFonts.EnsureExtracted()`: Pretendard 4종 otf 추출.
+1. **`App` 정적 생성자** — `BundledConfig.EnsureExtracted()`: exe에 임베딩된 App.config를 `%LocalAppData%\GBCWorkHub\GBCWorkHub.exe.config`로 추출하고 `ConfigurationManager` 내부 static 필드를 리플렉션으로 리셋(`BundledConfig.cs:36-61`). `BundledFonts.EnsureExtracted()`: Pretendard 4종 otf 추출.
 2. **`App.OnStartup`**: 전역 예외 핸들러 2종 등록 → `BundledFonts.ApplyTo(this)`(폰트 리소스 주입).
 3. **`new MainWindow()`**: 필드 이니셜라이저에서 이미 `new MainViewModel()` 생성 완료.
    - **`MainViewModel` 생성자**: `TfsWorkLogViewModel`/`WorkLogListViewModel` 생성 → `new RemoteWorkspaceViewModel(callback)` 생성
@@ -213,7 +213,7 @@ graph TD
     subgraph Local["로컬 저장 (%LocalAppData%\\GBCWorkHub)"]
       OCC["occupancy-name.json"]
       INBOX["TfsCheckinInbox.json"]
-      CFG["GBCWorkHub.UI.exe.config"]
+      CFG["GBCWorkHub.exe.config"]
     end
     BIZ --> OCC
     SVC --> INBOX
@@ -266,7 +266,7 @@ sequenceDiagram
 |---|---|---|---|---|---|---|
 | 점유명 + 소속 | 사용자 직접 입력(최초 팝업) | `%LocalAppData%\GBCWorkHub\occupancy-name.json` | JSON(평문) | **유지** | 점유/업무기록 작성자 표시 | `OccupancyNameStore.cs:19-27,181-198` |
 | TFS 체크인 보관함 레코드 | 원격 SessionAgent 클립보드 페이로드 | `%LocalAppData%\GBCWorkHub\TfsCheckinInbox.json` | JSON(Indented) | **유지** | waiting/skipped/reported 상태 추적 | `TfsCheckinInboxStore.cs:83-94` |
-| App.config(연결문자열 등) | exe 내장 리소스 | `%LocalAppData%\GBCWorkHub\GBCWorkHub.UI.exe.config` | 평문 XML | 유지 | `ConfigurationManager` 설정 소스 | `BundledConfig.cs:16-38` |
+| App.config(연결문자열 등) | exe 내장 리소스 | `%LocalAppData%\GBCWorkHub\GBCWorkHub.exe.config` | 평문 XML | 유지 | `ConfigurationManager` 설정 소스 | `BundledConfig.cs:16-38` |
 | Pretendard 폰트 | exe 내장 리소스 | `%LocalAppData%\GBCWorkHub\Fonts\*.otf` | 바이너리 | 유지 | UI 폰트 | `BundledFonts.cs:14-34` |
 | 진단/DB 로그 | 앱 실행 전반 | `C:\GBCWorkHub\Logs\WorkHub-yyyyMMdd.log` | UTF-8 텍스트 append, **자동삭제 없음(무한 누적)** | 유지 | 트러블슈팅 | `DiagnosticLogger.cs`, `WorkHubFileLogger.cs`(동일 파일에 병기) |
 | 크래시 로그 | 미처리 예외 | `C:\GBCWorkHub\Logs\Crash-*.log` | 평문, 예외별 새 파일 | 유지 | 사후분석 | `App.xaml.cs:63-94` |

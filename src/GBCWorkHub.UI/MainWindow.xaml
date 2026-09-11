@@ -5,6 +5,7 @@
         xmlns:imp="clr-namespace:GBCWorkHub.UI.Views.Improvement"
         xmlns:views="clr-namespace:GBCWorkHub.UI.Views"
         Title="GBC WorkHub"
+        Icon="pack://application:,,,/Assets/AppIcon.ico"
         Height="760" Width="1180"
         MinHeight="520" MinWidth="860"
         WindowStartupLocation="CenterScreen"

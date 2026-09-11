@@ -40,7 +40,7 @@ function Build-Version([string]$ver, [string]$releaseBaseUrl) {
     & $msbuild "tools\GBCWorkHub.Updater\GBCWorkHub.Updater.csproj" /p:Configuration=Release /p:Platform=AnyCPU /m /v:minimal
     if ($LASTEXITCODE -ne 0) { throw "Updater build failed for $ver" }
 
-    $ui = "src\GBCWorkHub.UI\bin\Release\GBCWorkHub.UI.exe"
+    $ui = "src\GBCWorkHub.UI\bin\Release\GBCWorkHub.exe"
     $fv = Get-FileVersion $ui
     Write-Host "Built UI FileVersion=$fv"
     if ($fv -ne "$ver.0" -and $fv -ne $ver) { throw "FileVersion mismatch: $fv" }
@@ -57,9 +57,9 @@ Write-Host "== Build v1.0.1 (installed baseline) =="
 Build-Version "1.0.1" $releaseBase
 $install = Join-Path $work "install"
 New-Item -ItemType Directory -Path $install | Out-Null
-Copy-Item (Join-Path $work "pack-1.0.1\GBCWorkHub.UI.exe") $install
+Copy-Item (Join-Path $work "pack-1.0.1\GBCWorkHub.exe") $install
 Copy-Item (Join-Path $work "pack-1.0.1\GBCWorkHubUpdater.exe") $install
-Write-Host "Install FileVersion=$(Get-FileVersion (Join-Path $install 'GBCWorkHub.UI.exe'))"
+Write-Host "Install FileVersion=$(Get-FileVersion (Join-Path $install 'GBCWorkHub.exe'))"
 
 Write-Host "== Build v1.0.2 (GitHub Release feed) =="
 Build-Version "1.0.2" $releaseBase
@@ -118,7 +118,7 @@ try {
         throw "Updater exit $($p.ExitCode)"
     }
 
-    $after = Get-FileVersion (Join-Path $install "GBCWorkHub.UI.exe")
+    $after = Get-FileVersion (Join-Path $install "GBCWorkHub.exe")
     Write-Host "After update FileVersion=$after"
     if ($after -ne "1.0.2.0" -and $after -ne "1.0.2") { throw "E2E failed FileVersion=$after" }
 
