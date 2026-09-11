@@ -18,6 +18,10 @@ namespace GBCWorkHub.UI.Models.Popup
         public bool ShowAffiliationInput { get; set; }
         public bool RequireAffiliation { get; set; }
         public string AffiliationText { get; set; }
+        /// <summary>비어 있으면 기존처럼 자유 입력. 있으면 칩 목록에서 고르게 하고, "기타" 선택 시에만 자유 입력란을 보여준다.</summary>
+        public IList<string> AffiliationOptions { get; set; }
+        /// <summary>AffiliationOptions에 포함된, "직접 입력"을 뜻하는 항목 텍스트.</summary>
+        public string AffiliationCustomOptionLabel { get; set; }
         /// <summary>범용 세 번째 텍스트 입력란(예: 로그인ID 수정) — 라벨은 호출자가 지정.</summary>
         public bool ShowSecondaryInput { get; set; }
         public bool RequireSecondaryInput { get; set; }

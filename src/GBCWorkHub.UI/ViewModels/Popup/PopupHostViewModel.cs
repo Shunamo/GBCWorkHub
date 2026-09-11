@@ -18,6 +18,8 @@ namespace GBCWorkHub.UI.ViewModels.Popup
         private bool _showAffiliationInput;
         private bool _requireAffiliation;
         private string _affiliationText;
+        private string _selectedAffiliationOption;
+        private string _affiliationCustomOptionLabel = "기타";
         private bool _showSecondaryInput;
         private bool _requireSecondaryInput;
         private string _secondaryInputLabel;
@@ -130,6 +132,40 @@ namespace GBCWorkHub.UI.ViewModels.Popup
             {
                 if (SetProperty(ref _affiliationText, value))
                     InputError = null;
+            }
+        }
+
+        /// <summary>비어 있으면(기존 호출자) 자유 입력만 보이고, 값이 있으면 칩 목록 + "기타" 직접입력을 보여준다.</summary>
+        public ObservableCollection<string> AffiliationOptions { get; private set; }
+            = new ObservableCollection<string>();
+
+        public bool HasAffiliationOptions
+        {
+            get { return AffiliationOptions != null && AffiliationOptions.Count > 0; }
+        }
+
+        public string SelectedAffiliationOption
+        {
+            get { return _selectedAffiliationOption; }
+            set
+            {
+                if (!SetProperty(ref _selectedAffiliationOption, value))
+                    return;
+                RaisePropertyChanged("IsAffiliationCustom");
+                if (!IsAffiliationCustom)
+                    AffiliationText = value ?? string.Empty;
+                else if (string.Equals(AffiliationText, value, System.StringComparison.Ordinal))
+                    AffiliationText = string.Empty;
+            }
+        }
+
+        /// <summary>지금 선택된 칩이 "기타"라서 별도 자유 입력란을 보여줘야 하는지.</summary>
+        public bool IsAffiliationCustom
+        {
+            get
+            {
+                return HasAffiliationOptions
+                    && string.Equals(SelectedAffiliationOption, _affiliationCustomOptionLabel, System.StringComparison.Ordinal);
             }
         }
 
@@ -468,7 +504,42 @@ namespace GBCWorkHub.UI.ViewModels.Popup
             InputText = request.InputText ?? string.Empty;
             ShowAffiliationInput = request.ShowAffiliationInput;
             RequireAffiliation = request.RequireAffiliation;
+            _affiliationCustomOptionLabel = string.IsNullOrWhiteSpace(request.AffiliationCustomOptionLabel)
+                ? "기타"
+                : request.AffiliationCustomOptionLabel.Trim();
+            AffiliationOptions.Clear();
+            if (request.AffiliationOptions != null)
+            {
+                foreach (string option in request.AffiliationOptions)
+                {
+                    if (!string.IsNullOrWhiteSpace(option))
+                        AffiliationOptions.Add(option.Trim());
+                }
+            }
+            RaisePropertyChanged("HasAffiliationOptions");
             AffiliationText = request.AffiliationText ?? string.Empty;
+            if (HasAffiliationOptions)
+            {
+                bool matchesOption = false;
+                foreach (string option in AffiliationOptions)
+                {
+                    if (string.Equals(option, AffiliationText, System.StringComparison.Ordinal))
+                    {
+                        matchesOption = true;
+                        break;
+                    }
+                }
+                if (matchesOption)
+                    SelectedAffiliationOption = AffiliationText;
+                else if (!string.IsNullOrWhiteSpace(AffiliationText))
+                    SelectedAffiliationOption = _affiliationCustomOptionLabel;
+                else
+                    SelectedAffiliationOption = null;
+            }
+            else
+            {
+                SelectedAffiliationOption = null;
+            }
             ShowSecondaryInput = request.ShowSecondaryInput;
             RequireSecondaryInput = request.RequireSecondaryInput;
             SecondaryInputLabel = request.SecondaryInputLabel ?? string.Empty;

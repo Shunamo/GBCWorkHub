@@ -176,10 +176,64 @@
                     <StackPanel Visibility="{Binding ShowAffiliationInput, Converter={StaticResource BoolToVis}}"
                                 Margin="0,10,0,0">
                         <TextBlock Text="소속" FontSize="12" Foreground="#64748B" Margin="0,0,0,4" />
+
+                        <ListBox ItemsSource="{Binding AffiliationOptions}"
+                                 SelectedItem="{Binding SelectedAffiliationOption, Mode=TwoWay}"
+                                 Background="Transparent" BorderThickness="0" Padding="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                 Visibility="{Binding HasAffiliationOptions, Converter={StaticResource BoolToVis}}">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Margin" Value="0,0,8,8" />
+                                    <Setter Property="Padding" Value="14,8" />
+                                    <Setter Property="Foreground" Value="#334155" />
+                                    <Setter Property="FontSize" Value="13" />
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <Border x:Name="Chip" Background="#F4F6F9" BorderBrush="#D8DEE8"
+                                                        BorderThickness="1" CornerRadius="16"
+                                                        Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter TargetName="Chip" Property="Background" Value="{StaticResource WlGlassAccent}" />
+                                                        <Setter TargetName="Chip" Property="BorderBrush" Value="{StaticResource WlGlassAccent}" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Chip" Property="BorderBrush" Value="{StaticResource WlGlassAccent}" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                    <Style.Triggers>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="Foreground" Value="White" />
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                        </ListBox>
+
+                        <TextBox Style="{StaticResource GlassPromptInput}"
+                                 Tag="소속을 입력하세요"
+                                 Margin="0,8,0,0"
+                                 Text="{Binding AffiliationText, UpdateSourceTrigger=PropertyChanged}"
+                                 Visibility="{Binding IsAffiliationCustom, Converter={StaticResource BoolToVis}}" />
+
                         <TextBox x:Name="AffiliationInputBox"
                                  Style="{StaticResource GlassPromptInput}"
                                  Tag="ex) 진료지원"
-                                 Text="{Binding AffiliationText, UpdateSourceTrigger=PropertyChanged}" />
+                                 Text="{Binding AffiliationText, UpdateSourceTrigger=PropertyChanged}"
+                                 Visibility="{Binding HasAffiliationOptions, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
                     </StackPanel>
                     <StackPanel Visibility="{Binding ShowSecondaryInput, Converter={StaticResource BoolToVis}}"
                                 Margin="0,10,0,0">

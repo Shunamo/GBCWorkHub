@@ -150,6 +150,7 @@ namespace GBCWorkHub.UI.Services
                 InputText = string.Empty,
                 ShowAffiliationInput = true,
                 RequireAffiliation = true,
+                AffiliationOptions = new System.Collections.Generic.List<string> { "진료지원", "진료간호", "원무", "기타" },
                 ShowPasswordInput = true,
                 RequirePassword = true,
                 ShowPasswordConfirm = true,
