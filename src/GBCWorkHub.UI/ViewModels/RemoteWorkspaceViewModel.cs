@@ -2518,10 +2518,27 @@ namespace GBCWorkHub.UI.ViewModels
             }
             distinct.Sort(CompareGroupNames);
 
-            _groupFilterOptions.Clear();
-            _groupFilterOptions.Add("전체");
-            foreach (string name in distinct)
-                _groupFilterOptions.Add(name);
+            // ObservableCollection을 매번 Clear+Add 하면 ListBox의 SelectedItem 바인딩이 그때마다
+            // 끊겨서(WPF Reset 처리) 필터가 자꾸 풀리는 것처럼 보인다 — 실제로 목록이 바뀔 때만 갱신한다.
+            bool changed = _groupFilterOptions.Count != distinct.Count + 1;
+            if (!changed)
+            {
+                for (int i = 0; i < distinct.Count; i++)
+                {
+                    if (!string.Equals(_groupFilterOptions[i + 1], distinct[i], StringComparison.Ordinal))
+                    {
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+            if (changed)
+            {
+                _groupFilterOptions.Clear();
+                _groupFilterOptions.Add("전체");
+                foreach (string name in distinct)
+                    _groupFilterOptions.Add(name);
+            }
 
             // 그룹(진료지원/진료간호/원무 등)은 사이트마다 달라지는 카테고리가 아니므로,
             // 사이트를 옮겨도 선택은 그대로 둔다 — 리셋하는 건 로그인한 사용자의 소속으로
