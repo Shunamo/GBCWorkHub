@@ -321,11 +321,14 @@
                                                 <DataTrigger Binding="{Binding AppendSearchText}" Value="{x:Null}">
                                                     <Setter Property="Visibility" Value="Visible" />
                                                 </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsFocused, ElementName=AppendSearchBox}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
-                                <TextBox Text="{Binding AppendSearchText, UpdateSourceTrigger=PropertyChanged}"
+                                <TextBox x:Name="AppendSearchBox" Text="{Binding AppendSearchText, UpdateSourceTrigger=PropertyChanged}"
                                          BorderThickness="0" Background="Transparent"
                                          Padding="12,0,4,0" FontSize="{StaticResource FontSize.Base}"
                                          VerticalContentAlignment="Center" />
@@ -442,14 +445,17 @@
                                                 <DataTrigger Binding="{Binding SessionDateText}" Value="">
                                                     <Setter Property="Visibility" Value="Visible" />
                                                 </DataTrigger>
-                                                <DataTrigger Binding="{Binding SessionDateText}" Value="{x:Null}">
+                                <DataTrigger Binding="{Binding SessionDateText}" Value="{x:Null}">
                                                     <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsFocused, ElementName=SessionDateBox}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
-                                <TextBox Style="{StaticResource PickerDateInput}"
+                                <TextBox x:Name="SessionDateBox" Style="{StaticResource PickerDateInput}"
                                          Text="{Binding SessionDateText, UpdateSourceTrigger=PropertyChanged}"
                                          MaxLength="10" />
                             </Grid>
@@ -466,14 +472,17 @@
                                                 <DataTrigger Binding="{Binding SessionStartTimeText}" Value="">
                                                     <Setter Property="Visibility" Value="Visible" />
                                                 </DataTrigger>
-                                                <DataTrigger Binding="{Binding SessionStartTimeText}" Value="{x:Null}">
+                                <DataTrigger Binding="{Binding SessionStartTimeText}" Value="{x:Null}">
                                                     <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsFocused, ElementName=SessionStartTimeBox}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
-                                <TextBox Style="{StaticResource PickerDateInput}"
+                                <TextBox x:Name="SessionStartTimeBox" Style="{StaticResource PickerDateInput}"
                                          Text="{Binding SessionStartTimeText, UpdateSourceTrigger=PropertyChanged}"
                                          MaxLength="5" />
                             </Grid>
@@ -492,14 +501,17 @@
                                                 <DataTrigger Binding="{Binding SessionEndTimeText}" Value="">
                                                     <Setter Property="Visibility" Value="Visible" />
                                                 </DataTrigger>
-                                                <DataTrigger Binding="{Binding SessionEndTimeText}" Value="{x:Null}">
+                                <DataTrigger Binding="{Binding SessionEndTimeText}" Value="{x:Null}">
                                                     <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsFocused, ElementName=SessionEndTimeBox}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
-                                <TextBox Style="{StaticResource PickerDateInput}"
+                                <TextBox x:Name="SessionEndTimeBox" Style="{StaticResource PickerDateInput}"
                                          Text="{Binding SessionEndTimeText, UpdateSourceTrigger=PropertyChanged}"
                                          MaxLength="5" />
                             </Grid>

@@ -357,7 +357,7 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <Grid>
-                                        <TextBox BorderThickness="0" Background="Transparent"
+                                        <TextBox x:Name="TreeSearchBox" BorderThickness="0" Background="Transparent"
                                                  Padding="10,0,4,0" FontSize="{StaticResource FontSize.Base}"
                                                  VerticalContentAlignment="Center"
                                                  Text="{Binding TreeSearchText, UpdateSourceTrigger=PropertyChanged}" />
@@ -373,6 +373,9 @@
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding TreeSearchText}" Value="{x:Null}">
                                                             <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsFocused, ElementName=TreeSearchBox}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>

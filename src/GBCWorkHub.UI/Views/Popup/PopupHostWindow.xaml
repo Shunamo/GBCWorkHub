@@ -52,6 +52,9 @@
                                                     <DataTrigger Binding="{Binding Text, RelativeSource={RelativeSource TemplatedParent}}" Value="{x:Null}">
                                                         <Setter Property="Visibility" Value="Visible" />
                                                     </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsFocused, RelativeSource={RelativeSource TemplatedParent}}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </TextBlock.Style>
@@ -109,6 +112,7 @@
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsKeyboardFocused" Value="True">
                                     <Setter TargetName="Bd" Property="BorderBrush" Value="#93C5FD" />
+                                    <Setter TargetName="Placeholder" Property="Visibility" Value="Collapsed" />
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>

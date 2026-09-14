@@ -92,11 +92,14 @@
                                                         <DataTrigger Binding="{Binding FilterFromText}" Value="{x:Null}">
                                                             <Setter Property="Visibility" Value="Visible" />
                                                         </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsFocused, ElementName=FilterFromBox}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </TextBlock.Style>
                                         </TextBlock>
-                                        <TextBox Text="{Binding FilterFromText, UpdateSourceTrigger=PropertyChanged}"
+                                        <TextBox x:Name="FilterFromBox" Text="{Binding FilterFromText, UpdateSourceTrigger=PropertyChanged}"
                                                  BorderThickness="0" Background="Transparent" Padding="6,0"
                                                  FontSize="12" VerticalContentAlignment="Center"
                                                  ToolTip="시작일 yyyy-MM-dd" />
@@ -116,11 +119,14 @@
                                                         <DataTrigger Binding="{Binding FilterToText}" Value="{x:Null}">
                                                             <Setter Property="Visibility" Value="Visible" />
                                                         </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsFocused, ElementName=FilterToBox}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </TextBlock.Style>
                                         </TextBlock>
-                                        <TextBox Text="{Binding FilterToText, UpdateSourceTrigger=PropertyChanged}"
+                                        <TextBox x:Name="FilterToBox" Text="{Binding FilterToText, UpdateSourceTrigger=PropertyChanged}"
                                                  BorderThickness="0" Background="Transparent" Padding="6,0"
                                                  FontSize="12" VerticalContentAlignment="Center"
                                                  ToolTip="종료일 yyyy-MM-dd" />
@@ -173,11 +179,14 @@
                                                         <DataTrigger Binding="{Binding SearchText}" Value="{x:Null}">
                                                             <Setter Property="Visibility" Value="Visible" />
                                                         </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsFocused, ElementName=ClassicSearchBox}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </TextBlock.Style>
                                         </TextBlock>
-                                        <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                        <TextBox x:Name="ClassicSearchBox" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                                                  BorderThickness="0" Background="Transparent" Padding="8,0,4,0"
                                                  FontSize="12" VerticalContentAlignment="Center"
                                                  VerticalAlignment="Stretch" />

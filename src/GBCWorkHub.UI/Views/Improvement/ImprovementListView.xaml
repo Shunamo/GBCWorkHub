@@ -150,11 +150,15 @@
                                                                 <DataTrigger Binding="{Binding SearchText}" Value="{x:Null}">
                                                                     <Setter Property="Visibility" Value="Visible" />
                                                                 </DataTrigger>
+                                                                <DataTrigger Binding="{Binding IsFocused, ElementName=ImprovementSearchBox}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
                                                     </TextBlock.Style>
                                                 </TextBlock>
-                                                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                                <TextBox x:Name="ImprovementSearchBox"
+                                                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                                                          BorderThickness="0" Background="Transparent"
                                                          Padding="2,0,4,4" FontSize="{StaticResource FontSize.Base}"
                                                          VerticalContentAlignment="Bottom" />

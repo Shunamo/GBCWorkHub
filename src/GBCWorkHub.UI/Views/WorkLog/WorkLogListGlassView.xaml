@@ -180,11 +180,14 @@
                                                                     <DataTrigger Binding="{Binding SearchText}" Value="{x:Null}">
                                                                         <Setter Property="Visibility" Value="Visible" />
                                                                     </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsFocused, ElementName=GlassSearchBox}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                    </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
                                                         </TextBlock.Style>
                                                     </TextBlock>
-                                                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                                    <TextBox x:Name="GlassSearchBox" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                                                              BorderThickness="0" Background="Transparent"
                                                              Padding="2,0,4,4" FontSize="{StaticResource FontSize.Base}"
                                                              VerticalContentAlignment="Bottom" />
@@ -724,11 +727,14 @@
                                                                                 <DataTrigger Binding="{Binding FilterFromText}" Value="{x:Null}">
                                                                                     <Setter Property="Visibility" Value="Visible" />
                                                                                 </DataTrigger>
+                                                                                <DataTrigger Binding="{Binding IsFocused, ElementName=GlassFilterFromBox}" Value="True">
+                                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                                </DataTrigger>
                                                                             </Style.Triggers>
                                                                         </Style>
                                                                     </TextBlock.Style>
                                                                 </TextBlock>
-                                                                <TextBox Text="{Binding FilterFromText, UpdateSourceTrigger=PropertyChanged}"
+                                                                <TextBox x:Name="GlassFilterFromBox" Text="{Binding FilterFromText, UpdateSourceTrigger=PropertyChanged}"
                                                                          BorderThickness="0" Background="Transparent"
                                                                          FontSize="11" MaxLength="10"
                                                                          TextAlignment="Center"
@@ -754,11 +760,14 @@
                                                                                 <DataTrigger Binding="{Binding FilterToText}" Value="{x:Null}">
                                                                                     <Setter Property="Visibility" Value="Visible" />
                                                                                 </DataTrigger>
+                                                                                <DataTrigger Binding="{Binding IsFocused, ElementName=GlassFilterToBox}" Value="True">
+                                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                                </DataTrigger>
                                                                             </Style.Triggers>
                                                                         </Style>
                                                                     </TextBlock.Style>
                                                                 </TextBlock>
-                                                                <TextBox Text="{Binding FilterToText, UpdateSourceTrigger=PropertyChanged}"
+                                                                <TextBox x:Name="GlassFilterToBox" Text="{Binding FilterToText, UpdateSourceTrigger=PropertyChanged}"
                                                                          BorderThickness="0" Background="Transparent"
                                                                          FontSize="11" MaxLength="10"
                                                                          TextAlignment="Center"

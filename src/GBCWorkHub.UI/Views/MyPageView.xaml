@@ -367,6 +367,9 @@
                                                             <DataTrigger Binding="{Binding Inbox.SearchText}" Value="{x:Null}">
                                                                 <Setter Property="Visibility" Value="Visible" />
                                                             </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsFocused, ElementName=InboxSearchBox}" Value="True">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
                                                 </TextBlock.Style>
@@ -522,6 +525,9 @@
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding WorkLogSearchText}" Value="{x:Null}">
                                                                 <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsFocused, ElementName=WorkLogSearchBox}" Value="True">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
                                                             </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
