@@ -725,6 +725,10 @@
                                             Visibility="{Binding ShowPcAccessEditButton, Converter={StaticResource BoolToVis}}">
                                         <Image Source="{StaticResource EditFillIcon}" Width="16" Height="16" />
                                     </Button>
+                                    <CheckBox Content="AGENT 설치 완료" FontSize="12" FontWeight="SemiBold" Foreground="#64748B"
+                                              Margin="8,0,10,0" Cursor="Hand" VerticalAlignment="Center"
+                                              IsChecked="{Binding SelectedPcAgentInstalled, Mode=TwoWay}"
+                                              Visibility="{Binding ShowPcAccessSaveButton, Converter={StaticResource BoolToVis}}" />
                                     <Button Style="{StaticResource HeaderIconButton}"
                                             Margin="4,0,0,0"
                                             ToolTip="저장"
@@ -922,12 +926,6 @@
                                              ToolTip="연필 아이콘으로 수정 후 저장하세요." />
                                 </StackPanel>
                             </Border>
-
-                            <CheckBox Content="AGENT 설치 완료" FontSize="12.5" FontWeight="SemiBold" Foreground="#64748B"
-                                      Margin="2,8,0,0" Cursor="Hand"
-                                      IsChecked="{Binding SelectedPcAgentInstalled, Mode=TwoWay}"
-                                      IsEnabled="{Binding IsPcAccessEditing}"
-                                      Visibility="{Binding HasSelectedRemoteComputer, Converter={StaticResource BoolToVis}}" />
                             </StackPanel>
                         </Grid>
                         <TextBlock DockPanel.Dock="Top" Text="최근 접속 내역이 없습니다."
