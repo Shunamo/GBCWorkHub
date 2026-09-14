@@ -294,6 +294,13 @@
                                   Visibility="{Binding IsUserShellVisible, Converter={StaticResource BoolToVis}}" />
                     <views:MainTabBar VerticalAlignment="Center" Margin="0,0,12,0" />
                     <Button Style="{StaticResource HeaderIconButton}"
+                            Command="{Binding OpenHelpGuideCommand}" ToolTip="도움말" Margin="0,0,8,0">
+                        <Border Width="20" Height="20" CornerRadius="10" Background="#EDEFF3">
+                            <TextBlock Text="?" FontSize="12" FontWeight="Bold" Foreground="#64748B"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </Button>
+                    <Button Style="{StaticResource HeaderIconButton}"
                             Command="{Binding RefreshCommand}" ToolTip="새로고침">
                         <Image Source="{StaticResource RefreshLightIcon}" Width="15" Height="15" />
                     </Button>

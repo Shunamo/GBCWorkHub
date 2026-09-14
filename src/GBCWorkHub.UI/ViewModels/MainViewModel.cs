@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -68,6 +69,7 @@ namespace GBCWorkHub.UI.ViewModels
             LoginCommand = new RelayCommand(() => { var _ = LoginAsync(); }, () => !IsLoggedIn);
             LogoutCommand = new RelayCommand(() => { var _ = LogoutAsync(); }, () => IsLoggedIn);
             RefreshCommand = new RelayCommand(() => { var _ = RefreshFromDbAsync(); }, () => !IsRefreshing);
+            OpenHelpGuideCommand = new RelayCommand(OpenHelpGuide);
             BackToSitesCommand = new RelayCommand(() => _remoteWorkspace.BackToSitesCommand.Execute(null));
             UpdateCommand = new RelayCommand(() => { var _ = ApplyUpdateAsync(); }, () => IsUpdateAvailable && !IsUpdateBusy);
             DismissUpdateCommand = new RelayCommand(DismissUpdate, () => IsUpdateAvailable && !IsUpdateBusy);
@@ -307,6 +309,7 @@ namespace GBCWorkHub.UI.ViewModels
         public ICommand LoginCommand { get; private set; }
         public ICommand LogoutCommand { get; private set; }
         public ICommand RefreshCommand { get; private set; }
+        public ICommand OpenHelpGuideCommand { get; private set; }
         public ICommand BackToSitesCommand { get; private set; }
         public ICommand UpdateCommand { get; private set; }
         public ICommand DismissUpdateCommand { get; private set; }
@@ -1062,6 +1065,25 @@ namespace GBCWorkHub.UI.ViewModels
                 TfsWorkLog,
                 active,
                 writeAck: true);
+        }
+
+        private const string HelpGuideUrl =
+            "https://www.notion.so/GBCWorkHub-3d8ed1532ad180a58ef7d422a854f004?source=copy_link";
+
+        private void OpenHelpGuide()
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = HelpGuideUrl,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.Error("HELP_GUIDE", "Open failed: " + ex.Message);
+            }
         }
 
         private void WorkLogBack()
