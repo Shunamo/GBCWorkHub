@@ -994,6 +994,7 @@ namespace GBCWorkHub.UI.ViewModels
                 Message = "사이트: " + site
                     + "\n· 사용자명 칸 → PC 이름\n· 소속 칸 → 팀(예: 진료지원)\n· IP는 추가 후 하단 수정에서 입력",
                 Icon = PopupIconKind.Info,
+                ShowInput = true,
                 ShowAffiliationInput = true,
                 RequireAffiliation = false,
                 AffiliationText = string.Empty,

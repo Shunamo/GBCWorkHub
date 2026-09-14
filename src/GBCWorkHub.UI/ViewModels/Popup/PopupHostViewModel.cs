@@ -500,7 +500,7 @@ namespace GBCWorkHub.UI.ViewModels.Popup
             Icon = request.Icon;
             Kind = request.Kind;
             ShowCancelOnProgress = request.ShowCancelOnProgress;
-            ShowInput = request.ShowInput || request.Kind == PopupKind.Prompt;
+            ShowInput = request.ShowInput;
             InputText = request.InputText ?? string.Empty;
             ShowAffiliationInput = request.ShowAffiliationInput;
             RequireAffiliation = request.RequireAffiliation;

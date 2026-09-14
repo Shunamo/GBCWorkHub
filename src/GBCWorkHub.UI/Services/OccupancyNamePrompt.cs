@@ -59,6 +59,7 @@ namespace GBCWorkHub.UI.Services
                 Title = "로그인",
                 Icon = PopupIconKind.Info,
                 Message = string.Empty,
+                ShowInput = true,
                 InputText = existing != null ? (existing.UserName ?? string.Empty) : string.Empty,
                 ShowAffiliationInput = true,
                 RequireAffiliation = false,
@@ -102,6 +103,7 @@ namespace GBCWorkHub.UI.Services
                 Title = "비밀번호 재설정",
                 Icon = PopupIconKind.Info,
                 Message = "이 PC에 등록된 계정만 가능합니다.",
+                ShowInput = true,
                 InputText = existing != null ? (existing.UserName ?? string.Empty) : string.Empty,
                 ShowAffiliationInput = false,
                 ShowPasswordInput = true,
@@ -147,6 +149,7 @@ namespace GBCWorkHub.UI.Services
             {
                 Title = "회원가입",
                 Icon = PopupIconKind.Info,
+                ShowInput = true,
                 InputText = string.Empty,
                 ShowAffiliationInput = true,
                 RequireAffiliation = true,
@@ -217,6 +220,7 @@ namespace GBCWorkHub.UI.Services
             {
                 Title = "사용자 정보",
                 Icon = PopupIconKind.Info,
+                ShowInput = true,
                 InputText = current,
                 ShowAffiliationInput = true,
                 AffiliationText = currentAffiliation,

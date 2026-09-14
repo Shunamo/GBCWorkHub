@@ -2896,6 +2896,7 @@ public sealed class AdminViewModel : ViewModelBase
 			Title = "접속 이력 수정",
 			Icon = PopupIconKind.Info,
 			Message = item.Title + "\n접속자명을 수정합니다.",
+			ShowInput = true,
 			InputText = item.AccessUserId ?? string.Empty,
 			Buttons = new PopupButtonDefinition[2]
 			{

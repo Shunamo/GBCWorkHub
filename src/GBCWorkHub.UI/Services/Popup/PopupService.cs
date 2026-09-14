@@ -58,7 +58,6 @@ namespace GBCWorkHub.UI.Services.Popup
             if (request == null)
                 request = new PopupRequest();
             request.Kind = PopupKind.Prompt;
-            request.ShowInput = true;
             return ShowDialogAsync(request);
         }
 
