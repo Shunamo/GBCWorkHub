@@ -79,6 +79,7 @@
     <Compile Include="Services\ClipboardMonitorService.cs" />
     <Compile Include="Services\CmcPmpBrowserLauncher.cs" />
     <Compile Include="Services\CmcPmpSessionMonitor.cs" />
+    <Compile Include="Services\AgentSetupNoticeStore.cs" />
     <Compile Include="Services\DiagnosticLogger.cs" />
     <Compile Include="Services\OccupancyTakeoverAlert.cs" />
     <Compile Include="Services\FortiClientLauncher.cs" />

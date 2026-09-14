@@ -702,6 +702,28 @@ namespace GBCWorkHub.UI.ViewModels
             IsLoginGreetingVisible = true;
             int token = ++_loginGreetingToken;
             var ignored = HideLoginGreetingAsync(token);
+            var ignoredNotice = MaybeShowAgentSetupNoticeAsync();
+        }
+
+        private async Task MaybeShowAgentSetupNoticeAsync()
+        {
+            if (_popup == null || AgentSetupNoticeStore.IsDismissed())
+                return;
+
+            PopupResult result = await _popup.ShowConfirmAsync(new PopupRequest
+            {
+                Title = "안내",
+                Message = "초기 PC 세팅(에이전트 설치)을 완료하셨다면 PC 목록에서 \"초기 세팅 완료\"를 체크해 주세요.",
+                Icon = PopupIconKind.Info,
+                Buttons = new[]
+                {
+                    new PopupButtonDefinition("닫기", PopupResultType.Cancel, isCancel: true),
+                    new PopupButtonDefinition("다시 보지 않기", PopupResultType.Primary, isDefault: true)
+                }
+            }).ConfigureAwait(true);
+
+            if (result != null && result.IsPrimary)
+                AgentSetupNoticeStore.MarkDismissed();
         }
 
         private async Task HideLoginGreetingAsync(int token)
