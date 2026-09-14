@@ -411,6 +411,10 @@ namespace GBCWorkHub.UI.ViewModels
                     ApplyRecentUsageLogs(++_usageLogLoadGeneration, null);
                 else
                 {
+                    if (!_selectedRemoteComputer.AgentInstalled)
+                    {
+                        var ignoredNotice = MaybeShowAgentSetupNoticeAsync();
+                    }
                     var _ = LoadRecentUsageLogsAsync(_selectedRemoteComputer);
                 }
             }
@@ -711,6 +715,27 @@ namespace GBCWorkHub.UI.ViewModels
         {
             get { return _selectedPcAgentInstalled; }
             set { SetProperty(ref _selectedPcAgentInstalled, value); }
+        }
+
+        private async Task MaybeShowAgentSetupNoticeAsync()
+        {
+            if (_popup == null || AgentSetupNoticeStore.IsDismissed())
+                return;
+
+            PopupResult result = await _popup.ShowConfirmAsync(new PopupRequest
+            {
+                Title = "안내",
+                Message = "이 PC는 아직 \"초기 세팅 완료\"로 표시되지 않았습니다.\n에이전트 설치 등 초기 세팅을 완료하셨다면 편집(연필 아이콘)에서 체크해 주세요.",
+                Icon = PopupIconKind.Info,
+                Buttons = new[]
+                {
+                    new PopupButtonDefinition("닫기", PopupResultType.Cancel, isCancel: true),
+                    new PopupButtonDefinition("다시 보지 않기", PopupResultType.Primary, isDefault: true)
+                }
+            }).ConfigureAwait(true);
+
+            if (result != null && result.IsPrimary)
+                AgentSetupNoticeStore.MarkDismissed();
         }
 
         private void CopySelectedPcDomain()
