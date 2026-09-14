@@ -222,7 +222,7 @@ namespace GBCWorkHub.BIZ.Tests
             public int UpdatePasswordHash(string loginOrName, string passwordHash) { return 0; }
             public int UpsertPcMap(PcMapDto map) { return 0; }
             public int UpdatePcComment(string siteCode, string pcName, string comment) { return 0; }
-            public int UpdatePcAccess(string siteCode, string pcName, string pcNote, string pcComment, string pcDomain) { return 0; }
+            public int UpdatePcAccess(string siteCode, string pcName, string pcNote, string pcComment, string pcDomain, bool? agentInstalled) { return 0; }
             public IList<string> ResolvePcAliases(string siteCode, string value) { return new List<string>(); }
             public IList<DirectoryUserDto> GetUsers() { return new List<DirectoryUserDto>(_rows); }
             public int SetUserActive(string loginOrName, bool isActive) { return 0; }
@@ -238,7 +238,7 @@ namespace GBCWorkHub.BIZ.Tests
             public Task<DirectoryUserDto> FindUserByLocalEndpointAsync(string pcName, string pcIp) { return Task.FromResult(FindUserByLocalEndpoint(pcName, pcIp)); }
             public Task<int> UpsertPcMapAsync(PcMapDto map) { return Task.FromResult(0); }
             public Task<int> UpdatePcCommentAsync(string siteCode, string pcName, string comment) { return Task.FromResult(0); }
-            public Task<int> UpdatePcAccessAsync(string siteCode, string pcName, string pcNote, string pcComment, string pcDomain) { return Task.FromResult(0); }
+            public Task<int> UpdatePcAccessAsync(string siteCode, string pcName, string pcNote, string pcComment, string pcDomain, bool? agentInstalled) { return Task.FromResult(0); }
             public Task<IList<string>> ResolvePcAliasesAsync(string siteCode, string value) { return Task.FromResult((IList<string>)new List<string>()); }
             public Task<IList<DirectoryUserDto>> GetUsersAsync() { return Task.FromResult(GetUsers()); }
             public Task<IList<PcMapDto>> GetPcMapsBySiteAsync(string siteCode) { return Task.FromResult((IList<PcMapDto>)new List<PcMapDto>()); }

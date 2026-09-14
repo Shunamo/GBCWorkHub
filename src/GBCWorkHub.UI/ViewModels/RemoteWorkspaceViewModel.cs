@@ -41,6 +41,7 @@ namespace GBCWorkHub.UI.ViewModels
         private ObservableCollection<PcAccessSectionViewModel> _selectedPcAccessSections;
         private string _selectedPcComment = string.Empty;
         private string _selectedPcCommentBaseline = string.Empty;
+        private bool _selectedPcAgentInstalled;
         private bool _isPcAccessEditing;
         private bool _isPcAccessSaving;
         private string _adminEditPcIp = string.Empty;
@@ -705,6 +706,13 @@ namespace GBCWorkHub.UI.ViewModels
             }
         }
 
+        /// <summary>AGENT 설치 완료 여부 — PC 접속 정보 바텀시트에서 누구나 직접 체크/해제 가능.</summary>
+        public bool SelectedPcAgentInstalled
+        {
+            get { return _selectedPcAgentInstalled; }
+            set { SetProperty(ref _selectedPcAgentInstalled, value); }
+        }
+
         private void CopySelectedPcDomain()
         {
             if (!HasSelectedPcDomain)
@@ -880,6 +888,7 @@ namespace GBCWorkHub.UI.ViewModels
             string note = BuildPcNoteFromSections(_selectedPcAccessSections);
             string comment = SelectedPcComment ?? string.Empty;
             string domain = BuildPcDomainFromSections(_selectedPcAccessSections);
+            bool agentInstalled = SelectedPcAgentInstalled;
             string site = item.SiteCode;
             string pc = item.PcName;
 
@@ -897,7 +906,8 @@ namespace GBCWorkHub.UI.ViewModels
                         TeamName = AdminEditTeamName,
                         PcDomain = domain,
                         PcNote = note,
-                        PcComment = comment
+                        PcComment = comment,
+                        AgentInstalled = agentInstalled
                     };
                     // AURORA는 IP를 점유키로
                     if (string.Equals(site, "AURORA", StringComparison.OrdinalIgnoreCase)
@@ -913,7 +923,7 @@ namespace GBCWorkHub.UI.ViewModels
                 }
                 else
                 {
-                    int n = await _directoryBiz.UpdatePcAccessAsync(site, pc, note, comment, domain).ConfigureAwait(true);
+                    int n = await _directoryBiz.UpdatePcAccessAsync(site, pc, note, comment, domain, agentInstalled).ConfigureAwait(true);
                     if (n < 0)
                         return;
                 }
@@ -925,6 +935,7 @@ namespace GBCWorkHub.UI.ViewModels
                     SelectedRemoteComputer.PcNote = string.IsNullOrWhiteSpace(note) ? null : note;
                     SelectedRemoteComputer.PcComment = string.IsNullOrWhiteSpace(comment) ? null : comment.Trim();
                     SelectedRemoteComputer.PcDomain = string.IsNullOrWhiteSpace(domain) ? null : domain;
+                    SelectedRemoteComputer.AgentInstalled = agentInstalled;
                     if (IsAdmin)
                     {
                         if (!string.IsNullOrWhiteSpace(AdminEditPcIp))
@@ -1126,6 +1137,7 @@ namespace GBCWorkHub.UI.ViewModels
             {
                 SetProperty(ref _selectedPcComment, string.Empty, "SelectedPcComment");
                 _selectedPcCommentBaseline = string.Empty;
+                SelectedPcAgentInstalled = false;
                 AdminEditPcIp = string.Empty;
                 AdminEditTeamName = string.Empty;
                 RaisePropertyChanged("HasSelectedPcAccessSections");
@@ -1195,6 +1207,7 @@ namespace GBCWorkHub.UI.ViewModels
 
             SetProperty(ref _selectedPcComment, comment ?? string.Empty, "SelectedPcComment");
             _selectedPcCommentBaseline = _selectedPcComment;
+            SelectedPcAgentInstalled = item.AgentInstalled;
 
             RaisePropertyChanged("HasSelectedPcAccessSections");
             RaisePropertyChanged("ShowPcAccessCommentColumn");

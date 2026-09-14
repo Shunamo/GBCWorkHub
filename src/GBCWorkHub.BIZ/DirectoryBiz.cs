@@ -496,13 +496,13 @@ namespace GBCWorkHub.BIZ
         }
 
         /// <summary>ID/PW/VPN/COMMENT 일괄 저장.</summary>
-        public int UpdatePcAccess(string siteCode, string pcName, string pcNote, string pcComment, string pcDomain)
+        public int UpdatePcAccess(string siteCode, string pcName, string pcNote, string pcComment, string pcDomain, bool? agentInstalled)
         {
             if (!IsConfigured || string.IsNullOrWhiteSpace(siteCode) || string.IsNullOrWhiteSpace(pcName))
                 return 0;
             try
             {
-                int n = _repository.UpdatePcAccess(siteCode, pcName, pcNote, pcComment, pcDomain);
+                int n = _repository.UpdatePcAccess(siteCode, pcName, pcNote, pcComment, pcDomain, agentInstalled);
                 if (n > 0)
                     InvalidateUserCache();
                 return n;
@@ -513,9 +513,9 @@ namespace GBCWorkHub.BIZ
             }
         }
 
-        public Task<int> UpdatePcAccessAsync(string siteCode, string pcName, string pcNote, string pcComment, string pcDomain)
+        public Task<int> UpdatePcAccessAsync(string siteCode, string pcName, string pcNote, string pcComment, string pcDomain, bool? agentInstalled)
         {
-            return Task.Run(() => UpdatePcAccess(siteCode, pcName, pcNote, pcComment, pcDomain));
+            return Task.Run(() => UpdatePcAccess(siteCode, pcName, pcNote, pcComment, pcDomain, agentInstalled));
         }
 
         private static readonly object UserCacheSync = new object();

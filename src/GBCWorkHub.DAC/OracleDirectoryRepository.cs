@@ -97,9 +97,9 @@ namespace GBCWorkHub.DAC
             return Task.Run(() => UpdatePcComment(siteCode, pcName, comment));
         }
 
-        public Task<int> UpdatePcAccessAsync(string siteCode, string pcName, string pcNote, string pcComment, string pcDomain)
+        public Task<int> UpdatePcAccessAsync(string siteCode, string pcName, string pcNote, string pcComment, string pcDomain, bool? agentInstalled)
         {
-            return Task.Run(() => UpdatePcAccess(siteCode, pcName, pcNote, pcComment, pcDomain));
+            return Task.Run(() => UpdatePcAccess(siteCode, pcName, pcNote, pcComment, pcDomain, agentInstalled));
         }
 
         public Task<IList<string>> ResolvePcAliasesAsync(string siteCode, string value)
@@ -882,7 +882,7 @@ namespace GBCWorkHub.DAC
             }
         }
 
-        public int UpdatePcAccess(string siteCode, string pcName, string pcNote, string pcComment, string pcDomain)
+        public int UpdatePcAccess(string siteCode, string pcName, string pcNote, string pcComment, string pcDomain, bool? agentInstalled)
         {
             if (string.IsNullOrWhiteSpace(siteCode) || string.IsNullOrWhiteSpace(pcName) || !IsConfigured)
                 return 0;
@@ -897,7 +897,8 @@ namespace GBCWorkHub.DAC
                     EnsurePcMapDomainColumn(conn);
                     EnsurePcMapNoteColumn(conn);
                     EnsurePcMapCommentColumn(conn);
-                    if (!_hasPcMapNote && !_hasPcMapComment && !_hasPcMapDomain)
+                    EnsurePcMapAgentInstalledColumn(conn);
+                    if (!_hasPcMapNote && !_hasPcMapComment && !_hasPcMapDomain && !_hasPcMapAgentInstalled)
                         return 0;
 
                     var sets = new StringBuilder();
@@ -914,6 +915,12 @@ namespace GBCWorkHub.DAC
                         if (sets.Length > 0)
                             sets.Append(", ");
                         sets.Append("PC_DOMAIN = :pcDomain");
+                    }
+                    if (_hasPcMapAgentInstalled && agentInstalled.HasValue)
+                    {
+                        if (sets.Length > 0)
+                            sets.Append(", ");
+                        sets.Append("AGENT_INSTALLED = :agentInstalled");
                     }
                     sets.Append(", UPDT_DTM = SYSTIMESTAMP");
 
@@ -941,6 +948,11 @@ namespace GBCWorkHub.DAC
                             string domain = pcDomain == null ? null : pcDomain.Trim();
                             cmd.Parameters.Add("pcDomain", OracleDbType.Varchar2).Value =
                                 string.IsNullOrEmpty(domain) ? (object)DBNull.Value : Trim(domain, 500);
+                        }
+                        if (_hasPcMapAgentInstalled && agentInstalled.HasValue)
+                        {
+                            cmd.Parameters.Add("agentInstalled", OracleDbType.Int32).Value =
+                                agentInstalled.Value ? 1 : 0;
                         }
                         cmd.Parameters.Add("siteCd", OracleDbType.Varchar2).Value = siteCode.Trim();
                         cmd.Parameters.Add("pcNm", OracleDbType.Varchar2).Value = pcName.Trim();

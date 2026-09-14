@@ -26,8 +26,8 @@ namespace GBCWorkHub.DAC
         int UpsertPcMap(PcMapDto map);
         /// <summary>PC_COMMENT만 갱신(빈 문자열 허용). 컬럼 없으면 0.</summary>
         int UpdatePcComment(string siteCode, string pcName, string comment);
-        /// <summary>PC_NOTE / PC_COMMENT / PC_DOMAIN 일괄 저장(편집 모드).</summary>
-        int UpdatePcAccess(string siteCode, string pcName, string pcNote, string pcComment, string pcDomain);
+        /// <summary>PC_NOTE / PC_COMMENT / PC_DOMAIN / AGENT_INSTALLED 일괄 저장(편집 모드). agentInstalled가 null이면 기존 값 유지.</summary>
+        int UpdatePcAccess(string siteCode, string pcName, string pcNote, string pcComment, string pcDomain, bool? agentInstalled);
         IList<string> ResolvePcAliases(string siteCode, string value);
         IList<DirectoryUserDto> GetUsers();
         /// <summary>LOGIN_ID 또는 USER_NM으로 IS_ACTIVE 갱신. 인증 컬럼 없으면 0.</summary>
@@ -49,7 +49,7 @@ namespace GBCWorkHub.DAC
         Task<DirectoryUserDto> FindUserByLocalEndpointAsync(string pcName, string pcIp);
         Task<int> UpsertPcMapAsync(PcMapDto map);
         Task<int> UpdatePcCommentAsync(string siteCode, string pcName, string comment);
-        Task<int> UpdatePcAccessAsync(string siteCode, string pcName, string pcNote, string pcComment, string pcDomain);
+        Task<int> UpdatePcAccessAsync(string siteCode, string pcName, string pcNote, string pcComment, string pcDomain, bool? agentInstalled);
         Task<IList<string>> ResolvePcAliasesAsync(string siteCode, string value);
         Task<IList<DirectoryUserDto>> GetUsersAsync();
         Task<IList<PcMapDto>> GetPcMapsBySiteAsync(string siteCode);

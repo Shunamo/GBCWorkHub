@@ -922,6 +922,12 @@
                                              ToolTip="연필 아이콘으로 수정 후 저장하세요." />
                                 </StackPanel>
                             </Border>
+
+                            <CheckBox Content="AGENT 설치 완료" FontSize="12.5" FontWeight="SemiBold" Foreground="#64748B"
+                                      Margin="2,8,0,0" Cursor="Hand"
+                                      IsChecked="{Binding SelectedPcAgentInstalled, Mode=TwoWay}"
+                                      IsEnabled="{Binding IsPcAccessEditing}"
+                                      Visibility="{Binding HasSelectedRemoteComputer, Converter={StaticResource BoolToVis}}" />
                             </StackPanel>
                         </Grid>
                         <TextBlock DockPanel.Dock="Top" Text="최근 접속 내역이 없습니다."
