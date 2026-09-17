@@ -75,6 +75,12 @@ namespace GBCWorkHub.LegacyRedirect
                 return currentDir;
             }
 
+            // 이미 예전에 한 번 이동을 마쳤다면(그때 예전 폴더의 사본은 지웠음) 이 stub은
+            // 표준 경로에 남겨둔 흔적을 다시 실행한 것일 뿐이다 — 복사할 게 없으니 바로 표준
+            // 경로를 쓴다. 이 검사가 없으면 "복사할 원본이 없다"는 이유로 잘못 실패 처리된다.
+            if (File.Exists(Path.Combine(StandardInstallDir, RealExeName)))
+                return StandardInstallDir;
+
             try
             {
                 Directory.CreateDirectory(StandardInstallDir);
