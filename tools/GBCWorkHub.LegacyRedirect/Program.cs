@@ -25,7 +25,8 @@ namespace GBCWorkHub.LegacyRedirect
         private static void Main()
         {
             string currentDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? string.Empty;
-            string targetDir = ResolveTargetDir(currentDir);
+            bool relocated;
+            string targetDir = ResolveTargetDir(currentDir, out relocated);
             string realExePath = Path.Combine(targetDir, RealExeName);
 
             if (!File.Exists(realExePath))
@@ -39,9 +40,13 @@ namespace GBCWorkHub.LegacyRedirect
                 return;
             }
 
+            string message = "보안 정책에 따라 프로그램 이름이 GBCWorkHub.UI로 변경되었습니다.\n";
+            if (relocated)
+                message += "설치 위치도 " + StandardInstallDir + "로 이동되었습니다.\n";
+            message += "확인을 누르면 새 프로그램이 바로 실행됩니다.";
+
             MessageBox.Show(
-                "보안 정책에 따라 프로그램 이름이 GBCWorkHub.UI로 변경되었습니다.\n" +
-                "확인을 누르면 새 프로그램이 바로 실행됩니다.",
+                message,
                 "GBCWorkHub 업데이트 안내",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
@@ -58,8 +63,9 @@ namespace GBCWorkHub.LegacyRedirect
         /// 지금 폴더가 표준 설치 경로가 아니면, 새 exe들을 표준 경로로 옮기고 그 경로를 반환한다.
         /// 옮기다 실패하면(권한 문제 등) 안전하게 지금 폴더를 그대로 쓴다.
         /// </summary>
-        private static string ResolveTargetDir(string currentDir)
+        private static string ResolveTargetDir(string currentDir, out bool relocated)
         {
+            relocated = false;
             if (string.IsNullOrWhiteSpace(currentDir)
                 || string.Equals(
                     currentDir.TrimEnd('\\'),
@@ -82,6 +88,7 @@ namespace GBCWorkHub.LegacyRedirect
                 TryDelete(Path.Combine(currentDir, RealExeName));
                 TryDelete(Path.Combine(currentDir, UpdaterExeName));
 
+                relocated = true;
                 return StandardInstallDir;
             }
             catch
