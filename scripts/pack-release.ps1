@@ -56,6 +56,23 @@ if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::CreateFromDirectory($stage, $zipPath)
 
+# 사람이 직접 받아 새로 설치/재설치할 때 쓰는 순수 앱 zip — 자동 업데이트 패키지($zipName)와 달리
+# 절대 legacy stub을 포함하지 않는다. stub이 없는 평소에는 위 zip과 내용이 같지만, 이번처럼
+# 전환용 stub이 들어간 릴리즈에서도 신규 설치자가 헷갈리지 않도록 항상 별도로 만들어 둔다.
+$setupZipName = "GBCWorkHub-Setup-$tag.zip"
+$setupZipPath = Join-Path $out $setupZipName
+if (Test-Path $setupZipPath) { Remove-Item $setupZipPath -Force }
+if ($LegacyStubExe -and (Test-Path $LegacyStubExe)) {
+    $cleanStage = Join-Path $out "stage-clean"
+    New-Item -ItemType Directory -Path $cleanStage | Out-Null
+    Copy-Item $uiExe (Join-Path $cleanStage "GBCWorkHub.UI.exe")
+    Copy-Item $updaterExe (Join-Path $cleanStage "GBCWorkHubUpdater.exe")
+    [System.IO.Compression.ZipFile]::CreateFromDirectory($cleanStage, $setupZipPath)
+} else {
+    Copy-Item $zipPath $setupZipPath
+}
+Write-Host "Packed $setupZipPath"
+
 $sha = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
 
 $base = $ReleaseBaseUrl.Trim().TrimEnd('/')

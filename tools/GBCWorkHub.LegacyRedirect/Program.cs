@@ -14,7 +14,7 @@ namespace GBCWorkHub.LegacyRedirect
     internal static class Program
     {
         private const string DirectDownloadUrl =
-            "https://github.com/Shunamo/GBCWorkHub/releases/download/v1.2.7/GBCWorkHub-v1.2.7.zip";
+            "https://github.com/Shunamo/GBCWorkHub/releases/download/v1.2.7/GBCWorkHub-Setup-v1.2.7.zip";
 
         [STAThread]
         private static void Main()
