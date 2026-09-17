@@ -82,12 +82,13 @@ jobs:
         run: |
           msbuild src\GBCWorkHub.UI\GBCWorkHub.UI.csproj /p:Configuration=Release /p:Platform=AnyCPU /m /v:minimal
           msbuild tools\GBCWorkHub.Updater\GBCWorkHub.Updater.csproj /p:Configuration=Release /p:Platform=AnyCPU /m /v:minimal
+          msbuild tools\GBCWorkHub.LegacyRedirect\GBCWorkHub.LegacyRedirect.csproj /p:Configuration=Release /p:Platform=AnyCPU /m /v:minimal
 
       - name: Verify EXE FileVersion matches tag
         shell: pwsh
         run: |
           $expected = "${{ steps.ver.outputs.version }}.0"
-          $ui = "src\GBCWorkHub.UI\bin\Release\GBCWorkHub.exe"
+          $ui = "src\GBCWorkHub.UI\bin\Release\GBCWorkHub.UI.exe"
           $up = "tools\GBCWorkHub.Updater\bin\Release\GBCWorkHubUpdater.exe"
           $uiFv = [System.Diagnostics.FileVersionInfo]::GetVersionInfo((Resolve-Path $ui)).FileVersion
           $upFv = [System.Diagnostics.FileVersionInfo]::GetVersionInfo((Resolve-Path $up)).FileVersion
@@ -102,7 +103,8 @@ jobs:
             -Version "${{ steps.ver.outputs.version }}" `
             -Configuration Release `
             -OutputDir artifacts\release `
-            -ReleaseBaseUrl "${{ steps.ver.outputs.release_base }}"
+            -ReleaseBaseUrl "${{ steps.ver.outputs.release_base }}" `
+            -LegacyStubExe "tools\GBCWorkHub.LegacyRedirect\bin\Release\GBCWorkHub.exe"
 
       - name: Upload Actions artifact
         uses: actions/upload-artifact@v4

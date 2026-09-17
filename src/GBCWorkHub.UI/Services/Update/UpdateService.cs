@@ -13,7 +13,7 @@ namespace GBCWorkHub.UI.Services.Update
     public sealed class UpdateService : IUpdateService
     {
         public const string UpdaterFileName = "GBCWorkHubUpdater.exe";
-        public const string MainExeFileName = "GBCWorkHub.exe";
+        public const string MainExeFileName = "GBCWorkHub.UI.exe";
 
         private readonly IUpdateSource _source;
 
@@ -123,7 +123,8 @@ namespace GBCWorkHub.UI.Services.Update
             string tempUpdater = Path.Combine(tempUpdaterDir, UpdaterFileName);
             File.Copy(installedUpdater, tempUpdater, true);
 
-            string launchPath = Path.Combine(installDir, MainExeFileName);
+            string exeName = string.IsNullOrWhiteSpace(manifest.MainExeFileName) ? MainExeFileName : manifest.MainExeFileName.Trim();
+            string launchPath = Path.Combine(installDir, exeName);
             string workDir = Path.Combine(Path.GetTempPath(), "GBCWorkHubUpdater", session + "-work");
 
             var psi = new ProcessStartInfo

@@ -20,6 +20,11 @@ namespace GBCWorkHub.UI.Services.Update
         [JsonProperty("releaseNotes")]
         public string ReleaseNotes { get; set; }
 
+        /// <summary>업데이트 적용 후 재실행할 exe 파일명. 비어 있으면 UpdateService.MainExeFileName(빌드에 박힌 기본값)을 쓴다.
+        /// 이 필드를 매니페스트에서 읽게 해두면, 앞으로 exe 이름이 바뀌어도 기존 설치본이 자동으로 새 이름을 따라간다.</summary>
+        [JsonProperty("mainExeFileName")]
+        public string MainExeFileName { get; set; }
+
         [JsonIgnore]
         public System.Version ParsedVersion
         {

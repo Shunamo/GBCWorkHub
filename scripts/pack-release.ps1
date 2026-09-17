@@ -11,7 +11,12 @@ param(
 
     [string]$ReleaseOwner = "",
 
-    [string]$ReleaseRepo = ""
+    [string]$ReleaseRepo = "",
+
+    # 이름이 GBCWorkHub.exe였던 예전 설치본의 자동 업데이트가 최소 한 번은
+    # 안내를 보고 새 이름(GBCWorkHub.UI.exe)으로 넘어가도록 하는 호환용 안내 실행 파일.
+    # 없으면(경로 미지정/파일 없음) 그냥 건너뛴다.
+    [string]$LegacyStubExe = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,7 +28,7 @@ if ($v.StartsWith("v") -or $v.StartsWith("V")) { $v = $v.Substring(1) }
 $tag = "v$v"
 $zipName = "GBCWorkHub-$tag.zip"
 
-$uiExe = Join-Path $root "src\GBCWorkHub.UI\bin\$Configuration\GBCWorkHub.exe"
+$uiExe = Join-Path $root "src\GBCWorkHub.UI\bin\$Configuration\GBCWorkHub.UI.exe"
 $updaterExe = Join-Path $root "tools\GBCWorkHub.Updater\bin\$Configuration\GBCWorkHubUpdater.exe"
 
 if (-not (Test-Path $uiExe)) { throw "Missing UI exe: $uiExe" }
@@ -39,8 +44,12 @@ New-Item -ItemType Directory -Path $out | Out-Null
 
 $stage = Join-Path $out "stage"
 New-Item -ItemType Directory -Path $stage | Out-Null
-Copy-Item $uiExe (Join-Path $stage "GBCWorkHub.exe")
+Copy-Item $uiExe (Join-Path $stage "GBCWorkHub.UI.exe")
 Copy-Item $updaterExe (Join-Path $stage "GBCWorkHubUpdater.exe")
+if ($LegacyStubExe -and (Test-Path $LegacyStubExe)) {
+    Copy-Item $LegacyStubExe (Join-Path $stage "GBCWorkHub.exe")
+    Write-Host "Included legacy redirect stub as GBCWorkHub.exe"
+}
 
 $zipPath = Join-Path $out $zipName
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
@@ -61,11 +70,12 @@ if ($base) {
 }
 
 $manifest = [ordered]@{
-    version      = $v
-    packageFile  = $zipName
-    packageUrl   = $packageUrl
-    sha256       = $sha
-    releaseNotes = ""
+    version         = $v
+    packageFile     = $zipName
+    packageUrl      = $packageUrl
+    sha256          = $sha
+    releaseNotes    = ""
+    mainExeFileName = "GBCWorkHub.UI.exe"
 }
 $manifestPath = Join-Path $out "version.json"
 $jsonText = ($manifest | ConvertTo-Json -Depth 5)
@@ -77,7 +87,7 @@ Write-Host "SHA256 $sha"
 Write-Host "packageUrl $packageUrl"
 Write-Host "Manifest $manifestPath"
 
-Copy-Item $uiExe (Join-Path $out "GBCWorkHub.exe")
+Copy-Item $uiExe (Join-Path $out "GBCWorkHub.UI.exe")
 Copy-Item $updaterExe (Join-Path $out "GBCWorkHubUpdater.exe")
 
 # 사이트별 SessionAgent 설치 스크립트 — 앱 자동 업데이트 zip과는 별개로,

@@ -115,7 +115,7 @@ namespace GBCWorkHub.UI.Views.Improvement
             var overrides = new ResourceDictionary
             {
                 Source = new Uri(
-                    "/GBCWorkHub;component/Assets/WorkLogEditGlassOverrides.xaml",
+                    "/GBCWorkHub.UI;component/Assets/WorkLogEditGlassOverrides.xaml",
                     UriKind.Relative)
             };
 

@@ -8,7 +8,7 @@
     <ProjectGuid>{A1B2C3D4-E5F6-7890-ABCD-444444444444}</ProjectGuid>
     <OutputType>WinExe</OutputType>
     <RootNamespace>GBCWorkHub.UI</RootNamespace>
-    <AssemblyName>GBCWorkHub</AssemblyName>
+    <AssemblyName>GBCWorkHub.UI</AssemblyName>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
