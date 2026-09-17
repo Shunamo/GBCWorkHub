@@ -33,16 +33,18 @@ namespace GBCWorkHub.LegacyRedirect
             {
                 MessageBox.Show(
                     "GBCWorkHub이 GBCWorkHub.UI로 이름이 변경되었습니다.\n\n" +
-                    "새 프로그램 파일을 찾지 못했습니다. GitHub Releases에서 최신 버전을 다시 받아 주세요.",
+                    "새 프로그램 파일을 찾지 못했습니다 (확인한 위치: " + realExePath + ").\n" +
+                    "GitHub Releases에서 최신 버전을 다시 받아 주세요.",
                     "GBCWorkHub 업데이트 안내",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
                 return;
             }
 
-            string message = "보안 정책에 따라 프로그램 이름이 GBCWorkHub.UI로 변경되었습니다.\n";
+            string message = "보안 정책에 따라 프로그램 이름이 GBCWorkHub.UI로 변경되었습니다.\n"
+                + "프로그램 위치: " + targetDir + "\n";
             if (relocated)
-                message += "설치 위치도 " + StandardInstallDir + "로 이동되었습니다.\n";
+                message += "(이번에 이 위치로 옮겨졌습니다. 바탕화면/시작메뉴 바로가기가 있다면 이 위치로 새로 만들어 주세요.)\n";
             message += "확인을 누르면 새 프로그램이 바로 실행됩니다.";
 
             MessageBox.Show(
