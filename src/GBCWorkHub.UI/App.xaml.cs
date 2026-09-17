@@ -2,6 +2,7 @@ using System;
 using System.Configuration;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -52,6 +53,7 @@ namespace GBCWorkHub.UI
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
             BundledFonts.ApplyTo(this);
             LoadSiteTimeZones();
+            CleanupLegacyRedirectStub();
 
             try
             {
@@ -64,6 +66,28 @@ namespace GBCWorkHub.UI
                 WriteCrash(ex);
                 MessageBox.Show(ex.ToString(), "GBC WorkHub — 시작 실패", MessageBoxButton.OK, MessageBoxImage.Error);
                 Shutdown(-1);
+            }
+        }
+
+        /// <summary>
+        /// GBCWorkHub.exe → GBCWorkHub.UI.exe 이름 변경 과도기에 같은 폴더에 남을 수 있는
+        /// 예전 이름 안내용 실행 파일(GBCWorkHub.LegacyRedirect 프로젝트 산출물)을 조용히 정리한다.
+        /// 이 앱 자신은 항상 GBCWorkHub.UI.exe이므로 동일 폴더의 GBCWorkHub.exe는 항상 그 잔재다.
+        /// </summary>
+        private static void CleanupLegacyRedirectStub()
+        {
+            try
+            {
+                string installDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                if (string.IsNullOrWhiteSpace(installDir))
+                    return;
+                string stubPath = Path.Combine(installDir, "GBCWorkHub.exe");
+                if (File.Exists(stubPath))
+                    File.Delete(stubPath);
+            }
+            catch
+            {
+                // 지우기 실패해도(사용 중 등) 다음 실행 때 다시 시도되므로 무시.
             }
         }
 
