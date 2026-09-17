@@ -20,6 +20,7 @@ namespace GBCWorkHub.LegacyRedirect
         private const string RealExeName = "GBCWorkHub.UI.exe";
         private const string UpdaterExeName = "GBCWorkHubUpdater.exe";
         private static readonly string StandardInstallDir = @"C:\BESTCare\GBCWorkHub";
+        private const string ReleasesUrl = "https://github.com/Shunamo/GBCWorkHub/releases/latest";
 
         [STAThread]
         private static void Main()
@@ -32,24 +33,19 @@ namespace GBCWorkHub.LegacyRedirect
             if (!File.Exists(realExePath))
             {
                 MessageBox.Show(
-                    "GBCWorkHub이 GBCWorkHub.UI로 이름이 변경되었습니다.\n\n" +
-                    "새 프로그램 파일을 찾지 못했습니다.\n" +
-                    "확인한 위치: " + realExePath + "\n" +
-                    "GitHub Releases에서 최신 버전을 다시 받아 주세요.",
+                    "보안 정책에 따라 프로그램 이름이 GBCWorkHub.UI로 변경되었습니다.\n" +
+                    "새 프로그램을 찾지 못해 다운로드 페이지를 엽니다.",
                     "GBCWorkHub 업데이트 안내",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
+                OpenUrl(ReleasesUrl);
                 return;
             }
 
-            string message = "보안 정책에 따라 프로그램 이름이 GBCWorkHub.UI로 변경되었습니다.\n"
-                + "프로그램 위치: " + targetDir + "\n";
-            if (relocated)
-                message += "바탕화면이나 시작메뉴에 바로가기가 있다면 이 위치로 새로 만들어 주세요.\n";
-            message += "확인을 누르면 새 프로그램이 바로 실행됩니다.";
-
             MessageBox.Show(
-                message,
+                "보안 정책에 따라 프로그램 이름이 GBCWorkHub.UI로 변경되었습니다.\n" +
+                "위치: " + targetDir + "\n" +
+                "확인을 누르면 새 프로그램이 바로 실행됩니다.",
                 "GBCWorkHub 업데이트 안내",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
@@ -60,6 +56,18 @@ namespace GBCWorkHub.LegacyRedirect
                 WorkingDirectory = targetDir,
                 UseShellExecute = true
             });
+        }
+
+        private static void OpenUrl(string url)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+            }
+            catch
+            {
+                // 브라우저를 못 열어도 안내 문구는 이미 봤으니 무시.
+            }
         }
 
         /// <summary>
