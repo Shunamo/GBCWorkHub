@@ -1,43 +1,50 @@
 using System;
 using System.Diagnostics;
+using System.IO;
+using System.Reflection;
 using System.Windows.Forms;
 
 namespace GBCWorkHub.LegacyRedirect
 {
     /// <summary>
     /// 예전 이름(GBCWorkHub.exe)으로 설치되어 있던 앱이 자동 업데이트를 적용한 뒤 재실행하는 대상이다.
-    /// 새 exe는 보안팀 승인을 받은 이름(GBCWorkHub.UI.exe)으로 바뀌었으므로, 여기서는 그냥 실행하지
-    /// 않고 zip 직접 다운로드 링크로 안내한다 — 사용자가 직접 새로 받아 실행해야 한다.
-    /// 릴리즈 페이지(여러 부가 산출물이 같이 나열됨)로 보내면 헷갈리므로, 이 stub이 실제로 배포되는
-    /// 버전의 zip 주소를 직접 가리킨다(이번 전환 버전 전용 — 다음 릴리즈부터는 이 stub 자체를 뺀다).
+    /// 새 exe(GBCWorkHub.UI.exe)는 같은 업데이트 패키지 안에 이미 같이 들어있으므로, 추가로 다시
+    /// 받을 필요 없이 바로 옆의 그 파일을 실행해 넘겨준다 — "업데이트 한 번"으로 끝나도록.
     /// </summary>
     internal static class Program
     {
-        private const string DirectDownloadUrl =
-            "https://github.com/Shunamo/GBCWorkHub/releases/download/v1.2.7/GBCWorkHub-Setup-v1.2.7.zip";
+        private const string RealExeName = "GBCWorkHub.UI.exe";
 
         [STAThread]
         private static void Main()
         {
+            string installDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? string.Empty;
+            string realExePath = Path.Combine(installDir, RealExeName);
+
+            if (!File.Exists(realExePath))
+            {
+                MessageBox.Show(
+                    "GBCWorkHub이 GBCWorkHub.UI로 이름이 변경되었습니다.\n\n" +
+                    "새 프로그램 파일을 찾지 못했습니다. GitHub Releases에서 최신 버전을 다시 받아 주세요.",
+                    "GBCWorkHub 업데이트 안내",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
             MessageBox.Show(
-                "보안 정책에 따라 프로그램 이름이 GBCWorkHub.UI로 변경되어, 이번 한 번은 자동 업데이트로 적용되지 않습니다.\n\n" +
-                "확인을 누르면 새 프로그램 다운로드가 바로 시작됩니다. 받은 압축 파일을 풀어서 실행해 주세요.",
+                "보안 정책에 따라 프로그램 이름이 GBCWorkHub.UI로 변경되었습니다.\n" +
+                "확인을 누르면 새 프로그램이 바로 실행됩니다.",
                 "GBCWorkHub 업데이트 안내",
                 MessageBoxButtons.OK,
-                MessageBoxIcon.Warning);
+                MessageBoxIcon.Information);
 
-            try
+            Process.Start(new ProcessStartInfo
             {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = DirectDownloadUrl,
-                    UseShellExecute = true
-                });
-            }
-            catch
-            {
-                // 브라우저를 못 열어도 안내 문구는 이미 봤으니 무시.
-            }
+                FileName = realExePath,
+                WorkingDirectory = installDir,
+                UseShellExecute = true
+            });
         }
     }
 }
