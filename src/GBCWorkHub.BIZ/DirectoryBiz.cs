@@ -61,6 +61,24 @@ namespace GBCWorkHub.BIZ
                 IsActive = true
             });
             InvalidateUserCache();
+
+            // USR_ID 개념 도입 이전에 로그인한 세션은 로컬에 UserId가 없을 수 있다 — 그 상태로는
+            // 개선사항 요청 등 USR_ID가 꼭 필요한 기능이 "로그인이 필요합니다"로 계속 막히므로,
+            // 매 시작 시 여기서 한 번 조회해 채워 넣는다.
+            if (!OccupancyNameStore.TryGetUserId().HasValue)
+            {
+                try
+                {
+                    DirectoryUserDto found = _repository.FindUserForAuth(name.Trim());
+                    if (found != null && found.UserId.HasValue)
+                        OccupancyNameStore.Save(name, OccupancyNameStore.TryGetAffiliation(), false, found.UserId);
+                }
+                catch
+                {
+                    // 조회 실패해도 다음 시작 때 다시 시도된다.
+                }
+            }
+
             return n;
         }
 
