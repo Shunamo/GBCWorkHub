@@ -9,17 +9,24 @@ namespace GBCWorkHub.LegacyRedirect
     /// <summary>
     /// 예전 이름(GBCWorkHub.exe)으로 설치되어 있던 앱이 자동 업데이트를 적용한 뒤 재실행하는 대상이다.
     /// 새 exe(GBCWorkHub.UI.exe)는 같은 업데이트 패키지 안에 이미 같이 들어있으므로, 추가로 다시
-    /// 받을 필요 없이 바로 옆의 그 파일을 실행해 넘겨준다 — "업데이트 한 번"으로 끝나도록.
+    /// 받을 필요 없이 바로 실행해 넘겨준다 — "업데이트 한 번"으로 끝나도록.
+    ///
+    /// 보안팀 예외 정책이 폴더 경로 기준(C:\BESTCare\GBCWorkHub)이라, 사이트마다 예전 설치 위치가
+    /// 제각각이었을 수 있는 문제를 여기서 함께 해결한다: 지금 위치가 그 표준 경로가 아니면 새 파일을
+    /// 그 경로로 옮긴 뒤 그곳에서 실행한다.
     /// </summary>
     internal static class Program
     {
         private const string RealExeName = "GBCWorkHub.UI.exe";
+        private const string UpdaterExeName = "GBCWorkHubUpdater.exe";
+        private static readonly string StandardInstallDir = @"C:\BESTCare\GBCWorkHub";
 
         [STAThread]
         private static void Main()
         {
-            string installDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? string.Empty;
-            string realExePath = Path.Combine(installDir, RealExeName);
+            string currentDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? string.Empty;
+            string targetDir = ResolveTargetDir(currentDir);
+            string realExePath = Path.Combine(targetDir, RealExeName);
 
             if (!File.Exists(realExePath))
             {
@@ -42,9 +49,67 @@ namespace GBCWorkHub.LegacyRedirect
             Process.Start(new ProcessStartInfo
             {
                 FileName = realExePath,
-                WorkingDirectory = installDir,
+                WorkingDirectory = targetDir,
                 UseShellExecute = true
             });
+        }
+
+        /// <summary>
+        /// 지금 폴더가 표준 설치 경로가 아니면, 새 exe들을 표준 경로로 옮기고 그 경로를 반환한다.
+        /// 옮기다 실패하면(권한 문제 등) 안전하게 지금 폴더를 그대로 쓴다.
+        /// </summary>
+        private static string ResolveTargetDir(string currentDir)
+        {
+            if (string.IsNullOrWhiteSpace(currentDir)
+                || string.Equals(
+                    currentDir.TrimEnd('\\'),
+                    StandardInstallDir.TrimEnd('\\'),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return currentDir;
+            }
+
+            try
+            {
+                Directory.CreateDirectory(StandardInstallDir);
+                bool movedReal = CopyIfExists(currentDir, StandardInstallDir, RealExeName);
+                CopyIfExists(currentDir, StandardInstallDir, UpdaterExeName);
+                if (!movedReal)
+                    return currentDir;
+
+                // 예전 폴더의 사본은 정리(안내용 stub 자신은 그대로 둬도 무해함 — 나중에 실수로
+                // 다시 실행돼도 여기서 다시 표준 경로로 안내해주는 역할을 그대로 한다).
+                TryDelete(Path.Combine(currentDir, RealExeName));
+                TryDelete(Path.Combine(currentDir, UpdaterExeName));
+
+                return StandardInstallDir;
+            }
+            catch
+            {
+                return currentDir;
+            }
+        }
+
+        private static bool CopyIfExists(string fromDir, string toDir, string fileName)
+        {
+            string from = Path.Combine(fromDir, fileName);
+            if (!File.Exists(from))
+                return false;
+            File.Copy(from, Path.Combine(toDir, fileName), true);
+            return true;
+        }
+
+        private static void TryDelete(string path)
+        {
+            try
+            {
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch
+            {
+                // 지우기 실패해도(사용 중 등) 무시 — 중복 파일이 남는 정도.
+            }
         }
     }
 }
