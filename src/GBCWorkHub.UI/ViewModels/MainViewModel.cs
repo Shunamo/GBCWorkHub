@@ -377,7 +377,11 @@ namespace GBCWorkHub.UI.ViewModels
             string version;
             string releaseNotes;
             if (!PendingReleaseNoticeStore.TryConsume(out version, out releaseNotes))
+            {
+                DiagnosticLogger.Info("UPDATE", "No pending release notice found (marker file absent/empty).");
                 return;
+            }
+            DiagnosticLogger.Info("UPDATE", "Pending release notice found for v" + version + ", popup=" + (_popup != null));
             if (_popup == null)
                 return;
 
@@ -460,8 +464,8 @@ namespace GBCWorkHub.UI.ViewModels
                     throw new InvalidOperationException("Update source is not configured.");
 
                 var service = new UpdateService(source);
-                PendingReleaseNoticeStore.Save(_pendingUpdate.Version, _pendingUpdate.ReleaseNotes);
                 await service.ApplyUpdateAsync(_pendingUpdate, CancellationToken.None).ConfigureAwait(true);
+                PendingReleaseNoticeStore.Save(_pendingUpdate.Version, _pendingUpdate.ReleaseNotes);
                 DiagnosticLogger.Info("UPDATE", "Updater launched; shutting down for apply");
                 Application.Current.Shutdown();
             }

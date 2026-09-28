@@ -31,12 +31,15 @@ namespace GBCWorkHub.UI.Services
                 return;
             try
             {
+                string path = FilePath;
                 string content = (version ?? string.Empty).Trim() + "\n" + releaseNotes;
-                File.WriteAllText(FilePath, content, Encoding.UTF8);
+                File.WriteAllText(path, content, Encoding.UTF8);
+                DiagnosticLogger.Info("UPDATE", "Pending release notice saved to " + path + " for v" + version);
             }
-            catch
+            catch (Exception ex)
             {
                 // 저장 실패해도 업데이트 자체 진행에는 영향 없음 — 안내 팝업만 못 뜨는 정도.
+                DiagnosticLogger.Warn("UPDATE", "Pending release notice save failed: " + ex.Message);
             }
         }
 
@@ -45,25 +48,34 @@ namespace GBCWorkHub.UI.Services
         {
             version = null;
             releaseNotes = null;
+            string path = FilePath;
             try
             {
-                string path = FilePath;
                 if (!File.Exists(path))
+                {
+                    DiagnosticLogger.Info("UPDATE", "No pending release notice file at " + path);
                     return false;
+                }
 
                 string content = File.ReadAllText(path, Encoding.UTF8);
                 File.Delete(path);
 
                 int idx = content.IndexOf('\n');
                 if (idx < 0)
+                {
+                    DiagnosticLogger.Warn("UPDATE", "Pending release notice file malformed (no newline): " + path);
                     return false;
+                }
 
                 version = content.Substring(0, idx).Trim();
                 releaseNotes = content.Substring(idx + 1);
-                return !string.IsNullOrWhiteSpace(releaseNotes);
+                bool hasNotes = !string.IsNullOrWhiteSpace(releaseNotes);
+                DiagnosticLogger.Info("UPDATE", "Pending release notice consumed for v" + version + ", hasNotes=" + hasNotes);
+                return hasNotes;
             }
-            catch
+            catch (Exception ex)
             {
+                DiagnosticLogger.Warn("UPDATE", "Pending release notice consume failed at " + path + ": " + ex.Message);
                 return false;
             }
         }
