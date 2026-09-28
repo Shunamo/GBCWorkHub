@@ -16,7 +16,12 @@ param(
     # 이름이 GBCWorkHub.exe였던 예전 설치본의 자동 업데이트가 최소 한 번은
     # 안내를 보고 새 이름(GBCWorkHub.UI.exe)으로 넘어가도록 하는 호환용 안내 실행 파일.
     # 없으면(경로 미지정/파일 없음) 그냥 건너뛴다.
-    [string]$LegacyStubExe = ""
+    [string]$LegacyStubExe = "",
+
+    # 업데이트 후 뜨는 "새 버전 안내" 팝업에 그대로 표시되는 텍스트. 보통 annotated 태그의
+    # 메시지(git tag -a vX.Y.Z -m "...")를 그대로 넘겨준다. 비어 있으면 팝업 자체가 안 뜬다
+    # (PendingReleaseNoticeStore.Save가 빈 문자열을 무시함).
+    [string]$ReleaseNotes = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -91,7 +96,7 @@ $manifest = [ordered]@{
     packageFile     = $zipName
     packageUrl      = $packageUrl
     sha256          = $sha
-    releaseNotes    = ""
+    releaseNotes    = $ReleaseNotes
     mainExeFileName = "GBCWorkHub.UI.exe"
 }
 $manifestPath = Join-Path $out "version.json"

@@ -25,6 +25,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Resolve version + release target
         id: ver
@@ -53,6 +55,28 @@ jobs:
           "release_repo=$repo" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "release_base=$base" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           Write-Host "Release $tag → assets on $base"
+
+      - name: Extract release notes from annotated tag
+        id: notes
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.ver.outputs.tag }}"
+          # 태그가 annotated면(git tag -a vX.Y.Z -m "...") 그 메시지 본문을 그대로 쓴다.
+          # lightweight 태그면 빈 문자열 — 이 경우 앱 내 업데이트 안내 팝업은 뜨지 않는다
+          # (PendingReleaseNoticeStore.Save가 빈 텍스트를 무시함).
+          $lines = git tag -l --format='%(contents:body)' $tag
+          $notesText = if ($lines) { ($lines -join "`n").TrimEnd() } else { "" }
+
+          $delimiter = "NOTES_EOF_$([guid]::NewGuid().ToString('N'))"
+          "notes<<$delimiter" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          $notesText | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          $delimiter | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+          if ([string]::IsNullOrWhiteSpace($notesText)) {
+            Write-Host "No annotated tag message found for $tag — release notice popup will not show for this update."
+          } else {
+            Write-Host "Release notes extracted from tag $tag ($($notesText.Length) chars)"
+          }
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
@@ -98,13 +122,16 @@ jobs:
 
       - name: Pack release zip + version.json (packageUrl = Release asset URL)
         shell: pwsh
+        env:
+          RELEASE_NOTES: ${{ steps.notes.outputs.notes }}
         run: |
           .\scripts\pack-release.ps1 `
             -Version "${{ steps.ver.outputs.version }}" `
             -Configuration Release `
             -OutputDir artifacts\release `
             -ReleaseBaseUrl "${{ steps.ver.outputs.release_base }}" `
-            -LegacyStubExe "tools\GBCWorkHub.LegacyRedirect\bin\Release\GBCWorkHub.exe"
+            -LegacyStubExe "tools\GBCWorkHub.LegacyRedirect\bin\Release\GBCWorkHub.exe" `
+            -ReleaseNotes $env:RELEASE_NOTES
 
       - name: Upload Actions artifact
         uses: actions/upload-artifact@v4
@@ -117,12 +144,13 @@ jobs:
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: GBCWorkHub ${{ steps.ver.outputs.tag }}
+          body: ${{ steps.notes.outputs.notes }}
           files: |
             artifacts/release/GBCWorkHub-${{ steps.ver.outputs.tag }}.zip
             artifacts/release/GBCWorkHub-Setup-${{ steps.ver.outputs.tag }}.zip
             artifacts/release/GBCWorkHub-SiteSetup-${{ steps.ver.outputs.tag }}.zip
             artifacts/release/version.json
-          generate_release_notes: true
+          generate_release_notes: false
           fail_on_unmatched_files: true
           # When RELEASE_REPO differs from this repo, set repository: owner/repo
           repository: ${{ steps.ver.outputs.release_owner }}/${{ steps.ver.outputs.release_repo }}
