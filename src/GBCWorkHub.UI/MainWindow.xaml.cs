@@ -74,6 +74,15 @@ namespace GBCWorkHub.UI
             }
         }
 
+        private void HelpMenuButton_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as FrameworkElement;
+            if (button == null || button.ContextMenu == null)
+                return;
+            button.ContextMenu.PlacementTarget = button;
+            button.ContextMenu.IsOpen = true;
+        }
+
         private void Window_Closed(object sender, EventArgs e)
         {
             try

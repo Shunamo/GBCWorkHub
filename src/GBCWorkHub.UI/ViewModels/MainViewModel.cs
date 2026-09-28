@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -70,6 +71,7 @@ namespace GBCWorkHub.UI.ViewModels
             LogoutCommand = new RelayCommand(() => { var _ = LogoutAsync(); }, () => IsLoggedIn);
             RefreshCommand = new RelayCommand(() => { var _ = RefreshFromDbAsync(); }, () => !IsRefreshing);
             OpenHelpGuideCommand = new RelayCommand(OpenHelpGuide);
+            OpenGuideCommand = new RelayCommand<string>(key => { var _ = OpenGuideAsync(key); });
             BackToSitesCommand = new RelayCommand(() => _remoteWorkspace.BackToSitesCommand.Execute(null));
             UpdateCommand = new RelayCommand(() => { var _ = ApplyUpdateAsync(); }, () => IsUpdateAvailable && !IsUpdateBusy);
             DismissUpdateCommand = new RelayCommand(DismissUpdate, () => IsUpdateAvailable && !IsUpdateBusy);
@@ -310,6 +312,7 @@ namespace GBCWorkHub.UI.ViewModels
         public ICommand LogoutCommand { get; private set; }
         public ICommand RefreshCommand { get; private set; }
         public ICommand OpenHelpGuideCommand { get; private set; }
+        public ICommand OpenGuideCommand { get; private set; }
         public ICommand BackToSitesCommand { get; private set; }
         public ICommand UpdateCommand { get; private set; }
         public ICommand DismissUpdateCommand { get; private set; }
@@ -1117,6 +1120,53 @@ namespace GBCWorkHub.UI.ViewModels
             catch (Exception ex)
             {
                 DiagnosticLogger.Error("HELP_GUIDE", "Open failed: " + ex.Message);
+            }
+        }
+
+        private static readonly Dictionary<string, string> SiteGuideFiles = new Dictionary<string, string>
+        {
+            { "CMC", "VPN-CMC.pptx" },
+            { "RC", "VPN-RC.pptx" },
+            { "AURORA", "VPN-AURORA.pptx" },
+            { "MNGHA", "VPN-MNGHA.pptx" }
+        };
+
+        /// <summary>
+        /// 사이트별 VPN 접속 가이드를 연다. 처음 열 때만(또는 관리자가 파일을 교체했을 때만)
+        /// GitHub Release에서 내려받고, 그 뒤로는 로컬 캐시를 바로 연다.
+        /// </summary>
+        private async Task OpenGuideAsync(string siteKey)
+        {
+            string fileName;
+            if (siteKey == null || !SiteGuideFiles.TryGetValue(siteKey, out fileName))
+                return;
+
+            try
+            {
+                string path = await GuideDownloadService.EnsureLocalCopyAsync(fileName).ConfigureAwait(true);
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = path,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.Warn("GUIDE", "Open failed for " + siteKey + ": " + ex.Message);
+                if (_popup != null)
+                {
+                    await _popup.ShowResultAsync(new PopupRequest
+                    {
+                        Title = "가이드를 열지 못했습니다",
+                        Message = ex.Message,
+                        Icon = PopupIconKind.Warning,
+                        Kind = PopupKind.Result,
+                        Buttons = new[]
+                        {
+                            new PopupButtonDefinition("확인", PopupResultType.Primary, isDefault: true)
+                        }
+                    }).ConfigureAwait(true);
+                }
             }
         }
 

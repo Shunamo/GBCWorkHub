@@ -206,6 +206,45 @@
             </Setter>
         </Style>
 
+        <!-- "?" 도움말 버튼 드롭다운: 흰색 라운드 카드 스타일, 텍스트 메뉴 항목. -->
+        <Style x:Key="HeaderDropdownMenu" TargetType="ContextMenu">
+            <Setter Property="OverridesDefaultStyle" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="1"
+                                CornerRadius="10" Padding="4" MinWidth="180" SnapsToDevicePixels="True">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.16" Color="#2F4466" />
+                            </Border.Effect>
+                            <StackPanel IsItemsHost="True" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="HeaderDropdownMenuItem" TargetType="MenuItem">
+            <Setter Property="OverridesDefaultStyle" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="Bd" CornerRadius="6" Padding="10,8">
+                            <ContentPresenter ContentSource="Header" RecognizesAccessKey="False" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#EFF6FF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="#334155" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+
     </Window.Resources>
 
     <Grid ClipToBounds="True">
@@ -294,11 +333,25 @@
                                   Visibility="{Binding IsUserShellVisible, Converter={StaticResource BoolToVis}}" />
                     <views:MainTabBar VerticalAlignment="Center" Margin="0,0,12,0" />
                     <Button Style="{StaticResource HeaderIconButton}"
-                            Command="{Binding OpenHelpGuideCommand}" ToolTip="도움말" Margin="0,0,8,0">
+                            Click="HelpMenuButton_Click" ToolTip="도움말" Margin="0,0,8,0">
                         <Border Width="20" Height="20" CornerRadius="10" Background="#EDEFF3">
                             <TextBlock Text="?" FontSize="12" FontWeight="Bold" Foreground="#64748B"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
+                        <Button.ContextMenu>
+                            <ContextMenu Style="{StaticResource HeaderDropdownMenu}" Placement="Bottom">
+                                <MenuItem Header="WorkHub 세팅 가이드" Style="{StaticResource HeaderDropdownMenuItem}"
+                                          Command="{Binding OpenHelpGuideCommand}" />
+                                <MenuItem Header="CMC VPN 가이드" Style="{StaticResource HeaderDropdownMenuItem}"
+                                          Command="{Binding OpenGuideCommand}" CommandParameter="CMC" />
+                                <MenuItem Header="RC VPN 가이드" Style="{StaticResource HeaderDropdownMenuItem}"
+                                          Command="{Binding OpenGuideCommand}" CommandParameter="RC" />
+                                <MenuItem Header="AURORA VPN 가이드" Style="{StaticResource HeaderDropdownMenuItem}"
+                                          Command="{Binding OpenGuideCommand}" CommandParameter="AURORA" />
+                                <MenuItem Header="MNGHA VPN 가이드" Style="{StaticResource HeaderDropdownMenuItem}"
+                                          Command="{Binding OpenGuideCommand}" CommandParameter="MNGHA" />
+                            </ContextMenu>
+                        </Button.ContextMenu>
                     </Button>
                     <Button Style="{StaticResource HeaderIconButton}"
                             Command="{Binding RefreshCommand}" ToolTip="새로고침">

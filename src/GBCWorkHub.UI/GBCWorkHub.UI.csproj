@@ -230,6 +230,7 @@
     </Compile>
     <Compile Include="Services\BundledConfig.cs" />
     <Compile Include="Services\BundledFonts.cs" />
+    <Compile Include="Services\GuideDownloadService.cs" />
     <Compile Include="Services\PendingReleaseNoticeStore.cs" />
     <Compile Include="Services\StandardInstallLocation.cs" />
     <Compile Include="Services\Update\AppVersion.cs" />
