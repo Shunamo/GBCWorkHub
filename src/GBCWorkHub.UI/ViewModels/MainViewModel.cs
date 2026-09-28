@@ -366,6 +366,39 @@ namespace GBCWorkHub.UI.ViewModels
         }
 
         /// <summary>
+        /// 업데이트 적용 직전에 저장해둔 "방금 올라간 버전 + 릴리즈 노트"가 있으면 한 번만 보여준다.
+        /// 저장된 게 없으면(일반 실행) 아무 일도 안 한다.
+        /// </summary>
+        public async Task ShowPendingReleaseNoticeIfAnyAsync()
+        {
+            string version;
+            string releaseNotes;
+            if (!PendingReleaseNoticeStore.TryConsume(out version, out releaseNotes))
+                return;
+            if (_popup == null)
+                return;
+
+            try
+            {
+                await _popup.ShowResultAsync(new PopupRequest
+                {
+                    Title = "v" + version + " 업데이트 완료",
+                    Message = releaseNotes,
+                    Icon = PopupIconKind.Info,
+                    Kind = PopupKind.Result,
+                    Buttons = new[]
+                    {
+                        new PopupButtonDefinition("확인", PopupResultType.Primary, isDefault: true)
+                    }
+                }).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.Warn("UPDATE", "Pending release notice failed: " + ex.Message);
+            }
+        }
+
+        /// <summary>
         /// Best-effort update check. On newer version shows the bottom-left banner only;
         /// apply runs when the user clicks Update. Never blocks app startup on failure.
         /// </summary>
@@ -424,6 +457,7 @@ namespace GBCWorkHub.UI.ViewModels
                     throw new InvalidOperationException("Update source is not configured.");
 
                 var service = new UpdateService(source);
+                PendingReleaseNoticeStore.Save(_pendingUpdate.Version, _pendingUpdate.ReleaseNotes);
                 await service.ApplyUpdateAsync(_pendingUpdate, CancellationToken.None).ConfigureAwait(true);
                 DiagnosticLogger.Info("UPDATE", "Updater launched; shutting down for apply");
                 Application.Current.Shutdown();

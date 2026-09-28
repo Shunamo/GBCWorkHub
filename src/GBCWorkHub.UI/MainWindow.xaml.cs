@@ -62,6 +62,8 @@ namespace GBCWorkHub.UI
 
             await _viewModel.InitializeCentralShareAsync();
 
+            await _viewModel.ShowPendingReleaseNoticeIfAnyAsync();
+
             try
             {
                 await _viewModel.CheckForUpdatesAsync().ConfigureAwait(true);
