@@ -48,11 +48,23 @@ namespace GBCWorkHub.UI.Controls
                     continue;
                 child.Measure(unconstrained);
                 itemW = Math.Max(itemW, child.DesiredSize.Width);
-                itemH = Math.Max(itemH, child.DesiredSize.Height);
             }
 
             if (itemW <= 0)
                 itemW = 1;
+
+            // 폭을 itemW로 고정해 다시 측정한다 — 이 폭에서 비로소 줄바꿈되는 자식이 있으면
+            // 무제한 폭으로 쟀던 1차 측정보다 더 큰 높이가 필요할 수 있다. 이걸 itemH에
+            // 반영하지 않으면 Arrange에서 칸이 너무 낮게 잡혀 내용이 다음 줄 카드에 가려진다.
+            Size widthOnly = new Size(itemW, double.PositiveInfinity);
+            foreach (UIElement child in InternalChildren)
+            {
+                if (child == null)
+                    continue;
+                child.Measure(widthOnly);
+                itemH = Math.Max(itemH, child.DesiredSize.Height);
+            }
+
             if (itemH <= 0)
                 itemH = 1;
 

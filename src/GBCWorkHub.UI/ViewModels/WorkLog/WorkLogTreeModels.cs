@@ -2,7 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Windows;
+using System.Windows.Input;
 using GBCWorkHub.BIZ.WorkLog;
+using GBCWorkHub.UI.ViewModels;
 
 namespace GBCWorkHub.UI.ViewModels.WorkLog
 {
@@ -637,6 +640,32 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
         {
             get { return _isTreeVisible; }
             set { SetProperty(ref _isTreeVisible, value); }
+        }
+
+        private ICommand _copyTitleCommand;
+
+        /// <summary>우클릭 메뉴에서 노드 제목을 클립보드로 복사한다.</summary>
+        public ICommand CopyTitleCommand
+        {
+            get
+            {
+                if (_copyTitleCommand == null)
+                    _copyTitleCommand = new RelayCommand(CopyTitleToClipboard);
+                return _copyTitleCommand;
+            }
+        }
+
+        private void CopyTitleToClipboard()
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(Title))
+                    Clipboard.SetText(Title);
+            }
+            catch
+            {
+                // 클립보드 접근 실패(다른 프로세스 점유 등)해도 무시.
+            }
         }
     }
 

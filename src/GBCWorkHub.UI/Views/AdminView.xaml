@@ -325,11 +325,11 @@
             <Border Style="{StaticResource AdminPcCardBorder}"
                     MouseLeftButtonUp="AdminPcCard_MouseLeftButtonUp">
                 <StackPanel HorizontalAlignment="Stretch">
-                    <Grid Width="72" Height="72" HorizontalAlignment="Center" Margin="0,0,0,8">
-                        <Image Width="72" Height="72" Stretch="Uniform"
+                    <Grid HorizontalAlignment="Center" Margin="0,0,0,8">
+                        <Image Width="72" Height="72" Stretch="Uniform" Margin="0,3,3,0"
                                Source="{StaticResource PcMonitorIcon}" />
                         <Ellipse Width="9" Height="9" Fill="#FACC15"
-                                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-3,-3,0"
+                                 HorizontalAlignment="Right" VerticalAlignment="Top"
                                  ToolTip="초기 세팅 완료"
                                  Visibility="{Binding AgentInstalled, Converter={StaticResource BoolToVis}}" />
                     </Grid>
@@ -693,7 +693,8 @@
                             <TextBox Text="{Binding PcSearchText, UpdateSourceTrigger=PropertyChanged}" BorderThickness="0"
                                      Background="Transparent" FontSize="13" />
                         </Border>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                      Padding="0,6,0,0">
                             <ItemsControl ItemsSource="{Binding AdminPcGroups}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>

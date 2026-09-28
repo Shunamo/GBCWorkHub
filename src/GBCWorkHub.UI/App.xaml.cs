@@ -40,6 +40,12 @@ namespace GBCWorkHub.UI
         {
             base.OnStartup(e);
 
+            if (StandardInstallLocation.RelocateIfNeeded())
+            {
+                Shutdown();
+                return;
+            }
+
             bool createdNew;
             _singleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out createdNew);
             if (!createdNew)
@@ -54,6 +60,7 @@ namespace GBCWorkHub.UI
             BundledFonts.ApplyTo(this);
             LoadSiteTimeZones();
             CleanupLegacyRedirectStub();
+            StandardInstallLocation.CleanupOldInstallIfRequested(e.Args);
 
             try
             {

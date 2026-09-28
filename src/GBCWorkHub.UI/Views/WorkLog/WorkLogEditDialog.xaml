@@ -218,6 +218,44 @@
                 </Style.Triggers>
             </Style>
 
+            <!-- 트리 노드 제목 우클릭 시 뜨는 미니 팝업: 텍스트 없이 복사 아이콘 하나만. -->
+            <Style x:Key="TreeCopyContextMenu" TargetType="ContextMenu">
+                <Setter Property="OverridesDefaultStyle" Value="True" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ContextMenu">
+                            <Border Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="1"
+                                    CornerRadius="8" Padding="3" SnapsToDevicePixels="True">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="10" ShadowDepth="1" Opacity="0.18" Color="#2F4466" />
+                                </Border.Effect>
+                                <ItemsPresenter />
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="TreeCopyMenuItem" TargetType="MenuItem">
+                <Setter Property="OverridesDefaultStyle" Value="True" />
+                <Setter Property="ToolTip" Value="복사" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="MenuItem">
+                            <Border x:Name="Bd" Width="26" Height="26" CornerRadius="6" Background="Transparent">
+                                <Image Source="{StaticResource CopyAltIcon}" Width="14" Height="14"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsHighlighted" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="#EFF6FF" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <Style x:Key="TreeSourceSquareSlot" TargetType="Border">
                 <Setter Property="Width" Value="18" />
                 <Setter Property="Height" Value="18" />
@@ -438,6 +476,12 @@
                                                                               Command="{Binding DataContext.SelectNodeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                               CommandParameter="{Binding}" />
                                                             </Border.InputBindings>
+                                                            <Border.ContextMenu>
+                                                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                                             Style="{StaticResource TreeCopyContextMenu}">
+                                                                    <MenuItem Command="{Binding CopyTitleCommand}" Style="{StaticResource TreeCopyMenuItem}" />
+                                                                </ContextMenu>
+                                                            </Border.ContextMenu>
                                                             <TextBlock Text="{Binding Title}" Style="{DynamicResource TreeNodeTitleText}" />
                                                         </Border>
                                                         <Button Grid.Column="2" Style="{DynamicResource TreePlusButton}"
@@ -500,6 +544,12 @@
                                                                                               Command="{Binding DataContext.SelectNodeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                                               CommandParameter="{Binding}" />
                                                                             </Border.InputBindings>
+                                                                            <Border.ContextMenu>
+                                                                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                                                             Style="{StaticResource TreeCopyContextMenu}">
+                                                                                    <MenuItem Command="{Binding CopyTitleCommand}" Style="{StaticResource TreeCopyMenuItem}" />
+                                                                                </ContextMenu>
+                                                                            </Border.ContextMenu>
                                                                             <TextBlock Text="{Binding Title}" Style="{DynamicResource TreeNodeTitleText}" />
                                                                         </Border>
                                                                         <Button Grid.Column="2" Style="{DynamicResource TreePlusButton}"
@@ -561,6 +611,12 @@
                                                                                                               Command="{Binding DataContext.SelectNodeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                                                               CommandParameter="{Binding}" />
                                                                                             </Border.InputBindings>
+                                                                                            <Border.ContextMenu>
+                                                                                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                                                                             Style="{StaticResource TreeCopyContextMenu}">
+                                                                                                    <MenuItem Command="{Binding CopyTitleCommand}" Style="{StaticResource TreeCopyMenuItem}" />
+                                                                                                </ContextMenu>
+                                                                                            </Border.ContextMenu>
                                                                                             <TextBlock Text="{Binding Title}" Style="{DynamicResource TreeNodeTitleText}" />
                                                                                         </Border>
                                                                                         <Button Grid.Column="2" Style="{DynamicResource TreePlusButton}"
@@ -621,6 +677,12 @@
                                                                                                                               Command="{Binding DataContext.SelectNodeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                                                                               CommandParameter="{Binding}" />
                                                                                                             </Border.InputBindings>
+                                                                                                            <Border.ContextMenu>
+                                                                                                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                                                                                             Style="{StaticResource TreeCopyContextMenu}">
+                                                                                                                    <MenuItem Command="{Binding CopyTitleCommand}" Style="{StaticResource TreeCopyMenuItem}" />
+                                                                                                                </ContextMenu>
+                                                                                                            </Border.ContextMenu>
                                                                                                             <TextBlock Text="{Binding Title}"
                                                                                                                        ToolTip="{Binding Title}"
                                                                                                                        Style="{DynamicResource TreeNodeTitleText}" />
@@ -647,6 +709,12 @@
                                                                                                                           Command="{Binding DataContext.SelectSourceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                                                                           CommandParameter="{Binding}" />
                                                                                                         </Border.InputBindings>
+                                                                                                        <Border.ContextMenu>
+                                                                                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                                                                                         Style="{StaticResource TreeCopyContextMenu}">
+                                                                                                                <MenuItem Command="{Binding CopyTitleCommand}" Style="{StaticResource TreeCopyMenuItem}" />
+                                                                                                            </ContextMenu>
+                                                                                                        </Border.ContextMenu>
                                                                                                             <Border Style="{DynamicResource TreeSourceRowBorder}">
                                                                                                                 <Grid>
                                                                                                                     <Grid.ColumnDefinitions>
@@ -751,26 +819,25 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" Margin="0,0,12,0" MinWidth="0" ClipToBounds="True">
                                     <DockPanel LastChildFill="False" Margin="0,0,0,8">
-                                        <TextBlock DockPanel.Dock="Left" Text="{Binding HeaderTicketLine}"
+                                        <TextBox DockPanel.Dock="Left" Text="{Binding HeaderTicketLine, Mode=OneWay}" Style="{StaticResource SelectableTextStyle}"
                                                    FontSize="{StaticResource FontSize.Xxxl}" FontWeight="Bold" Foreground="#0F172A"
-                                                   VerticalAlignment="Center" Margin="0,0,12,0"
-                                                   TextTrimming="CharacterEllipsis" />
+                                                   VerticalAlignment="Center" Margin="0,0,12,0" />
                                         <WrapPanel VerticalAlignment="Center">
                                             <Border Style="{StaticResource WorkLogChipType}"
                                                     Visibility="{Binding HasDetailTypeChip, Converter={StaticResource BoolToVis}}">
-                                                <TextBlock Text="{Binding DetailTypeChip}" Style="{StaticResource WorkLogChipTypeText}" />
+                                                <TextBox Text="{Binding DetailTypeChip, Mode=OneWay}" Style="{StaticResource WorkLogChipTypeTextSelectable}" />
                                             </Border>
                                             <Border Style="{StaticResource WorkLogChipCategory}"
                                                     Visibility="{Binding HasDetailCategoryChip, Converter={StaticResource BoolToVis}}">
-                                                <TextBlock Text="{Binding DetailCategoryChip}" Style="{StaticResource WorkLogChipCategoryText}" />
+                                                <TextBox Text="{Binding DetailCategoryChip, Mode=OneWay}" Style="{StaticResource WorkLogChipCategoryTextSelectable}" />
                                             </Border>
                                             <Border Style="{StaticResource WorkLogChipDeploy}"
                                                     Visibility="{Binding HasDetailDeployChip, Converter={StaticResource BoolToVis}}">
-                                                <TextBlock Text="{Binding DetailDeployChip}" Style="{StaticResource WorkLogChipDeployText}" />
+                                                <TextBox Text="{Binding DetailDeployChip, Mode=OneWay}" Style="{StaticResource WorkLogChipDeployTextSelectable}" />
                                             </Border>
                                         </WrapPanel>
                                     </DockPanel>
-                                    <TextBlock Text="{Binding HeaderCommentLine}" FontSize="{StaticResource FontSize.Base}" Foreground="#475569"
+                                    <TextBox Text="{Binding HeaderCommentLine, Mode=OneWay}" Style="{StaticResource SelectableTextStyle}" FontSize="{StaticResource FontSize.Base}" Foreground="#475569"
                                                TextWrapping="Wrap" Margin="0,0,0,8"
                                                Visibility="{Binding HasHeaderComment, Converter={StaticResource BoolToVis}}" />
                                     <ToggleButton Style="{StaticResource CheckinMessageSwitch}"
@@ -790,10 +857,10 @@
                                                    Visibility="{Binding HasOriginalTfsComment, Converter={StaticResource BoolToVis}}" />
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding DetailPersonMeta}" FontSize="{StaticResource FontSize.Base}" Foreground="#64748B"
+                                        <TextBox Text="{Binding DetailPersonMeta, Mode=OneWay}" Style="{StaticResource SelectableTextStyle}" FontSize="{StaticResource FontSize.Base}" Foreground="#64748B"
                                                    VerticalAlignment="Center" />
                                         <Border Width="1" Height="12" Background="#E2E8F0" Margin="12,0" VerticalAlignment="Center" />
-                                        <TextBlock Text="{Binding DetailPeriodMeta}" FontSize="{StaticResource FontSize.Base}" Foreground="#64748B"
+                                        <TextBox Text="{Binding DetailPeriodMeta, Mode=OneWay}" Style="{StaticResource SelectableTextStyle}" FontSize="{StaticResource FontSize.Base}" Foreground="#64748B"
                                                    VerticalAlignment="Center" />
                                     </StackPanel>
                                 </StackPanel>
@@ -820,36 +887,36 @@
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                         <Ellipse Width="8" Height="8" Fill="#668EA4E8" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                        <TextBlock Text="MENU" Style="{DynamicResource WorkLogInfoTileLabel}" Margin="0" />
+                                        <TextBox Text="MENU" IsReadOnly="True" Style="{StaticResource WorkLogInfoTileLabelSelectable}" Margin="0" />
                                     </StackPanel>
-                                    <TextBlock Text="{Binding DetailMenu}" Style="{DynamicResource WorkLogInfoTileValue}" />
+                                    <TextBox Text="{Binding DetailMenu, Mode=OneWay}" Style="{StaticResource WorkLogInfoTileValueSelectable}" />
                                 </StackPanel>
                             </Border>
                             <Border Style="{DynamicResource WorkLogInfoTile}" Margin="0,0,8,0">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                         <Ellipse Width="8" Height="8" Fill="#66F59E0B" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                        <TextBlock Text="PC" Style="{DynamicResource WorkLogInfoTileLabel}" Margin="0" />
+                                        <TextBox Text="PC" IsReadOnly="True" Style="{StaticResource WorkLogInfoTileLabelSelectable}" Margin="0" />
                                     </StackPanel>
-                                    <TextBlock Text="{Binding DetailIp}" Style="{DynamicResource WorkLogInfoTileValue}" />
+                                    <TextBox Text="{Binding DetailIp, Mode=OneWay}" Style="{StaticResource WorkLogInfoTileValueSelectable}" />
                                 </StackPanel>
                             </Border>
                             <Border Style="{DynamicResource WorkLogInfoTile}" Margin="0,0,8,0">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                         <Ellipse Width="8" Height="8" Fill="#6610B981" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                        <TextBlock Text="Deployment" Style="{DynamicResource WorkLogInfoTileLabel}" Margin="0" />
+                                        <TextBox Text="Deployment" IsReadOnly="True" Style="{StaticResource WorkLogInfoTileLabelSelectable}" Margin="0" />
                                     </StackPanel>
-                                    <TextBlock Text="{Binding DetailDeployDate}" Style="{DynamicResource WorkLogInfoTileValue}" />
+                                    <TextBox Text="{Binding DetailDeployDate, Mode=OneWay}" Style="{StaticResource WorkLogInfoTileValueSelectable}" />
                                 </StackPanel>
                             </Border>
                             <Border Style="{DynamicResource WorkLogInfoTile}" Margin="0">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                         <Ellipse Width="8" Height="8" Fill="#668B5CF6" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                        <TextBlock Text="PROJECT" Style="{DynamicResource WorkLogInfoTileLabel}" Margin="0" />
+                                        <TextBox Text="PROJECT" IsReadOnly="True" Style="{StaticResource WorkLogInfoTileLabelSelectable}" Margin="0" />
                                     </StackPanel>
-                                    <TextBlock Text="{Binding DetailProject}" Style="{DynamicResource WorkLogInfoTileValue}" />
+                                    <TextBox Text="{Binding DetailProject, Mode=OneWay}" Style="{StaticResource WorkLogInfoTileValueSelectable}" />
                                 </StackPanel>
                             </Border>
                         </UniformGrid>
@@ -857,7 +924,7 @@
                         <Border Style="{DynamicResource WorkLogDetailCard}"
                                 Visibility="{Binding HasCommentBlocks, Converter={StaticResource BoolToVis}}">
                             <StackPanel>
-                                <TextBlock Text="COMMENT" Style="{StaticResource WorkLogDetailCardTitle}" Foreground="#1E40AF" />
+                                <TextBox Text="COMMENT" IsReadOnly="True" Style="{StaticResource WorkLogDetailCardTitleSelectable}" Foreground="#1E40AF" />
                                 <ItemsControl ItemsSource="{Binding CommentBlocks}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
@@ -878,9 +945,10 @@
                                                         <TextBlock Text="{Binding BadgeText}" FontSize="{StaticResource FontSize.Sm}"
                                                                    FontWeight="SemiBold" Foreground="#1D4ED8" />
                                                     </Border>
-                                                    <TextBlock Text="{Binding Body}" FontSize="{StaticResource FontSize.Md}" Foreground="#334155"
-                                                               TextWrapping="Wrap" LineHeight="20"
-                                                               Visibility="{Binding HasBody, Converter={StaticResource BoolToVis}}" />
+                                                    <TextBox Text="{Binding Body, Mode=OneWay}" Style="{StaticResource SelectableTextStyle}"
+                                                             FontSize="{StaticResource FontSize.Md}" Foreground="#334155"
+                                                             TextWrapping="Wrap"
+                                                             Visibility="{Binding HasBody, Converter={StaticResource BoolToVis}}" />
                                                 </StackPanel>
                                             </Grid>
                                         </DataTemplate>
@@ -892,7 +960,7 @@
                         <Border Style="{DynamicResource WorkLogDetailCard}"
                                 Visibility="{Binding HasDetailSources, Converter={StaticResource BoolToVis}}">
                             <StackPanel>
-                                <TextBlock Text="{Binding DetailSourceHeader}" Style="{StaticResource WorkLogDetailCardTitle}"
+                                <TextBox Text="{Binding DetailSourceHeader, Mode=OneWay}" IsReadOnly="True" Style="{StaticResource WorkLogDetailCardTitleSelectable}"
                                            Foreground="#1E40AF" />
                                 <ItemsControl ItemsSource="{Binding DetailSources}">
                                     <ItemsControl.ItemTemplate>
@@ -907,22 +975,11 @@
                                                     <Image Source="{StaticResource CodeLightIcon}"
                                                            Width="14" Height="14" Margin="0,0,8,0"
                                                            VerticalAlignment="Center" />
-                                                    <TextBlock Text="{Binding ChangeDetailText}" FontSize="{StaticResource FontSize.Base}"
-                                                               TextWrapping="NoWrap"
-                                                               VerticalAlignment="Center"
-                                                               ToolTip="{Binding OriginalPath}">
-                                                        <TextBlock.Style>
-                                                            <Style TargetType="TextBlock">
-                                                                <Setter Property="Foreground" Value="#334155" />
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding IsAppended}" Value="True">
-                                                                        <Setter Property="Foreground" Value="#166534" />
-                                                                        <Setter Property="FontWeight" Value="SemiBold" />
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </TextBlock.Style>
-                                                    </TextBlock>
+                                                    <TextBox Text="{Binding ChangeDetailText, Mode=OneWay}" FontSize="{StaticResource FontSize.Base}"
+                                                             Style="{StaticResource WorkLogChangeDetailTextSelectable}"
+                                                             TextWrapping="NoWrap"
+                                                             VerticalAlignment="Center"
+                                                             ToolTip="{Binding OriginalPath}" />
                                                 </StackPanel>
                                             </Border>
                                         </DataTemplate>

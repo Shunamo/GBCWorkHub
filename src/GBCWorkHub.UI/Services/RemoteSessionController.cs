@@ -737,15 +737,18 @@ namespace GBCWorkHub.UI.Services
                 {
                     Kind = PopupKind.Confirm,
                     Icon = PopupIconKind.Warning,
-                    Title = "원격 접속 상태 복구",
-                    Message = "이전에 종료되지 않은 원격 접속 상태가 있습니다",
-                    Detail = (s.RemotePcName ?? "-") + " (" + s.RemoteAccessIpAddress + ")\n상태: "
-                        + (s.DisplayStatus ?? s.AccessStatusCode)
-                        + "\n소유: " + (s.AccessUserId ?? "-") + " / " + (s.AccessPcName ?? "-"),
+                    Title = "원격 접속 상태를 확인해 주세요",
+                    Message = "원격 연결은 종료되었지만, 사용 상태가 정상적으로 정리되지 않았습니다.",
+                    Detail = "SITE: " + (s.SiteCode ?? "-")
+                        + "\nPC: " + (s.RemotePcName ?? "-")
+                        + "\nIP: " + (s.RemoteAccessIpAddress ?? "-")
+                        + "\n마지막 사용자: " + (s.AccessUserId ?? "-") + " (" + (s.AccessPcName ?? "-") + ")"
+                        + "\n점유기간: " + (s.AccessStartDateTime.HasValue ? s.AccessStartDateTime.Value.ToString("yyyy-MM-dd HH:mm") : "-")
+                        + " ~ 현재",
                     DedupKey = "StaleSession:" + s.RemoteAccessIpAddress,
                     Buttons = new[]
                     {
-                        new PopupButtonDefinition("상태 복구", PopupResultType.Primary, isDefault: true),
+                        new PopupButtonDefinition("초기화", PopupResultType.Primary, isDefault: true),
                         new PopupButtonDefinition("나중에", PopupResultType.Secondary, isCancel: true)
                     }
                 }).ConfigureAwait(true);

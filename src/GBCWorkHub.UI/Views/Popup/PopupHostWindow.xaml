@@ -128,7 +128,7 @@
                 BorderBrush="#E2E8F0"
                 BorderThickness="1"
                 CornerRadius="16"
-                Padding="24" MinWidth="380" MaxWidth="500" Margin="24">
+                Padding="24" MinWidth="380" MaxWidth="640" Margin="24">
             <Border.Effect>
                 <DropShadowEffect BlurRadius="22" ShadowDepth="4" Opacity="0.14" Color="#2F4466" />
             </Border.Effect>
@@ -149,11 +149,11 @@
                                    Foreground="#2563EB" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <TextBlock Text="{Binding Title}" FontSize="17" FontWeight="SemiBold"
-                               Foreground="#1E293B" TextWrapping="Wrap" VerticalAlignment="Center" />
+                               Foreground="#1E293B" TextWrapping="Wrap" MaxWidth="420" VerticalAlignment="Center" />
                 </StackPanel>
 
                 <TextBlock Grid.Row="1" Text="{Binding Message}" FontSize="13.5" Foreground="#334155"
-                           TextWrapping="Wrap" Margin="0,0,0,12">
+                           TextWrapping="Wrap" MaxWidth="420" Margin="0,0,0,12">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <Setter Property="Visibility" Value="Visible" />

@@ -23,8 +23,8 @@
                     HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                     MouseLeftButtonUp="RemoteComputerCard_MouseLeftButtonUp">
                 <StackPanel HorizontalAlignment="Stretch">
-                    <Grid Width="96" Height="96" HorizontalAlignment="Center" Margin="0,0,0,10">
-                        <Image Width="96" Height="96" Stretch="Uniform">
+                    <Grid HorizontalAlignment="Center" Margin="0,0,0,10">
+                        <Image Width="96" Height="96" Stretch="Uniform" Margin="0,3,3,0">
                             <Image.Style>
                                 <Style TargetType="Image">
                                     <Setter Property="Source" Value="{StaticResource PcMonitorIcon}" />
@@ -51,7 +51,7 @@
                             </Image.Style>
                         </Image>
                         <Ellipse Width="10" Height="10" Fill="#FACC15"
-                                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-3,-3,0"
+                                 HorizontalAlignment="Right" VerticalAlignment="Top"
                                  ToolTip="초기 세팅 완료"
                                  Visibility="{Binding AgentInstalled, Converter={StaticResource BoolToVis}}" />
                     </Grid>
@@ -96,11 +96,12 @@
                     </Viewbox>
                     <!-- 도메인 2개+: 줄바꿈 -->
                     <TextBlock Text="{Binding PcDomainDisplay}" FontSize="11" Foreground="#94A3B8"
-                               Margin="4,2,4,0" TextAlignment="Center" HorizontalAlignment="Stretch"
-                               TextWrapping="Wrap"
+                               Margin="4,2,4,0" TextAlignment="Center" HorizontalAlignment="Center"
+                               TextWrapping="NoWrap"
                                Visibility="{Binding HasMultiplePcDomains, Converter={StaticResource BoolToVis}}" />
                     <TextBlock Text="{Binding OccupantText}" FontSize="12" Foreground="#475569" Margin="0,4,0,0"
                                TextAlignment="Center" HorizontalAlignment="Center"
+                               TextWrapping="Wrap" MaxWidth="160"
                                Visibility="{Binding HasOccupant, Converter={StaticResource BoolToVis}}" />
                 </StackPanel>
             </Border>
@@ -134,8 +135,8 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <Grid Width="36" Height="36" Margin="0,0,12,0" VerticalAlignment="Center">
-                        <Image Width="36" Height="36">
+                    <Grid Margin="0,0,12,0" VerticalAlignment="Center">
+                        <Image Width="36" Height="36" Margin="0,2,2,0">
                             <Image.Style>
                                 <Style TargetType="Image">
                                     <Setter Property="Source" Value="{StaticResource PcMonitorIcon}" />
@@ -159,7 +160,7 @@
                             </Image.Style>
                         </Image>
                         <Ellipse Width="6" Height="6" Fill="#FACC15"
-                                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-2,-2,0"
+                                 HorizontalAlignment="Right" VerticalAlignment="Top"
                                  ToolTip="초기 세팅 완료"
                                  Visibility="{Binding AgentInstalled, Converter={StaticResource BoolToVis}}" />
                     </Grid>
@@ -205,12 +206,13 @@
                         </Viewbox>
                         <TextBlock FontSize="11" Foreground="#94A3B8" Margin="0,2,0,0"
                                    Text="{Binding PcDomainDisplay}"
-                                   TextWrapping="Wrap"
+                                   TextWrapping="NoWrap"
                                    Visibility="{Binding HasMultiplePcDomains, Converter={StaticResource BoolToVis}}" />
                     </StackPanel>
                     <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"
                                FontSize="12" Foreground="#475569"
                                Text="{Binding OccupantText}"
+                               TextWrapping="Wrap" MaxWidth="150"
                                Visibility="{Binding HasOccupant, Converter={StaticResource BoolToVis}}" />
                 </Grid>
             </Border>
@@ -673,6 +675,7 @@
 
                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled"
+                              Padding="0,6,0,0"
                               Background="Transparent">
                     <ScrollViewer.Style>
                         <Style TargetType="ScrollViewer">
@@ -766,7 +769,7 @@
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                                     <TextBlock Text="IP" Width="40" FontSize="12" FontWeight="SemiBold" Foreground="#64748B"
                                                VerticalAlignment="Center" />
-                                    <TextBlock Text="{Binding AdminEditPcIp}" FontSize="12.5" Foreground="#1E293B"
+                                    <TextBox Text="{Binding AdminEditPcIp, Mode=OneWay}" Style="{StaticResource SelectableTextStyle}" FontSize="12.5" Foreground="#1E293B"
                                                VerticalAlignment="Center"
                                                Visibility="{Binding IsPcAccessReadOnly, Converter={StaticResource BoolToVis}}" />
                                     <TextBox Text="{Binding AdminEditPcIp, UpdateSourceTrigger=PropertyChanged}"
@@ -776,7 +779,7 @@
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="소속" Width="40" FontSize="12" FontWeight="SemiBold" Foreground="#64748B"
                                                VerticalAlignment="Center" />
-                                    <TextBlock Text="{Binding AdminEditTeamName}" FontSize="12.5" Foreground="#1E293B"
+                                    <TextBox Text="{Binding AdminEditTeamName, Mode=OneWay}" Style="{StaticResource SelectableTextStyle}" FontSize="12.5" Foreground="#1E293B"
                                                VerticalAlignment="Center"
                                                Visibility="{Binding IsPcAccessReadOnly, Converter={StaticResource BoolToVis}}" />
                                     <TextBox Text="{Binding AdminEditTeamName, UpdateSourceTrigger=PropertyChanged}"
@@ -842,12 +845,12 @@
                                                                                     <ColumnDefinition Width="Auto" />
                                                                                     <ColumnDefinition Width="Auto" />
                                                                                 </Grid.ColumnDefinitions>
-                                                                                <TextBlock Text="{Binding Value}"
+                                                                                <TextBox Text="{Binding Value, Mode=OneWay}"
+                                                                                           Style="{StaticResource SelectableTextStyle}"
                                                                                            FontSize="12.5"
                                                                                            Foreground="#1E293B"
                                                                                            VerticalAlignment="Center"
                                                                                            TextWrapping="NoWrap"
-                                                                                           TextTrimming="None"
                                                                                            Visibility="{Binding IsReadOnly, Converter={StaticResource BoolToVis}}" />
                                                                                 <TextBox Grid.Column="0"
                                                                                          Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -906,7 +909,8 @@
                                     <TextBlock Text="COMMENT"
                                                Style="{StaticResource RemoteUsageHistoryColHeader}"
                                                FontWeight="SemiBold" />
-                                    <TextBlock Text="{Binding SelectedPcComment}"
+                                    <TextBox Text="{Binding SelectedPcComment, Mode=OneWay}"
+                                               Style="{StaticResource SelectableTextStyle}"
                                                FontSize="12.5"
                                                Foreground="#1E293B"
                                                TextWrapping="Wrap"
