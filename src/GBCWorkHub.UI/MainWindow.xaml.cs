@@ -76,11 +76,21 @@ namespace GBCWorkHub.UI
 
         private void HelpMenuButton_Click(object sender, RoutedEventArgs e)
         {
-            var button = sender as FrameworkElement;
-            if (button == null || button.ContextMenu == null)
-                return;
-            button.ContextMenu.PlacementTarget = button;
-            button.ContextMenu.IsOpen = true;
+            bool opening = HelpMenuFlyout.Visibility != Visibility.Visible;
+            HelpMenuFlyout.Visibility = opening ? Visibility.Visible : Visibility.Collapsed;
+            HelpMenuScrim.Visibility = opening ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void HelpMenuScrim_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            HelpMenuFlyout.Visibility = Visibility.Collapsed;
+            HelpMenuScrim.Visibility = Visibility.Collapsed;
+        }
+
+        private void HelpMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            HelpMenuFlyout.Visibility = Visibility.Collapsed;
+            HelpMenuScrim.Visibility = Visibility.Collapsed;
         }
 
         private void Window_Closed(object sender, EventArgs e)
