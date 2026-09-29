@@ -61,6 +61,12 @@ jobs:
         shell: pwsh
         run: |
           $tag = "${{ steps.ver.outputs.tag }}"
+          # actions/checkout fetches tags correctly, but then does its own follow-up
+          # fetch of GITHUB_SHA into that same ref name (its way of guaranteeing the
+          # triggering commit is present) — that overwrites refs/tags/$tag to point
+          # directly at the commit, discarding the annotated tag object. Re-fetch the
+          # tag explicitly so we read its message, not the commit's.
+          git fetch --force origin "refs/tags/${tag}:refs/tags/${tag}"
           # 태그가 annotated면(git tag -a vX.Y.Z -m "...") 그 메시지 본문을 그대로 쓴다.
           # lightweight 태그면 빈 문자열 — 이 경우 앱 내 업데이트 안내 팝업은 뜨지 않는다
           # (PendingReleaseNoticeStore.Save가 빈 텍스트를 무시함).
