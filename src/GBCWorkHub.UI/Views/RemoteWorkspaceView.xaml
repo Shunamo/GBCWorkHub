@@ -715,7 +715,7 @@
                         Padding="12,10" Margin="4,8,4,0"
                         Visibility="{Binding HasSelectedRemoteComputer, Converter={StaticResource BoolToVis}}">
                     <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                  HorizontalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
                                   CanContentScroll="False">
                     <DockPanel LastChildFill="True">
                         <Grid DockPanel.Dock="Top" Margin="0,0,0,0">
@@ -787,8 +787,10 @@
                                              Visibility="{Binding IsPcAccessEditing, Converter={StaticResource BoolToVis}}" />
                                 </StackPanel>
                             </StackPanel>
-                            <StackPanel Grid.Row="2"
-                                        Orientation="Horizontal"
+                            <ScrollViewer Grid.Row="2"
+                                          HorizontalScrollBarVisibility="Auto"
+                                          VerticalScrollBarVisibility="Disabled">
+                            <StackPanel Orientation="Horizontal"
                                         HorizontalAlignment="Left"
                                         VerticalAlignment="Top">
                             <ItemsControl ItemsSource="{Binding SelectedPcAccessSections}"
@@ -906,59 +908,65 @@
                                                                     <TextBlock Text="−" FontSize="16" FontWeight="SemiBold" Foreground="#94A3B8" />
                                                                 </Button>
 
-                                                                <Border Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0"
+                                                                <Border Grid.Row="1" Grid.Column="0" VerticalAlignment="Top" Margin="0,2,10,0"
                                                                         HorizontalAlignment="Left">
                                                                     <TextBlock Text="PW" FontSize="12.5" FontWeight="SemiBold"
                                                                                Foreground="#64748B" VerticalAlignment="Center" />
                                                                 </Border>
-                                                                <Grid Grid.Row="1" Grid.Column="1" Height="24" Margin="0"
-                                                                      HorizontalAlignment="Left" DataContext="{Binding Pw}">
-                                                                    <Grid.ColumnDefinitions>
-                                                                        <ColumnDefinition Width="Auto" />
-                                                                        <ColumnDefinition Width="Auto" />
-                                                                    </Grid.ColumnDefinitions>
-                                                                    <TextBox Text="{Binding Value, Mode=OneWay}"
-                                                                               Style="{StaticResource SelectableTextStyle}"
-                                                                               FontSize="12.5"
-                                                                               Foreground="#1E293B"
-                                                                               VerticalAlignment="Center"
-                                                                               TextWrapping="NoWrap"
-                                                                               Visibility="{Binding IsReadOnly, Converter={StaticResource BoolToVis}}" />
-                                                                    <TextBox Grid.Column="0"
-                                                                             Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                             FontSize="12.5"
-                                                                             Foreground="#1E293B"
-                                                                             VerticalContentAlignment="Center"
-                                                                             HorizontalAlignment="Left"
-                                                                             BorderThickness="1"
-                                                                             BorderBrush="#D9FFFFFF"
-                                                                             Background="#66FFFFFF"
-                                                                             Padding="4,0"
-                                                                             Height="24"
-                                                                             Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}"
-                                                                             IsTabStop="{Binding IsEditing}" />
-                                                                    <Grid Grid.Column="1" Width="24" Height="24" Margin="6,0,0,0"
-                                                                          VerticalAlignment="Center"
-                                                                          Visibility="{Binding DataContext.IsPcAccessReadOnly, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}, ConverterParameter=Hidden}">
-                                                                        <Button Style="{StaticResource HeaderIconButton}"
-                                                                                VerticalAlignment="Center"
-                                                                                HorizontalAlignment="Center"
-                                                                                ToolTip="복사됨"
-                                                                                IsHitTestVisible="False"
-                                                                                Visibility="{Binding IsCopied, Converter={StaticResource BoolToVis}}">
-                                                                            <Image Source="{StaticResource DoneLightIcon}" Width="14" Height="14" />
-                                                                        </Button>
-                                                                        <Button Style="{StaticResource HeaderIconButton}"
-                                                                                VerticalAlignment="Center"
-                                                                                HorizontalAlignment="Center"
-                                                                                ToolTip="{Binding Value, StringFormat=복사: {0}}"
-                                                                                Command="{Binding CopyCommand}"
-                                                                                CommandParameter="{Binding}"
-                                                                                Visibility="{Binding ShowCopyIcon, Converter={StaticResource BoolToVis}}">
-                                                                            <Image Source="{StaticResource CopyAltIcon}" Width="14" Height="14" />
-                                                                        </Button>
-                                                                    </Grid>
-                                                                </Grid>
+                                                                <ItemsControl Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Pw}"
+                                                                              HorizontalAlignment="Left">
+                                                                    <ItemsControl.ItemTemplate>
+                                                                        <DataTemplate>
+                                                                            <Grid Height="24" Margin="0,0,0,6" HorizontalAlignment="Left">
+                                                                                <Grid.ColumnDefinitions>
+                                                                                    <ColumnDefinition Width="Auto" />
+                                                                                    <ColumnDefinition Width="Auto" />
+                                                                                </Grid.ColumnDefinitions>
+                                                                                <TextBox Text="{Binding Value, Mode=OneWay}"
+                                                                                           Style="{StaticResource SelectableTextStyle}"
+                                                                                           FontSize="12.5"
+                                                                                           Foreground="#1E293B"
+                                                                                           VerticalAlignment="Center"
+                                                                                           TextWrapping="NoWrap"
+                                                                                           Visibility="{Binding IsReadOnly, Converter={StaticResource BoolToVis}}" />
+                                                                                <TextBox Grid.Column="0"
+                                                                                         Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                                         FontSize="12.5"
+                                                                                         Foreground="#1E293B"
+                                                                                         VerticalContentAlignment="Center"
+                                                                                         HorizontalAlignment="Left"
+                                                                                         BorderThickness="1"
+                                                                                         BorderBrush="#D9FFFFFF"
+                                                                                         Background="#66FFFFFF"
+                                                                                         Padding="4,0"
+                                                                                         Height="24"
+                                                                                         Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}"
+                                                                                         IsTabStop="{Binding IsEditing}" />
+                                                                                <Grid Grid.Column="1" Width="24" Height="24" Margin="6,0,0,0"
+                                                                                      VerticalAlignment="Center"
+                                                                                      Visibility="{Binding DataContext.IsPcAccessReadOnly, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}, ConverterParameter=Hidden}">
+                                                                                    <Button Style="{StaticResource HeaderIconButton}"
+                                                                                            VerticalAlignment="Center"
+                                                                                            HorizontalAlignment="Center"
+                                                                                            ToolTip="복사됨"
+                                                                                            IsHitTestVisible="False"
+                                                                                            Visibility="{Binding IsCopied, Converter={StaticResource BoolToVis}}">
+                                                                                        <Image Source="{StaticResource DoneLightIcon}" Width="14" Height="14" />
+                                                                                    </Button>
+                                                                                    <Button Style="{StaticResource HeaderIconButton}"
+                                                                                            VerticalAlignment="Center"
+                                                                                            HorizontalAlignment="Center"
+                                                                                            ToolTip="{Binding Value, StringFormat=복사: {0}}"
+                                                                                            Command="{Binding CopyCommand}"
+                                                                                            CommandParameter="{Binding}"
+                                                                                            Visibility="{Binding ShowCopyIcon, Converter={StaticResource BoolToVis}}">
+                                                                                        <Image Source="{StaticResource CopyAltIcon}" Width="14" Height="14" />
+                                                                                    </Button>
+                                                                                </Grid>
+                                                                            </Grid>
+                                                                        </DataTemplate>
+                                                                    </ItemsControl.ItemTemplate>
+                                                                </ItemsControl>
                                                             </Grid>
                                                             </Border>
                                                         </DataTemplate>
@@ -1005,6 +1013,7 @@
                                 </StackPanel>
                             </Border>
                             </StackPanel>
+                            </ScrollViewer>
                         </Grid>
                         <TextBlock DockPanel.Dock="Top" Text="최근 접속 내역이 없습니다."
                                    FontSize="13" Foreground="#94A3B8" Margin="2,8,0,0"

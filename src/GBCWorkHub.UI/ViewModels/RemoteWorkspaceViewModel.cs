@@ -870,14 +870,23 @@ namespace GBCWorkHub.UI.ViewModels
             if (section == null || section.Sets == null)
                 return;
             if (section.Sets.Count == 0)
-                section.Sets.Add(CreateCredentialSet(section, string.Empty, string.Empty));
+                section.Sets.Add(CreateCredentialSet(section, string.Empty, null));
         }
 
-        private PcCredentialSetViewModel CreateCredentialSet(PcAccessSectionViewModel owner, string idValue, string pwValue)
+        private PcCredentialSetViewModel CreateCredentialSet(PcAccessSectionViewModel owner, string idValue, IList<string> pwValues)
         {
             var id = new PcCredentialLineViewModel(idValue ?? string.Empty, CopyPcCredentialCommand);
-            var pw = new PcCredentialLineViewModel(pwValue ?? string.Empty, CopyPcCredentialCommand);
-            var set = new PcCredentialSetViewModel(owner, id, pw);
+            var pwLines = new List<PcCredentialLineViewModel>();
+            if (pwValues != null && pwValues.Count > 0)
+            {
+                for (int i = 0; i < pwValues.Count; i++)
+                    pwLines.Add(new PcCredentialLineViewModel(pwValues[i] ?? string.Empty, CopyPcCredentialCommand));
+            }
+            else
+            {
+                pwLines.Add(new PcCredentialLineViewModel(string.Empty, CopyPcCredentialCommand));
+            }
+            var set = new PcCredentialSetViewModel(owner, id, pwLines);
             if (IsPcAccessEditing)
                 set.SetEditing(true);
             return set;
@@ -887,7 +896,7 @@ namespace GBCWorkHub.UI.ViewModels
         {
             if (section == null || section.Sets == null)
                 return;
-            section.Sets.Add(CreateCredentialSet(section, string.Empty, string.Empty));
+            section.Sets.Add(CreateCredentialSet(section, string.Empty, null));
         }
 
         private void RemoveCredentialSet(PcCredentialSetViewModel set)
@@ -896,7 +905,7 @@ namespace GBCWorkHub.UI.ViewModels
                 return;
             set.OwnerSection.Sets.Remove(set);
             if (set.OwnerSection.Sets.Count == 0)
-                set.OwnerSection.Sets.Add(CreateCredentialSet(set.OwnerSection, string.Empty, string.Empty));
+                set.OwnerSection.Sets.Add(CreateCredentialSet(set.OwnerSection, string.Empty, null));
         }
 
         private void CancelEditPcAccess()
@@ -1153,16 +1162,26 @@ namespace GBCWorkHub.UI.ViewModels
                     var set = section.Sets[i];
                     if (set == null)
                         continue;
-                    string idVal = (set.Id != null ? set.Id.Value : null) ?? string.Empty;
-                    string pwVal = (set.Pw != null ? set.Pw.Value : null) ?? string.Empty;
-                    idVal = idVal.Trim();
-                    pwVal = pwVal.Trim();
-                    if (idVal.Length == 0 || pwVal.Length == 0)
+                    string idVal = ((set.Id != null ? set.Id.Value : null) ?? string.Empty).Trim();
+                    var pwVals = new List<string>();
+                    if (set.Pw != null)
+                    {
+                        foreach (var pwLine in set.Pw)
+                        {
+                            string pwVal = ((pwLine != null ? pwLine.Value : null) ?? string.Empty).Trim();
+                            if (pwVal.Length > 0)
+                                pwVals.Add(pwVal);
+                        }
+                    }
+                    if (idVal.Length == 0 || pwVals.Count == 0)
                         continue;
                     if (idsTarget != null)
                         idsTarget.Add(idVal);
                     if (pwsTarget != null)
-                        pwsTarget.Add(pwVal);
+                    {
+                        for (int j = 0; j < pwVals.Count; j++)
+                            pwsTarget.Add(pwVals[j]);
+                    }
                 }
             }
         }
@@ -1208,7 +1227,18 @@ namespace GBCWorkHub.UI.ViewModels
                         if (set == null)
                             continue;
                         bool hasId = set.Id != null && !string.IsNullOrWhiteSpace(set.Id.Value);
-                        bool hasPw = set.Pw != null && !string.IsNullOrWhiteSpace(set.Pw.Value);
+                        bool hasPw = false;
+                        if (set.Pw != null)
+                        {
+                            foreach (var pwLine in set.Pw)
+                            {
+                                if (pwLine != null && !string.IsNullOrWhiteSpace(pwLine.Value))
+                                {
+                                    hasPw = true;
+                                    break;
+                                }
+                            }
+                        }
                         if (hasId != hasPw)
                         {
                             sectionTitle = section.Title;
@@ -1312,14 +1342,32 @@ namespace GBCWorkHub.UI.ViewModels
         private PcAccessSectionViewModel CreateAccessSection(string title, IList<string> idValues, IList<string> pwValues)
         {
             var section = new PcAccessSectionViewModel(title);
-            int count = Math.Max(idValues != null ? idValues.Count : 0, pwValues != null ? pwValues.Count : 0);
-            if (count == 0)
-                count = 1;
-            for (int i = 0; i < count; i++)
+            int idCount = idValues != null ? idValues.Count : 0;
+            int pwCount = pwValues != null ? pwValues.Count : 0;
+            int pairCount = Math.Min(idCount, pwCount);
+            for (int i = 0; i < pairCount; i++)
             {
-                string idVal = idValues != null && i < idValues.Count ? idValues[i] : string.Empty;
-                string pwVal = pwValues != null && i < pwValues.Count ? pwValues[i] : string.Empty;
-                section.Sets.Add(CreateCredentialSet(section, idVal, pwVal));
+                section.Sets.Add(CreateCredentialSet(section, idValues[i], new[] { pwValues[i] }));
+            }
+            if (section.Sets.Count == 0)
+                section.Sets.Add(CreateCredentialSet(section, string.Empty, null));
+
+            // ID/PW 개수가 안 맞는 예전 데이터(예: ID 1개에 PW 2개)는 남는 줄로 빈 ID/PW 세트를
+            // 새로 만들지 않고, 마지막 세트에 합쳐서 원래처럼 유지한다 — 세트는 사용자가 "+"를
+            // 눌렀을 때만 늘어나야 한다. PW는 각자 복사 가능해야 하므로 문자열로 합치지 않고
+            // 별도 줄(컬렉션 항목)로 추가한다.
+            var last = section.Sets[section.Sets.Count - 1];
+            if (idCount > pairCount && last.Id != null)
+            {
+                string merged = last.Id.Value ?? string.Empty;
+                for (int i = pairCount; i < idCount; i++)
+                    merged = merged.Length == 0 ? idValues[i] : merged + "\n" + idValues[i];
+                last.Id.Value = merged;
+            }
+            if (pwCount > pairCount)
+            {
+                for (int i = pairCount; i < pwCount; i++)
+                    last.Pw.Add(new PcCredentialLineViewModel(pwValues[i] ?? string.Empty, CopyPcCredentialCommand));
             }
             return section;
         }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -30,26 +31,39 @@ namespace GBCWorkHub.UI.ViewModels
         }
     }
 
-    /// <summary>섹션 안 ID+PW 한 세트.</summary>
+    /// <summary>섹션 안 ID+PW 한 세트. PW는 보통 1개지만, ID 1개에 비밀번호가 여러 개인 예전
+    /// 데이터는 여러 줄로 들어올 수 있다 — 각 줄이 독립적으로 복사 가능해야 하므로 한 문자열에
+    /// 개행으로 합치지 않고 별도 줄(컬렉션)로 둔다.</summary>
     public sealed class PcCredentialSetViewModel : ViewModelBase
     {
-        public PcCredentialSetViewModel(PcAccessSectionViewModel owner, PcCredentialLineViewModel id, PcCredentialLineViewModel pw)
+        public PcCredentialSetViewModel(PcAccessSectionViewModel owner, PcCredentialLineViewModel id, IEnumerable<PcCredentialLineViewModel> pwLines)
         {
             OwnerSection = owner;
             Id = id;
-            Pw = pw;
+            Pw = new ObservableCollection<PcCredentialLineViewModel>();
+            if (pwLines != null)
+            {
+                foreach (PcCredentialLineViewModel line in pwLines)
+                {
+                    if (line != null)
+                        Pw.Add(line);
+                }
+            }
         }
 
         public PcAccessSectionViewModel OwnerSection { get; private set; }
         public PcCredentialLineViewModel Id { get; private set; }
-        public PcCredentialLineViewModel Pw { get; private set; }
+        public ObservableCollection<PcCredentialLineViewModel> Pw { get; private set; }
 
         public void SetEditing(bool editing)
         {
             if (Id != null)
                 Id.IsEditing = editing;
-            if (Pw != null)
-                Pw.IsEditing = editing;
+            for (int i = 0; i < Pw.Count; i++)
+            {
+                if (Pw[i] != null)
+                    Pw[i].IsEditing = editing;
+            }
         }
     }
 

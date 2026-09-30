@@ -1672,18 +1672,33 @@ public sealed class AdminViewModel : ViewModelBase
 	private static void FillCredSets(ObservableCollection<AdminCredSetItem> target, IList<string> ids, IList<string> pws)
 	{
 		target.Clear();
-		int count = Math.Max(ids.Count, pws.Count);
-		for (int i = 0; i < count; i++)
+		int pairCount = Math.Min(ids.Count, pws.Count);
+		for (int i = 0; i < pairCount; i++)
 		{
-			target.Add(new AdminCredSetItem
-			{
-				Id = i < ids.Count ? ids[i] : string.Empty,
-				Pw = i < pws.Count ? pws[i] : string.Empty
-			});
+			target.Add(new AdminCredSetItem { Id = ids[i], Pw = pws[i] });
 		}
 		if (target.Count == 0)
 		{
 			target.Add(new AdminCredSetItem());
+		}
+
+		// ID/PW 개수가 안 맞는 예전 데이터(예: ID 1개에 PW 2개)는 남는 줄로 빈 ID/PW 세트를
+		// 새로 만들지 않고, 마지막 세트에 합쳐서 원래처럼 한 덩어리로 유지한다 — 세트는
+		// admin이 "+"를 눌렀을 때만 늘어나야 한다.
+		AdminCredSetItem last = target[target.Count - 1];
+		if (ids.Count > pairCount)
+		{
+			string merged = last.Id ?? string.Empty;
+			for (int i = pairCount; i < ids.Count; i++)
+				merged = merged.Length == 0 ? ids[i] : merged + "\n" + ids[i];
+			last.Id = merged;
+		}
+		if (pws.Count > pairCount)
+		{
+			string merged = last.Pw ?? string.Empty;
+			for (int i = pairCount; i < pws.Count; i++)
+				merged = merged.Length == 0 ? pws[i] : merged + "\n" + pws[i];
+			last.Pw = merged;
 		}
 	}
 
