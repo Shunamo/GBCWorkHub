@@ -394,9 +394,12 @@ namespace GBCWorkHub.UI.ViewModels
                     .ConfigureAwait(true);
                 if (skipped != null && skipped.Count > 0)
                 {
-                    expandableTitle = "이전 릴리즈 변경사항 보기 (v" + oldVersion + " ~ v" + version + ")";
+                    // 너무 오래 건너뛴 경우 팝업이 한없이 길어지지 않도록 최신 3개까지만 보여준다.
+                    const int MaxHistoryEntries = 3;
+                    int shownCount = Math.Min(skipped.Count, MaxHistoryEntries);
+                    expandableTitle = "이전 릴리즈 변경사항";
                     var sb = new System.Text.StringBuilder();
-                    for (int i = 0; i < skipped.Count; i++)
+                    for (int i = 0; i < shownCount; i++)
                     {
                         if (i > 0)
                             sb.Append("\n\n");
