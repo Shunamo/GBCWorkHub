@@ -73,14 +73,28 @@ namespace GBCWorkHub.UI.Services.Update
             if (!string.IsNullOrWhiteSpace(baseOverride))
                 return baseOverride.Trim().TrimEnd('/');
 
-            // Defaults match App.config.example so stale LocalAppData configs still check updates.
+            return GitHubReleaseUrls.NormalizeBaseUrl(ResolveReleaseOwner(), ResolveReleaseRepo());
+        }
+
+        /// <summary>Defaults match App.config.example so stale LocalAppData configs still check updates.
+        /// Only meaningful when Update.ReleaseBaseUrl is not overridden to a non-GitHub host.</summary>
+        public static string ResolveReleaseOwner()
+        {
             string owner = ReadSetting("Update.ReleaseOwner");
-            if (string.IsNullOrWhiteSpace(owner))
-                owner = "Shunamo";
+            return string.IsNullOrWhiteSpace(owner) ? "Shunamo" : owner.Trim();
+        }
+
+        public static string ResolveReleaseRepo()
+        {
             string repo = ReadSetting("Update.ReleaseRepo");
-            if (string.IsNullOrWhiteSpace(repo))
-                repo = "GBCWorkHub";
-            return GitHubReleaseUrls.NormalizeBaseUrl(owner, repo);
+            return string.IsNullOrWhiteSpace(repo) ? "GBCWorkHub" : repo.Trim();
+        }
+
+        /// <summary>Update.ReleaseBaseUrl로 GitHub 외 호스트를 쓰는 배포에서는 release-history API가
+        /// 의미 없으므로, 그 경우 true를 반환해 히스토리 조회를 건너뛰게 한다.</summary>
+        public static bool HasCustomReleaseBaseUrl()
+        {
+            return !string.IsNullOrWhiteSpace(ReadSetting("Update.ReleaseBaseUrl"));
         }
 
         public async Task<UpdateManifest> CheckForUpdateAsync(CancellationToken cancellationToken)

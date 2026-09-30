@@ -7,6 +7,10 @@ namespace GBCWorkHub.UI.Models.Popup
         public string Title { get; set; }
         public string Message { get; set; }
         public string Detail { get; set; }
+        /// <summary>접이식 보조 섹션 제목(예: "이전 릴리즈 변경사항 보기 (v1.3.8 ~ v1.3.10)"). null/빈 문자열이면 토글 자체가 안 보인다.</summary>
+        public string ExpandableTitle { get; set; }
+        /// <summary>접었다 폈다 하는 보조 섹션 본문.</summary>
+        public string ExpandableContent { get; set; }
         public PopupIconKind Icon { get; set; }
         public PopupKind Kind { get; set; }
         public string ProgressStepText { get; set; }

@@ -9,6 +9,9 @@ namespace GBCWorkHub.UI.ViewModels.Popup
         private string _title;
         private string _message;
         private string _detail;
+        private string _expandableTitle;
+        private string _expandableContent;
+        private bool _isExpandableOpen;
         private string _progressStepText;
         private PopupIconKind _icon;
         private PopupKind _kind;
@@ -54,6 +57,48 @@ namespace GBCWorkHub.UI.ViewModels.Popup
             get { return _detail; }
             set { SetProperty(ref _detail, value); }
         }
+
+        public string ExpandableTitle
+        {
+            get { return _expandableTitle; }
+            set
+            {
+                if (SetProperty(ref _expandableTitle, value))
+                    RaisePropertyChanged("HasExpandable");
+            }
+        }
+
+        public string ExpandableContent
+        {
+            get { return _expandableContent; }
+            set
+            {
+                if (SetProperty(ref _expandableContent, value))
+                    RaisePropertyChanged("HasExpandable");
+            }
+        }
+
+        public bool IsExpandableOpen
+        {
+            get { return _isExpandableOpen; }
+            set
+            {
+                if (SetProperty(ref _isExpandableOpen, value))
+                    RaisePropertyChanged("ExpandableToggleGlyph");
+            }
+        }
+
+        public bool HasExpandable
+        {
+            get { return !string.IsNullOrWhiteSpace(ExpandableContent) && !string.IsNullOrWhiteSpace(ExpandableTitle); }
+        }
+
+        public string ExpandableToggleGlyph
+        {
+            get { return IsExpandableOpen ? "▾" : "▸"; }
+        }
+
+        public ICommand ToggleExpandableCommand { get; set; }
 
         public string ProgressStepText
         {
@@ -496,6 +541,9 @@ namespace GBCWorkHub.UI.ViewModels.Popup
             Title = request.Title ?? string.Empty;
             Message = request.Message ?? string.Empty;
             Detail = request.Detail ?? string.Empty;
+            ExpandableTitle = request.ExpandableTitle ?? string.Empty;
+            ExpandableContent = request.ExpandableContent ?? string.Empty;
+            IsExpandableOpen = false;
             ProgressStepText = request.ProgressStepText ?? string.Empty;
             Icon = request.Icon;
             Kind = request.Kind;

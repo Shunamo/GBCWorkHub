@@ -375,8 +375,9 @@ namespace GBCWorkHub.UI.ViewModels
         public async Task ShowPendingReleaseNoticeIfAnyAsync()
         {
             string version;
+            string oldVersion;
             string releaseNotes;
-            if (!PendingReleaseNoticeStore.TryConsume(out version, out releaseNotes))
+            if (!PendingReleaseNoticeStore.TryConsume(out version, out oldVersion, out releaseNotes))
             {
                 DiagnosticLogger.Info("UPDATE", "No pending release notice found (marker file absent/empty).");
                 return;
@@ -385,12 +386,39 @@ namespace GBCWorkHub.UI.ViewModels
             if (_popup == null)
                 return;
 
+            string expandableTitle = null;
+            string expandableContent = null;
+            try
+            {
+                var skipped = await ReleaseHistoryService.GetSkippedNotesAsync(oldVersion, version, CancellationToken.None)
+                    .ConfigureAwait(true);
+                if (skipped != null && skipped.Count > 0)
+                {
+                    expandableTitle = "이전 릴리즈 변경사항 보기 (v" + oldVersion + " ~ v" + version + ")";
+                    var sb = new System.Text.StringBuilder();
+                    for (int i = 0; i < skipped.Count; i++)
+                    {
+                        if (i > 0)
+                            sb.Append("\n\n");
+                        sb.Append("v").Append(skipped[i].Version).Append('\n').Append(skipped[i].Notes);
+                    }
+                    expandableContent = sb.ToString();
+                }
+            }
+            catch (Exception ex)
+            {
+                // 건너뛴 버전 이력 조회 실패는 최신 버전 팝업 자체에 영향 없음 — 토글만 안 보인다.
+                DiagnosticLogger.Warn("UPDATE", "Skipped-release history fetch failed: " + ex.Message);
+            }
+
             try
             {
                 await _popup.ShowResultAsync(new PopupRequest
                 {
                     Title = "v" + version + " 업데이트 완료",
                     Message = releaseNotes,
+                    ExpandableTitle = expandableTitle,
+                    ExpandableContent = expandableContent,
                     Icon = PopupIconKind.Info,
                     Kind = PopupKind.Result,
                     Buttons = new[]
@@ -465,7 +493,7 @@ namespace GBCWorkHub.UI.ViewModels
 
                 var service = new UpdateService(source);
                 await service.ApplyUpdateAsync(_pendingUpdate, CancellationToken.None).ConfigureAwait(true);
-                PendingReleaseNoticeStore.Save(_pendingUpdate.Version, _pendingUpdate.ReleaseNotes);
+                PendingReleaseNoticeStore.Save(_pendingUpdate.Version, AppVersion.Current, _pendingUpdate.ReleaseNotes);
                 DiagnosticLogger.Info("UPDATE", "Updater launched; shutting down for apply");
                 Application.Current.Shutdown();
             }

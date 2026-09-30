@@ -202,6 +202,10 @@ namespace GBCWorkHub.UI.Services.Popup
                 }
                 CloseHost(PopupResult.From(btn.ResultType, btn.Text, _vm.InputText, _vm.AffiliationText, _vm.PasswordText));
             });
+            _vm.ToggleExpandableCommand = new RelayCommand(() =>
+            {
+                _vm.IsExpandableOpen = !_vm.IsExpandableOpen;
+            });
             _vm.CancelProgressCommand = new RelayCommand(() =>
             {
                 try
