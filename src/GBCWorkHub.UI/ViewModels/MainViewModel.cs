@@ -390,28 +390,28 @@ namespace GBCWorkHub.UI.ViewModels
             string expandableContent = null;
             try
             {
-                var skipped = await ReleaseHistoryService.GetSkippedNotesAsync(oldVersion, version, CancellationToken.None)
+                // 건너뛰었는지 여부와 무관하게 직전 3개 릴리즈 노트를 항상 참고용으로 보여준다
+                // (연속 업데이트라도 과거 이력을 다시 볼 수 있게).
+                const int MaxHistoryEntries = 3;
+                var previous = await ReleaseHistoryService.GetPreviousReleaseNotesAsync(version, MaxHistoryEntries, CancellationToken.None)
                     .ConfigureAwait(true);
-                if (skipped != null && skipped.Count > 0)
+                if (previous != null && previous.Count > 0)
                 {
-                    // 너무 오래 건너뛴 경우 팝업이 한없이 길어지지 않도록 최신 3개까지만 보여준다.
-                    const int MaxHistoryEntries = 3;
-                    int shownCount = Math.Min(skipped.Count, MaxHistoryEntries);
                     expandableTitle = "이전 릴리즈 변경사항";
                     var sb = new System.Text.StringBuilder();
-                    for (int i = 0; i < shownCount; i++)
+                    for (int i = 0; i < previous.Count; i++)
                     {
                         if (i > 0)
                             sb.Append("\n\n");
-                        sb.Append("v").Append(skipped[i].Version).Append('\n').Append(skipped[i].Notes);
+                        sb.Append("v").Append(previous[i].Version).Append('\n').Append(previous[i].Notes);
                     }
                     expandableContent = sb.ToString();
                 }
             }
             catch (Exception ex)
             {
-                // 건너뛴 버전 이력 조회 실패는 최신 버전 팝업 자체에 영향 없음 — 토글만 안 보인다.
-                DiagnosticLogger.Warn("UPDATE", "Skipped-release history fetch failed: " + ex.Message);
+                // 이전 릴리즈 이력 조회 실패는 최신 버전 팝업 자체에 영향 없음 — 토글만 안 보인다.
+                DiagnosticLogger.Warn("UPDATE", "Previous-release history fetch failed: " + ex.Message);
             }
 
             try
