@@ -50,12 +50,39 @@ namespace GBCWorkHub.LegacyRedirect
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
 
-            Process.Start(new ProcessStartInfo
+            if (!TryLaunch(realExePath, targetDir))
             {
-                FileName = realExePath,
-                WorkingDirectory = targetDir,
-                UseShellExecute = true
-            });
+                // 방금 옮긴 파일을 곧바로 실행하면 백신의 신규 파일 검사와 겹쳐 잠깐 잠길 수
+                // 있다 — 짧게 한 번 더 시도하고, 그래도 실패하면 조용히 죽는 대신 알려준다.
+                System.Threading.Thread.Sleep(500);
+                if (!TryLaunch(realExePath, targetDir))
+                {
+                    MessageBox.Show(
+                        "새 프로그램 실행에 실패했습니다.\n" +
+                        "다음 위치에서 직접 실행해 주세요:\n" + realExePath,
+                        "GBCWorkHub 업데이트 안내",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        private static bool TryLaunch(string exePath, string workingDir)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = exePath,
+                    WorkingDirectory = workingDir,
+                    UseShellExecute = true
+                });
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static void OpenUrl(string url)
