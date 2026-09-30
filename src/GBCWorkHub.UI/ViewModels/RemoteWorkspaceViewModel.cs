@@ -148,6 +148,8 @@ namespace GBCWorkHub.UI.ViewModels
             BackToSitesCommand = new RelayCommand(BackToSites);
             CopySelectedPcDomainCommand = new RelayCommand(CopySelectedPcDomain, () => HasSelectedPcDomain);
             CopyPcCredentialCommand = new RelayCommand<PcCredentialLineViewModel>(CopyPcCredentialLine);
+            AddCredentialSetCommand = new RelayCommand<PcAccessSectionViewModel>(AddCredentialSet);
+            RemoveCredentialSetCommand = new RelayCommand<PcCredentialSetViewModel>(RemoveCredentialSet);
             BeginEditPcAccessCommand = new RelayCommand(BeginEditPcAccess, () => HasSelectedRemoteComputer && !IsPcAccessEditing && !IsPcAccessSaving);
             SavePcAccessCommand = new RelayCommand(() => { var _ = SavePcAccessAsync(); }, () => IsPcAccessEditing && !IsPcAccessSaving);
             CancelEditPcAccessCommand = new RelayCommand(CancelEditPcAccess, () => IsPcAccessEditing && !IsPcAccessSaving);
@@ -572,6 +574,8 @@ namespace GBCWorkHub.UI.ViewModels
         public ICommand BackToSitesCommand { get; private set; }
         public ICommand CopySelectedPcDomainCommand { get; private set; }
         public ICommand CopyPcCredentialCommand { get; private set; }
+        public ICommand AddCredentialSetCommand { get; private set; }
+        public ICommand RemoveCredentialSetCommand { get; private set; }
         public ICommand BeginEditPcAccessCommand { get; private set; }
         public ICommand SavePcAccessCommand { get; private set; }
         public ICommand CancelEditPcAccessCommand { get; private set; }
@@ -863,35 +867,36 @@ namespace GBCWorkHub.UI.ViewModels
 
         private void EnsureSectionHasEditableFields(PcAccessSectionViewModel section, string title)
         {
-            if (section == null)
+            if (section == null || section.Sets == null)
                 return;
-            EnsureFieldHasLine(section, "ID", "ID");
-            EnsureFieldHasLine(section, "PW", "PW");
+            if (section.Sets.Count == 0)
+                section.Sets.Add(CreateCredentialSet(section, string.Empty, string.Empty));
         }
 
-        private void EnsureFieldHasLine(PcAccessSectionViewModel section, string kind, string label)
+        private PcCredentialSetViewModel CreateCredentialSet(PcAccessSectionViewModel owner, string idValue, string pwValue)
         {
-            if (section == null || section.Fields == null)
+            var id = new PcCredentialLineViewModel(idValue ?? string.Empty, CopyPcCredentialCommand);
+            var pw = new PcCredentialLineViewModel(pwValue ?? string.Empty, CopyPcCredentialCommand);
+            var set = new PcCredentialSetViewModel(owner, id, pw);
+            if (IsPcAccessEditing)
+                set.SetEditing(true);
+            return set;
+        }
+
+        private void AddCredentialSet(PcAccessSectionViewModel section)
+        {
+            if (section == null || section.Sets == null)
                 return;
-            PcCredentialFieldViewModel field = null;
-            for (int i = 0; i < section.Fields.Count; i++)
-            {
-                if (section.Fields[i] != null
-                    && string.Equals(section.Fields[i].Kind, kind, StringComparison.OrdinalIgnoreCase))
-                {
-                    field = section.Fields[i];
-                    break;
-                }
-            }
-            if (field == null)
-            {
-                field = new PcCredentialFieldViewModel(kind, label);
-                section.Fields.Add(field);
-            }
-            if (field.Lines == null)
+            section.Sets.Add(CreateCredentialSet(section, string.Empty, string.Empty));
+        }
+
+        private void RemoveCredentialSet(PcCredentialSetViewModel set)
+        {
+            if (set == null || set.OwnerSection == null || set.OwnerSection.Sets == null)
                 return;
-            if (field.Lines.Count == 0)
-                field.Lines.Add(new PcCredentialLineViewModel(string.Empty, CopyPcCredentialCommand));
+            set.OwnerSection.Sets.Remove(set);
+            if (set.OwnerSection.Sets.Count == 0)
+                set.OwnerSection.Sets.Add(CreateCredentialSet(set.OwnerSection, string.Empty, string.Empty));
         }
 
         private void CancelEditPcAccess()
@@ -909,6 +914,14 @@ namespace GBCWorkHub.UI.ViewModels
                 return;
             if (string.IsNullOrWhiteSpace(item.SiteCode) || string.IsNullOrWhiteSpace(item.PcName))
                 return;
+
+            string incompleteSection;
+            if (HasIncompleteCredentialSet(_selectedPcAccessSections, out incompleteSection))
+            {
+                await ShowInfoPopupAsync("PC 저장", incompleteSection + " 세트의 ID/PW를 마저 입력하거나 그 세트를 삭제해 주세요.", PopupIconKind.Warning)
+                    .ConfigureAwait(true);
+                return;
+            }
 
             string note = BuildPcNoteFromSections(_selectedPcAccessSections);
             string comment = SelectedPcComment ?? string.Empty;
@@ -1083,12 +1096,9 @@ namespace GBCWorkHub.UI.ViewModels
             var vpnPws = new List<string>();
             var authIds = new List<string>();
             var authPws = new List<string>();
-            CollectSectionLines(sections, "Domain", "ID", ids);
-            CollectSectionLines(sections, "Domain", "PW", pws);
-            CollectSectionLines(sections, "VPN", "ID", vpnIds);
-            CollectSectionLines(sections, "VPN", "PW", vpnPws);
-            CollectSectionLines(sections, "Auth", "ID", authIds);
-            CollectSectionLines(sections, "Auth", "PW", authPws);
+            CollectCompleteSets(sections, "Domain", ids, pws);
+            CollectCompleteSets(sections, "VPN", vpnIds, vpnPws);
+            CollectCompleteSets(sections, "Auth", authIds, authPws);
 
             var parts = new List<string>();
             if (ids.Count > 0)
@@ -1110,8 +1120,8 @@ namespace GBCWorkHub.UI.ViewModels
         {
             var ids = new List<string>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            CollectSectionLines(sections, "Domain", "ID", ids);
-            CollectSectionLines(sections, "VPN", "ID", ids);
+            CollectSectionIds(sections, "Domain", ids);
+            CollectSectionIds(sections, "VPN", ids);
             var unique = new List<string>();
             for (int i = 0; i < ids.Count; i++)
             {
@@ -1121,36 +1131,94 @@ namespace GBCWorkHub.UI.ViewModels
             return unique.Count == 0 ? null : string.Join("\n", unique.ToArray());
         }
 
-        private static void CollectSectionLines(
+        /// <summary>ID/PW가 모두 채워진 완성된 세트만 뽑는다 — 절반만 채운 세트가 있으면
+        /// 저장 전에 SavePcAccessAsync의 검증에서 막히므로, 여기 도달했을 땐 항상
+        /// 완전한 세트만 있거나 아예 없는 상태다. 그래도 방어적으로 다시 거른다.</summary>
+        private static void CollectCompleteSets(
             IEnumerable<PcAccessSectionViewModel> sections,
             string sectionTitle,
-            string fieldKind,
+            IList<string> idsTarget,
+            IList<string> pwsTarget)
+        {
+            if (sections == null)
+                return;
+            foreach (var section in sections)
+            {
+                if (section == null || section.Sets == null)
+                    continue;
+                if (!string.Equals(section.Title, sectionTitle, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                for (int i = 0; i < section.Sets.Count; i++)
+                {
+                    var set = section.Sets[i];
+                    if (set == null)
+                        continue;
+                    string idVal = (set.Id != null ? set.Id.Value : null) ?? string.Empty;
+                    string pwVal = (set.Pw != null ? set.Pw.Value : null) ?? string.Empty;
+                    idVal = idVal.Trim();
+                    pwVal = pwVal.Trim();
+                    if (idVal.Length == 0 || pwVal.Length == 0)
+                        continue;
+                    if (idsTarget != null)
+                        idsTarget.Add(idVal);
+                    if (pwsTarget != null)
+                        pwsTarget.Add(pwVal);
+                }
+            }
+        }
+
+        /// <summary>PcDomain 요약 필드용 — PW 여부와 무관하게 채워진 ID만 모은다.</summary>
+        private static void CollectSectionIds(
+            IEnumerable<PcAccessSectionViewModel> sections,
+            string sectionTitle,
             IList<string> target)
         {
             if (sections == null || target == null)
                 return;
             foreach (var section in sections)
             {
-                if (section == null || section.Fields == null)
+                if (section == null || section.Sets == null)
                     continue;
                 if (!string.Equals(section.Title, sectionTitle, StringComparison.OrdinalIgnoreCase))
                     continue;
-                for (int i = 0; i < section.Fields.Count; i++)
+                for (int i = 0; i < section.Sets.Count; i++)
                 {
-                    var field = section.Fields[i];
-                    if (field == null || field.Lines == null)
+                    var set = section.Sets[i];
+                    string idVal = set != null && set.Id != null ? set.Id.Value : null;
+                    if (string.IsNullOrWhiteSpace(idVal))
                         continue;
-                    if (!string.Equals(field.Kind, fieldKind, StringComparison.OrdinalIgnoreCase))
+                    target.Add(idVal.Trim());
+                }
+            }
+        }
+
+        /// <summary>ID/PW 중 한쪽만 채워진 반쪽짜리 세트가 있으면 어느 섹션인지 알려준다 —
+        /// 저장을 막고 사용자가 마저 채우거나 그 세트를 지우게 하기 위함.</summary>
+        private static bool HasIncompleteCredentialSet(IEnumerable<PcAccessSectionViewModel> sections, out string sectionTitle)
+        {
+            if (sections != null)
+            {
+                foreach (var section in sections)
+                {
+                    if (section == null || section.Sets == null)
                         continue;
-                    for (int j = 0; j < field.Lines.Count; j++)
+                    for (int i = 0; i < section.Sets.Count; i++)
                     {
-                        var line = field.Lines[j];
-                        if (line == null || string.IsNullOrWhiteSpace(line.Value))
+                        var set = section.Sets[i];
+                        if (set == null)
                             continue;
-                        target.Add(line.Value.Trim());
+                        bool hasId = set.Id != null && !string.IsNullOrWhiteSpace(set.Id.Value);
+                        bool hasPw = set.Pw != null && !string.IsNullOrWhiteSpace(set.Pw.Value);
+                        if (hasId != hasPw)
+                        {
+                            sectionTitle = section.Title;
+                            return true;
+                        }
                     }
                 }
             }
+            sectionTitle = null;
+            return false;
         }
 
         private void RebuildSelectedPcAccessPanel()
@@ -1244,33 +1312,15 @@ namespace GBCWorkHub.UI.ViewModels
         private PcAccessSectionViewModel CreateAccessSection(string title, IList<string> idValues, IList<string> pwValues)
         {
             var section = new PcAccessSectionViewModel(title);
-            var idField = new PcCredentialFieldViewModel("ID", "ID");
-            if (idValues != null)
+            int count = Math.Max(idValues != null ? idValues.Count : 0, pwValues != null ? pwValues.Count : 0);
+            if (count == 0)
+                count = 1;
+            for (int i = 0; i < count; i++)
             {
-                for (int i = 0; i < idValues.Count; i++)
-                {
-                    if (string.IsNullOrWhiteSpace(idValues[i]))
-                        continue;
-                    idField.Lines.Add(new PcCredentialLineViewModel(idValues[i].Trim(), CopyPcCredentialCommand));
-                }
+                string idVal = idValues != null && i < idValues.Count ? idValues[i] : string.Empty;
+                string pwVal = pwValues != null && i < pwValues.Count ? pwValues[i] : string.Empty;
+                section.Sets.Add(CreateCredentialSet(section, idVal, pwVal));
             }
-            if (idField.Lines.Count == 0)
-                idField.Lines.Add(new PcCredentialLineViewModel(string.Empty, CopyPcCredentialCommand));
-            section.Fields.Add(idField);
-
-            var pwField = new PcCredentialFieldViewModel("PW", "PW");
-            if (pwValues != null)
-            {
-                for (int i = 0; i < pwValues.Count; i++)
-                {
-                    if (string.IsNullOrWhiteSpace(pwValues[i]))
-                        continue;
-                    pwField.Lines.Add(new PcCredentialLineViewModel(pwValues[i].Trim(), CopyPcCredentialCommand));
-                }
-            }
-            if (pwField.Lines.Count == 0)
-                pwField.Lines.Add(new PcCredentialLineViewModel(string.Empty, CopyPcCredentialCommand));
-            section.Fields.Add(pwField);
             return section;
         }
 

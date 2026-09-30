@@ -5,57 +5,55 @@ using System.Windows.Threading;
 
 namespace GBCWorkHub.UI.ViewModels
 {
-    /// <summary>Domain / VPN 섹션.</summary>
+    /// <summary>Domain / VPN 섹션. ID+PW 한 세트씩(Sets) 묶어서 보여준다 — 세트 단위로
+    /// 추가/삭제해야 두 목록의 줄 수가 어긋나는 일이 없다.</summary>
     public sealed class PcAccessSectionViewModel : ViewModelBase
     {
         public PcAccessSectionViewModel(string title)
         {
             Title = title ?? string.Empty;
-            Fields = new ObservableCollection<PcCredentialFieldViewModel>();
+            Sets = new ObservableCollection<PcCredentialSetViewModel>();
         }
 
         public string Title { get; private set; }
-        public ObservableCollection<PcCredentialFieldViewModel> Fields { get; private set; }
+        public ObservableCollection<PcCredentialSetViewModel> Sets { get; private set; }
 
         public void SetEditing(bool editing)
         {
-            if (Fields == null)
+            if (Sets == null)
                 return;
-            for (int i = 0; i < Fields.Count; i++)
+            for (int i = 0; i < Sets.Count; i++)
             {
-                if (Fields[i] != null)
-                    Fields[i].SetEditing(editing);
+                if (Sets[i] != null)
+                    Sets[i].SetEditing(editing);
             }
         }
     }
 
-    /// <summary>섹션 안 ID 또는 PW 필드(복수 줄).</summary>
-    public sealed class PcCredentialFieldViewModel : ViewModelBase
+    /// <summary>섹션 안 ID+PW 한 세트.</summary>
+    public sealed class PcCredentialSetViewModel : ViewModelBase
     {
-        public PcCredentialFieldViewModel(string kind, string label)
+        public PcCredentialSetViewModel(PcAccessSectionViewModel owner, PcCredentialLineViewModel id, PcCredentialLineViewModel pw)
         {
-            Kind = kind ?? "ID";
-            Label = label ?? "ID";
-            Lines = new ObservableCollection<PcCredentialLineViewModel>();
+            OwnerSection = owner;
+            Id = id;
+            Pw = pw;
         }
 
-        public string Kind { get; private set; }
-        public string Label { get; private set; }
-        public ObservableCollection<PcCredentialLineViewModel> Lines { get; private set; }
+        public PcAccessSectionViewModel OwnerSection { get; private set; }
+        public PcCredentialLineViewModel Id { get; private set; }
+        public PcCredentialLineViewModel Pw { get; private set; }
 
         public void SetEditing(bool editing)
         {
-            if (Lines == null)
-                return;
-            for (int i = 0; i < Lines.Count; i++)
-            {
-                if (Lines[i] != null)
-                    Lines[i].IsEditing = editing;
-            }
+            if (Id != null)
+                Id.IsEditing = editing;
+            if (Pw != null)
+                Pw.IsEditing = editing;
         }
     }
 
-    /// <summary>필드 안 한 줄 값. 복사 피드백 + 편집.</summary>
+    /// <summary>세트 안 한 칸(ID 또는 PW) 값. 복사 피드백 + 편집.</summary>
     public sealed class PcCredentialLineViewModel : ViewModelBase
     {
         private string _value;

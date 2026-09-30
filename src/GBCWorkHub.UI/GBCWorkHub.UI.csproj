@@ -119,6 +119,7 @@
     <Compile Include="ViewModels\AdminSiteChipItemViewModel.cs" />
     <Compile Include="ViewModels\AdminPcGroupViewModel.cs" />
     <Compile Include="ViewModels\AdminPcItemViewModel.cs" />
+    <Compile Include="ViewModels\AdminCredSetItem.cs" />
     <Compile Include="ViewModels\AdminUserItemViewModel.cs" />
     <Compile Include="ViewModels\AdminOccupancyItemViewModel.cs" />
     <Compile Include="ViewModels\AdminOccupancyStatRowViewModel.cs" />
