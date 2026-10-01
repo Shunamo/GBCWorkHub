@@ -386,32 +386,48 @@ namespace GBCWorkHub.UI.Services
                         }
                     }
 
-                    System.Threading.Thread.Sleep(1200);
+                    // 다운로드된 .rdp(게시 RDP)는 "Mark of the Web" 때문에 Windows가
+                    // "열기 - 보안 경고" 창을 먼저 띄우고, 사용자가 "실행"을 눌러야 그제서야
+                    // mstsc.exe가 뜬다. 한 번만 짧게 자고 끝내면 그 클릭 대기 시간에 걸려
+                    // "후보를 못 찾음"으로 오판하므로, mstsc가 나타날 때까지 짧은 간격으로
+                    // 최대 8초간 폴링하고 찾는 즉시 멈춘다(정상 케이스는 기존처럼 금방 끝남).
+                    const int pollIntervalMs = 400;
+                    const int maxWaitMs = 8000;
+                    int waitedMs = 0;
+                    HashSet<int> afterIds;
+                    var candidateIds = new List<int>();
 
-                    var afterIds = GetMstscProcessIds();
-                    var candidateIds = afterIds.Except(beforeIds).ToList();
-
-                    if (started != null)
+                    do
                     {
-                        try
+                        System.Threading.Thread.Sleep(pollIntervalMs);
+                        waitedMs += pollIntervalMs;
+
+                        afterIds = GetMstscProcessIds();
+                        candidateIds = afterIds.Except(beforeIds).ToList();
+
+                        if (started != null)
                         {
-                            if (!started.HasExited && !candidateIds.Contains(started.Id))
-                                candidateIds.Add(started.Id);
+                            try
+                            {
+                                if (!started.HasExited && !candidateIds.Contains(started.Id))
+                                    candidateIds.Add(started.Id);
+                            }
+                            catch
+                            {
+                            }
                         }
-                        catch
+
+                        // .rdp 경로/파일명이 cmdline에 남은 mstsc
+                        if (!string.IsNullOrWhiteSpace(fileNeedle))
                         {
+                            foreach (var w in QueryMstscByCommandLine(fileNeedle))
+                            {
+                                if (afterIds.Contains(w.ProcessId) && !candidateIds.Contains(w.ProcessId))
+                                    candidateIds.Add(w.ProcessId);
+                            }
                         }
                     }
-
-                    // .rdp 경로/파일명이 cmdline에 남은 mstsc
-                    if (!string.IsNullOrWhiteSpace(fileNeedle))
-                    {
-                        foreach (var w in QueryMstscByCommandLine(fileNeedle))
-                        {
-                            if (afterIds.Contains(w.ProcessId) && !candidateIds.Contains(w.ProcessId))
-                                candidateIds.Add(w.ProcessId);
-                        }
-                    }
+                    while (candidateIds.Count == 0 && waitedMs < maxWaitMs);
 
                     if (candidateIds.Count == 0)
                     {

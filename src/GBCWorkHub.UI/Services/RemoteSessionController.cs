@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Configuration;
+using System.Diagnostics;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -2158,7 +2159,7 @@ namespace GBCWorkHub.UI.Services
             var rdp = Services.PublishedRdpLauncher.TryFindForPc(item.SiteCode, item.PcName);
             if (!rdp.Succeeded)
             {
-                await _ui.PopupShowInfoAsync("원격 접속", rdp.Message).ConfigureAwait(true);
+                await OfferRcRdWebAndGuideAsync(pcLabel).ConfigureAwait(true);
                 return;
             }
 
@@ -2173,6 +2174,50 @@ namespace GBCWorkHub.UI.Services
                 DiagnosticLogger.Info("RC_RDP_STARTED", "Pc=" + pcLabel + " File=" + rdp.Path
                     + " ShareKey=" + dto.IpAddress
                     + " VpnWasReady=" + vpnReady);
+        }
+
+        private const string RcRdWebUrl = "https://rchvrdpgw.med.rcjy/rdweb";
+
+        /// <summary>
+        /// 게시 .rdp를 이 PC에서 못 찾았을 때 — 확인을 누르면 RD Web 로그인 페이지와
+        /// RC 접속 가이드를 함께 열어, 사용자가 그 자리에서 바로 받아올 수 있게 한다.
+        /// </summary>
+        private async Task OfferRcRdWebAndGuideAsync(string pcLabel)
+        {
+            PopupResult result = await _ui.Popup.ShowConfirmAsync(new PopupRequest
+            {
+                Title = "게시 RDP 파일을 찾을 수 없습니다",
+                Icon = PopupIconKind.Warning,
+                Message = pcLabel + " 용 게시 RDP 파일이 이 PC에 없습니다.\n"
+                    + "해당 PC의 RDP 파일을 다운 받고 다시 접속해주세요.",
+                Buttons = new PopupButtonDefinition[2]
+                {
+                    new PopupButtonDefinition("취소", PopupResultType.Cancel, isDefault: false, isCancel: true),
+                    new PopupButtonDefinition("확인", PopupResultType.Primary, isDefault: true)
+                }
+            }).ConfigureAwait(true);
+
+            if (result == null || !result.IsPrimary || result.IsCancelOrClosed)
+                return;
+
+            try
+            {
+                Process.Start(new ProcessStartInfo { FileName = RcRdWebUrl, UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.Warn("RC_RDWEB_OPEN", ex.Message);
+            }
+
+            try
+            {
+                string guidePath = await GuideDownloadService.EnsureLocalCopyAsync("VPN-RC.pptx").ConfigureAwait(true);
+                Process.Start(new ProcessStartInfo { FileName = guidePath, UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.Warn("RC_GUIDE_OPEN", ex.Message);
+            }
         }
 
 
