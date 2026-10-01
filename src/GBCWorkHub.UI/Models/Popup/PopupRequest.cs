@@ -19,6 +19,10 @@ namespace GBCWorkHub.UI.Models.Popup
         public string DedupKey { get; set; }
         public bool ShowInput { get; set; }
         public string InputText { get; set; }
+        /// <summary>메인 입력란 라벨. 비워두면 기존처럼 "이름".</summary>
+        public string InputLabel { get; set; }
+        /// <summary>메인 입력란 placeholder(Tag). 비워두면 기존처럼 "ex) 김ㅇㅇ".</summary>
+        public string InputPlaceholder { get; set; }
         public bool ShowAffiliationInput { get; set; }
         public bool RequireAffiliation { get; set; }
         public string AffiliationText { get; set; }

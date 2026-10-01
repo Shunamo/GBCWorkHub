@@ -43,6 +43,7 @@
     <Compile Include="RemotePcDto.cs" />
     <Compile Include="DirectoryUserDto.cs" />
     <Compile Include="PcMapDto.cs" />
+    <Compile Include="ExcelShortcutDto.cs" />
     <Compile Include="PcAccessNoteParser.cs" />
     <Compile Include="PcTeamCatalog.cs" />
     <Compile Include="PcNameNaturalSort.cs" />

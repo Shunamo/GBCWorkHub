@@ -171,10 +171,10 @@
 
                 <StackPanel Grid.Row="2" Visibility="{Binding ShowPromptFields, Converter={StaticResource BoolToVis}}">
                     <StackPanel Visibility="{Binding ShowInput, Converter={StaticResource BoolToVis}}">
-                        <TextBlock Text="이름" FontSize="12" Foreground="#64748B" Margin="0,0,0,4" />
+                        <TextBlock Text="{Binding InputLabel}" FontSize="12" Foreground="#64748B" Margin="0,0,0,4" />
                         <TextBox x:Name="PromptInputBox"
                                  Style="{StaticResource GlassPromptInput}"
-                                 Tag="ex) 김ㅇㅇ"
+                                 Tag="{Binding InputPlaceholder}"
                                  Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                     <StackPanel Visibility="{Binding ShowAffiliationInput, Converter={StaticResource BoolToVis}}"

@@ -383,6 +383,12 @@
             <imp:ImprovementListView DataContext="{Binding Improvement}" />
         </Grid>
 
+        <!-- 엑셀시트 바로가기 탭 -->
+        <Grid Grid.Row="0" Grid.RowSpan="2" Panel.ZIndex="1" Background="Transparent"
+              Visibility="{Binding IsExcelSheetsTab, Converter={StaticResource BoolToVis}}">
+            <views:ExcelSheetsView DataContext="{Binding}" />
+        </Grid>
+
         <!-- 관리자 전용 셸 (헤더 ZIndex 아래 — 원격 갤러리와 동일) -->
         <Grid Grid.Row="1" Panel.ZIndex="1"
               Visibility="{Binding IsAdminShellVisible, Converter={StaticResource BoolToVis}}">

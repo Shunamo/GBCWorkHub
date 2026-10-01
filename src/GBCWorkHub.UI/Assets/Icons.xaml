@@ -684,68 +684,72 @@
         </DrawingImage.Drawing>
     </DrawingImage>
 
-    <!-- Excel 브랜드 톤: 초록 사각 + X -->
-    <DrawingImage x:Key="ExcelBrandIcon">
-        <DrawingImage.Drawing>
-            <DrawingGroup>
-                <GeometryDrawing Brush="#217346">
-                    <GeometryDrawing.Geometry>
-                        <RectangleGeometry RadiusX="3" RadiusY="3" Rect="2,2,20,20" />
-                    </GeometryDrawing.Geometry>
-                </GeometryDrawing>
-                <GeometryDrawing Brush="#185C37">
-                    <GeometryDrawing.Geometry>
-                        <RectangleGeometry RadiusX="0" RadiusY="0" Rect="2,2,7,20" />
-                    </GeometryDrawing.Geometry>
-                </GeometryDrawing>
-                <GeometryDrawing>
-                    <GeometryDrawing.Pen>
-                        <Pen Brush="#FFFFFF" Thickness="2.2" StartLineCap="Round" EndLineCap="Round" />
-                    </GeometryDrawing.Pen>
-                    <GeometryDrawing.Geometry>
-                        <PathGeometry Figures="M5.2,8 L10.2,16 M10.2,8 L5.2,16" />
-                    </GeometryDrawing.Geometry>
-                </GeometryDrawing>
-                <GeometryDrawing>
-                    <GeometryDrawing.Pen>
-                        <Pen Brush="#E6FFFFFF" Thickness="1.1" StartLineCap="Round" />
-                    </GeometryDrawing.Pen>
-                    <GeometryDrawing.Geometry>
-                        <PathGeometry Figures="M13,8 H20 M13,12 H20 M13,16 H20" />
-                    </GeometryDrawing.Geometry>
-                </GeometryDrawing>
-            </DrawingGroup>
-        </DrawingImage.Drawing>
-    </DrawingImage>
+    <!-- Excel 공식 로고 실루엣(Assets/Microsoft Excel Logo - Colored - zonalogo.com.svg 기반).
+         WPF엔 SVG 렌더러가 없어 벡터 Path로 옮기면서, 그라디언트/음영 디테일(원본의 미세한
+         radial/linear gradient 겹침)은 생략하고 대표 단색으로 단순화했다 — 작은 아이콘 크기에선
+         어차피 안 보이는 디테일이라, 모양(접힌 모서리 문서 + 좌하단 진초록 X 배지) 자체가
+         핵심이다. -->
+    <DrawingGroup x:Key="ExcelLogoDrawing">
+        <!-- 본체(뒤쪽, 가장 어두운 초록) -->
+        <GeometryDrawing Brush="#297C2D">
+            <GeometryDrawing.Geometry>
+                <PathGeometry Figures="M69.43,159.72c0-34.52,27.98-62.5,62.49-62.5h354.09v361.11c0,23.01-18.65,41.67-41.66,41.67H152.74c-46.01,0-83.31-37.31-83.31-83.33V159.72Z" />
+            </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <!-- 중간 단(가운데 초록) -->
+        <GeometryDrawing Brush="#4AA647">
+            <GeometryDrawing.Geometry>
+                <PathGeometry Figures="M69.43,229.17c0-34.52,27.98-62.5,62.49-62.5h187.46c-23.01,0-41.66,18.66-41.66,41.67v83.33c0,23.01-18.65,41.67-41.66,41.67h-83.31c-46.01,0-83.31,37.31-83.31,83.33v-187.5Z" />
+            </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <!-- 위 단(가장 밝은 초록) -->
+        <GeometryDrawing Brush="#66D052">
+            <GeometryDrawing.Geometry>
+                <PathGeometry Figures="M69.43,83.33C69.43,37.31,106.73,0,152.74,0h166.63v166.67h-166.63c-46.01,0-83.31,37.31-83.31,83.33V83.33Z" />
+            </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <!-- 우상단 접힌 모서리 -->
+        <GeometryDrawing Brush="#8FDB7A">
+            <GeometryDrawing.Geometry>
+                <RectangleGeometry RadiusX="41.66" RadiusY="41.66" Rect="277.71,0,208.29,166.67" />
+            </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <!-- 좌하단 진초록 X 배지 -->
+        <GeometryDrawing Brush="#1B5E20">
+            <GeometryDrawing.Geometry>
+                <RectangleGeometry RadiusX="45.13" RadiusY="45.13" Rect="0,236.11,222.17,222.22" />
+            </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <!-- 흰색 X -->
+        <GeometryDrawing Brush="#FFFFFF">
+            <GeometryDrawing.Geometry>
+                <PathGeometry Figures="M169.48,410.71h-34.25l-21.5-40.47c-.77-1.42-1.36-2.54-1.77-3.37-.35-.88-.74-1.89-1.15-3.01h-.35c-.53,1.42-1.03,2.57-1.5,3.45-.47.89-1.03,1.98-1.68,3.28l-22.3,40.11h-32.3l38.76-63.58-36.1-63.4h33.8l19.11,36.13c.77,1.48,1.42,2.78,1.95,3.9.59,1.06,1.18,2.33,1.77,3.81h.35c.82-1.71,1.47-3.07,1.95-4.07.53-1,1.24-2.33,2.12-3.98l19.82-35.77h32.21l-36.63,62.43,37.7,64.55Z" />
+            </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+    </DrawingGroup>
+
+    <!-- Excel 공식 로고 실루엣(Assets/Microsoft Excel Logo - Colored - zonalogo.com.svg 기반).
+         WPF엔 SVG 렌더러가 없어 벡터 Path로 옮기면서, 그라디언트/음영 디테일(원본의 미세한
+         radial/linear gradient 겹침)은 생략하고 대표 단색으로 단순화했다 — 작은 아이콘 크기에선
+         어차피 안 보이는 디테일이라, 모양(접힌 모서리 문서 + 좌하단 진초록 X 배지) 자체가
+         핵심이다. -->
+    <DrawingImage x:Key="ExcelBrandIcon" Drawing="{StaticResource ExcelLogoDrawing}" />
 
     <!-- 구 키 호환 → Excel 브랜드 아이콘과 동일 -->
-    <DrawingImage x:Key="ExcelSheetIcon">
+    <DrawingImage x:Key="ExcelSheetIcon" Drawing="{StaticResource ExcelLogoDrawing}" />
+
+    <!-- Freshdesk 공식 로고(Assets/Freshdesk.svg 기반) — 초록 둥근 사각형 + 흰색 헤드셋 아이콘. -->
+    <DrawingImage x:Key="FreshdeskBrandIcon">
         <DrawingImage.Drawing>
             <DrawingGroup>
-                <GeometryDrawing Brush="#217346">
+                <GeometryDrawing Brush="#22A849">
                     <GeometryDrawing.Geometry>
-                        <RectangleGeometry RadiusX="3" RadiusY="3" Rect="2,2,20,20" />
+                        <PathGeometry Figures="M299.6,50.1h131.6c24.7,0,44.2,19.5,44.2,44.2v131.6c0,96.6-78.1,174.7-174.7,174.7h-1c-96.6,0-174.7-78.1-174.7-174.7C124.9,129.3,203,51.1,299.6,50.1z" />
                     </GeometryDrawing.Geometry>
                 </GeometryDrawing>
-                <GeometryDrawing Brush="#185C37">
+                <GeometryDrawing Brush="#FFFFFF">
                     <GeometryDrawing.Geometry>
-                        <RectangleGeometry RadiusX="0" RadiusY="0" Rect="2,2,7,20" />
-                    </GeometryDrawing.Geometry>
-                </GeometryDrawing>
-                <GeometryDrawing>
-                    <GeometryDrawing.Pen>
-                        <Pen Brush="#FFFFFF" Thickness="2.2" StartLineCap="Round" EndLineCap="Round" />
-                    </GeometryDrawing.Pen>
-                    <GeometryDrawing.Geometry>
-                        <PathGeometry Figures="M5.2,8 L10.2,16 M10.2,8 L5.2,16" />
-                    </GeometryDrawing.Geometry>
-                </GeometryDrawing>
-                <GeometryDrawing>
-                    <GeometryDrawing.Pen>
-                        <Pen Brush="#E6FFFFFF" Thickness="1.1" StartLineCap="Round" />
-                    </GeometryDrawing.Pen>
-                    <GeometryDrawing.Geometry>
-                        <PathGeometry Figures="M13,8 H20 M13,12 H20 M13,16 H20" />
+                        <PathGeometry Figures="M300.1,126.8c-42.3,0-76.7,34.5-76.7,76.8c0,0,0,0,0,1v51.2c0,13.8,11.8,25.6,25.6,25.6h21.6v-60.1h-29.5v-16.7c1-33.5,29.5-59.1,61.9-57.1c31.5,1,56,26.6,57,57.1v16.7h-29.5v60.1h19.7v1c0,12.8-10.8,23.6-23.6,23.6h-23.6c-2,0-3.9,1-3.9,3c0,2,2,3.9,3.9,3.9h23.6c16.7,0,30.5-13.8,30.5-30.5v-2c11.8-3,19.7-12.8,19.7-24.6v-51.2C377.8,161.3,343.4,126.8,300.1,126.8C301.1,126.8,300.1,126.8,300.1,126.8z" />
                     </GeometryDrawing.Geometry>
                 </GeometryDrawing>
             </DrawingGroup>

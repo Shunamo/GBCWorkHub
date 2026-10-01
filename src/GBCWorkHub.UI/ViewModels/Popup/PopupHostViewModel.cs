@@ -18,6 +18,8 @@ namespace GBCWorkHub.UI.ViewModels.Popup
         private bool _showCancelOnProgress;
         private bool _showInput;
         private string _inputText;
+        private string _inputLabel = "이름";
+        private string _inputPlaceholder = "ex) 김ㅇㅇ";
         private bool _showAffiliationInput;
         private bool _requireAffiliation;
         private string _affiliationText;
@@ -156,6 +158,18 @@ namespace GBCWorkHub.UI.ViewModels.Popup
                 if (SetProperty(ref _inputText, value))
                     InputError = null;
             }
+        }
+
+        public string InputLabel
+        {
+            get { return _inputLabel; }
+            set { SetProperty(ref _inputLabel, value); }
+        }
+
+        public string InputPlaceholder
+        {
+            get { return _inputPlaceholder; }
+            set { SetProperty(ref _inputPlaceholder, value); }
         }
 
         public bool ShowAffiliationInput
@@ -510,7 +524,7 @@ namespace GBCWorkHub.UI.ViewModels.Popup
             string name = InputText != null ? InputText.Trim() : string.Empty;
             if (string.IsNullOrWhiteSpace(name))
             {
-                InputError = "이름을 입력해 주세요.";
+                InputError = (InputLabel ?? "이름") + "을(를) 입력해 주세요.";
                 return false;
             }
             InputText = name;
@@ -550,6 +564,9 @@ namespace GBCWorkHub.UI.ViewModels.Popup
             ShowCancelOnProgress = request.ShowCancelOnProgress;
             ShowInput = request.ShowInput;
             InputText = request.InputText ?? string.Empty;
+            InputLabel = string.IsNullOrWhiteSpace(request.InputLabel) ? "이름" : request.InputLabel;
+            // null(지정 안 함) = 기존 기본값, ""(명시적 빈 문자열) = placeholder 없음으로 구분.
+            InputPlaceholder = request.InputPlaceholder == null ? "ex) 김ㅇㅇ" : request.InputPlaceholder;
             ShowAffiliationInput = request.ShowAffiliationInput;
             RequireAffiliation = request.RequireAffiliation;
             _affiliationCustomOptionLabel = string.IsNullOrWhiteSpace(request.AffiliationCustomOptionLabel)

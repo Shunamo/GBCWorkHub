@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -72,6 +73,10 @@ namespace GBCWorkHub.UI.ViewModels
             RefreshCommand = new RelayCommand(() => { var _ = RefreshFromDbAsync(); }, () => !IsRefreshing);
             OpenHelpGuideCommand = new RelayCommand(OpenHelpGuide);
             OpenGuideCommand = new RelayCommand<string>(key => { var _ = OpenGuideAsync(key); });
+            OpenExternalLinkCommand = new RelayCommand<string>(OpenExternalLink);
+            AddExcelShortcutCommand = new RelayCommand(() => { var _ = AddExcelShortcutAsync(); });
+            ToggleExcelShortcutsEditModeCommand = new RelayCommand(() => { var _ = ToggleExcelShortcutsEditModeAsync(); });
+            DeleteExcelShortcutCommand = new RelayCommand<ExcelShortcutRowViewModel>(row => { var _ = DeleteExcelShortcutAsync(row); });
             BackToSitesCommand = new RelayCommand(() => _remoteWorkspace.BackToSitesCommand.Execute(null));
             UpdateCommand = new RelayCommand(() => { var _ = ApplyUpdateAsync(); }, () => IsUpdateAvailable && !IsUpdateBusy);
             DismissUpdateCommand = new RelayCommand(DismissUpdate, () => IsUpdateAvailable && !IsUpdateBusy);
@@ -313,6 +318,10 @@ namespace GBCWorkHub.UI.ViewModels
         public ICommand RefreshCommand { get; private set; }
         public ICommand OpenHelpGuideCommand { get; private set; }
         public ICommand OpenGuideCommand { get; private set; }
+        public ICommand OpenExternalLinkCommand { get; private set; }
+        public ICommand AddExcelShortcutCommand { get; private set; }
+        public ICommand ToggleExcelShortcutsEditModeCommand { get; private set; }
+        public ICommand DeleteExcelShortcutCommand { get; private set; }
         public ICommand BackToSitesCommand { get; private set; }
         public ICommand UpdateCommand { get; private set; }
         public ICommand DismissUpdateCommand { get; private set; }
@@ -571,6 +580,7 @@ namespace GBCWorkHub.UI.ViewModels
                     RaisePropertyChanged("IsWorkLogTab");
                     RaisePropertyChanged("IsMeTab");
                     RaisePropertyChanged("IsImprovementTab");
+                    RaisePropertyChanged("IsExcelSheetsTab");
                     RaisePropertyChanged("IsHeaderBackVisible");
                     RaisePropertyChanged("IsWorkLogGlassUi");
                     RaisePropertyChanged("IsWorkLogGlassOverlay");
@@ -632,9 +642,18 @@ namespace GBCWorkHub.UI.ViewModels
             }
         }
 
+        public bool IsExcelSheetsTab
+        {
+            get
+            {
+                return IsUserShellVisible
+                    && string.Equals(SelectedMainTab, "ExcelSheets", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
         public bool IsHeaderBackVisible
         {
-            get { return IsWorkLogTab || IsMeTab || IsImprovementTab || IsAdminWorkLogEditVisible || IsAdminImprovementEditVisible; }
+            get { return IsWorkLogTab || IsMeTab || IsImprovementTab || IsExcelSheetsTab || IsAdminWorkLogEditVisible || IsAdminImprovementEditVisible; }
         }
 
         public bool IsWorkLogGlassUi
@@ -664,7 +683,7 @@ namespace GBCWorkHub.UI.ViewModels
 
         public bool IsMainGlassOverlay
         {
-            get { return IsRemoteTab || IsWorkLogGlassOverlay || IsMeTab || IsImprovementTab || IsAdminShellVisible; }
+            get { return IsRemoteTab || IsWorkLogGlassOverlay || IsMeTab || IsImprovementTab || IsExcelSheetsTab || IsAdminShellVisible; }
         }
 
         /// <summary>헤더 뒤로가기/가시성 — RemoteWorkspace와 동기.</summary>
@@ -704,6 +723,8 @@ namespace GBCWorkHub.UI.ViewModels
                         return "개선 요청 작성";
                     return string.Empty; // 목록/상세는 탭 바에 이미 "개선사항 요청"이 표시되므로 중복 표기하지 않음
                 }
+                if (IsExcelSheetsTab)
+                    return string.Empty; // 목록은 탭 바에 이미 "엑셀 시트"가 표시되므로 중복 표기하지 않음
                 if (IsWorkLogTab)
                 {
                     if (WorkLogList != null && WorkLogList.IsEditOpen
@@ -832,6 +853,7 @@ namespace GBCWorkHub.UI.ViewModels
             RaisePropertyChanged("IsWorkLogTab");
             RaisePropertyChanged("IsMeTab");
             RaisePropertyChanged("IsImprovementTab");
+            RaisePropertyChanged("IsExcelSheetsTab");
             RaisePropertyChanged("IsHeaderBackVisible");
             RaisePropertyChanged("IsMainGlassOverlay");
             RaisePropertyChanged("IsSitePickerVisible");
@@ -1158,6 +1180,168 @@ namespace GBCWorkHub.UI.ViewModels
             }
         }
 
+        /// <summary>"엑셀시트" 탭 목록 — 항목마다 URL을 Command로 받아 기본 브라우저로 연다
+        /// (SharePoint 엑셀, Freshdesk 등 파일 다운로드가 필요 없는 외부 링크용).</summary>
+        private void OpenExternalLink(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+                return;
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.Error("EXTERNAL_LINK", "Open failed: " + ex.Message);
+            }
+        }
+
+        private readonly ExcelShortcutBiz _excelShortcutBiz = new ExcelShortcutBiz();
+        private bool _excelShortcutsLoaded;
+        private bool _isExcelShortcutsEditMode;
+
+        public ObservableCollection<ExcelShortcutRowViewModel> ExcelShortcuts { get; } = new ObservableCollection<ExcelShortcutRowViewModel>();
+
+        /// <summary>리스트 전체가 편집 가능 상태인지 — 줄마다 수정 아이콘이 있는 게 아니라
+        /// 상단의 "전체 수정" 버튼 1개로 전체 줄이 한꺼번에 입력창으로 바뀐다.</summary>
+        public bool IsExcelShortcutsEditMode
+        {
+            get { return _isExcelShortcutsEditMode; }
+            private set { SetProperty(ref _isExcelShortcutsEditMode, value); }
+        }
+
+        /// <summary>처음 탭을 열 때만(또는 추가 직후) 로드 — 운영팀 전체가 보는 공유 목록이라
+        /// DB(XSUP.MSDWHTKD_EXCEL_SHORTCUT)가 유일한 소스다.</summary>
+        private async Task EnsureExcelShortcutsLoadedAsync()
+        {
+            if (_excelShortcutsLoaded)
+                return;
+            _excelShortcutsLoaded = true;
+            await ReloadExcelShortcutsAsync().ConfigureAwait(true);
+        }
+
+        private async Task ReloadExcelShortcutsAsync()
+        {
+            List<ExcelShortcutDto> rows;
+            try
+            {
+                rows = await _excelShortcutBiz.GetAllAsync().ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.Error("EXCEL_SHORTCUT_LOAD", ex.Message);
+                return;
+            }
+            ExcelShortcuts.Clear();
+            if (rows == null)
+                return;
+            for (int i = 0; i < rows.Count; i++)
+                ExcelShortcuts.Add(new ExcelShortcutRowViewModel(rows[i]));
+        }
+
+        private async Task AddExcelShortcutAsync()
+        {
+            if (_popup == null)
+                return;
+
+            string createdBy = OccupancyNameStore.DisplayName;
+            var result = await _popup.ShowPromptAsync(new PopupRequest
+            {
+                Title = "바로가기 추가",
+                Icon = PopupIconKind.Info,
+                ShowInput = true,
+                InputText = string.Empty,
+                InputLabel = "파일명",
+                InputPlaceholder = string.Empty,
+                ShowSecondaryInput = true,
+                RequireSecondaryInput = true,
+                SecondaryInputLabel = "URL",
+                SecondaryInputText = string.Empty,
+                Buttons = new[]
+                {
+                    new PopupButtonDefinition("취소", PopupResultType.Cancel, isCancel: true),
+                    new PopupButtonDefinition("추가", PopupResultType.Primary, isDefault: true)
+                },
+                // 다이얼로그가 닫히기 전에만 SecondaryInputText(URL)를 읽을 수 있어, 저장 자체를
+                // 여기서 하고 실패하면 에러를 인라인으로 보여주며 다이얼로그를 유지한다.
+                PrimaryValidator = delegate(PopupHostViewModelSnapshot snap)
+                {
+                    return _excelShortcutBiz.AddAsync(snap.InputText, snap.SecondaryInputText, "ExcelBrandIcon", createdBy);
+                }
+            }).ConfigureAwait(true);
+
+            if (result == null || !result.IsPrimary)
+                return;
+            await ReloadExcelShortcutsAsync().ConfigureAwait(true);
+        }
+
+        /// <summary>"전체 수정" 버튼 — 줄마다 수정 아이콘이 있는 게 아니라, 이 버튼 하나로
+        /// 리스트 전체가 한꺼번에 편집 가능 모드로 바뀐다. 다시 누르면 변경된 줄만 저장하고 나간다.</summary>
+        private async Task ToggleExcelShortcutsEditModeAsync()
+        {
+            if (!IsExcelShortcutsEditMode)
+            {
+                for (int i = 0; i < ExcelShortcuts.Count; i++)
+                    ExcelShortcuts[i].SeedEdit();
+                IsExcelShortcutsEditMode = true;
+                return;
+            }
+
+            bool allSaved = true;
+            for (int i = 0; i < ExcelShortcuts.Count; i++)
+            {
+                ExcelShortcutRowViewModel row = ExcelShortcuts[i];
+                if (!row.IsChanged)
+                    continue;
+                if (string.IsNullOrWhiteSpace(row.EditName) || string.IsNullOrWhiteSpace(row.EditUrl))
+                {
+                    row.ErrorMessage = "파일명과 URL을 모두 입력해 주세요.";
+                    allSaved = false;
+                    continue;
+                }
+                string err = await _excelShortcutBiz.UpdateAsync(row.ShortcutId, row.EditName, row.EditUrl).ConfigureAwait(true);
+                if (!string.IsNullOrEmpty(err))
+                {
+                    row.ErrorMessage = err;
+                    allSaved = false;
+                    continue;
+                }
+                row.Apply(row.EditName.Trim(), row.EditUrl.Trim());
+            }
+
+            if (allSaved)
+                IsExcelShortcutsEditMode = false;
+        }
+
+        private async Task DeleteExcelShortcutAsync(ExcelShortcutRowViewModel row)
+        {
+            if (_popup == null || row == null)
+                return;
+
+            PopupResult confirm = await _popup.ShowConfirmAsync(new PopupRequest
+            {
+                Title = "바로가기 삭제",
+                Icon = PopupIconKind.Warning,
+                Message = row.Name + " 바로가기를 삭제할까요?",
+                Buttons = new PopupButtonDefinition[2]
+                {
+                    new PopupButtonDefinition("취소", PopupResultType.Cancel, isDefault: false, isCancel: true),
+                    new PopupButtonDefinition("삭제", PopupResultType.Primary, isDefault: true)
+                }
+            }).ConfigureAwait(true);
+            if (confirm == null || !confirm.IsPrimary || confirm.IsCancelOrClosed)
+                return;
+
+            string err = await _excelShortcutBiz.DeleteAsync(row.ShortcutId).ConfigureAwait(true);
+            if (!string.IsNullOrEmpty(err))
+                return;
+            ExcelShortcuts.Remove(row);
+        }
+
         private static readonly Dictionary<string, string> SiteGuideFiles = new Dictionary<string, string>
         {
             { "CMC", "VPN-CMC.pptx" },
@@ -1322,7 +1506,26 @@ namespace GBCWorkHub.UI.ViewModels
             if (!string.Equals(tab, "WorkLog", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(tab, _workLogBackTab, StringComparison.OrdinalIgnoreCase))
                 _workLogBackTab = null;
+
+            // 탭을 나갈 때 "전체 수정" 모드가 켜진 채로 남아있지 않게 — 저장 안 하고 나갔다 들어오면
+            // 편집 중이던 입력값은 버리고 평소 보기 상태로 되돌린다.
+            if (IsExcelShortcutsEditMode
+                && !string.Equals(tab, "ExcelSheets", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(SelectedMainTab, tab, StringComparison.OrdinalIgnoreCase))
+                DiscardExcelShortcutsEditMode();
+
             SelectedMainTab = tab;
+            if (string.Equals(tab, "ExcelSheets", StringComparison.OrdinalIgnoreCase))
+            {
+                var ignored = EnsureExcelShortcutsLoadedAsync();
+            }
+        }
+
+        private void DiscardExcelShortcutsEditMode()
+        {
+            for (int i = 0; i < ExcelShortcuts.Count; i++)
+                ExcelShortcuts[i].ErrorMessage = null;
+            IsExcelShortcutsEditMode = false;
         }
 
         public string GetAppCloseWarning()

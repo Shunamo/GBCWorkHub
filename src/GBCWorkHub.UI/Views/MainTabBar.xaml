@@ -86,6 +86,22 @@
             </Button.Style>
         </Button>
 
+        <Button Content="엑셀 시트" Margin="6,0,0,0"
+                Command="{Binding SelectMainTabCommand}" CommandParameter="ExcelSheets"
+                Visibility="{Binding IsUserShellVisible, Converter={StaticResource BoolToVis}}">
+            <Button.Style>
+                <Style TargetType="Button" BasedOn="{StaticResource TabBarButton}">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsExcelSheetsTab}" Value="True">
+                            <Setter Property="Background" Value="#CCE8F0FF" />
+                            <Setter Property="Foreground" Value="#1E293B" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Button.Style>
+        </Button>
+
         <!-- Me / Login + logout (same tab chrome, pastel red fill) -->
         <Grid Margin="6,0,0,0" VerticalAlignment="Center">
             <Button x:Name="MeTabButton"
