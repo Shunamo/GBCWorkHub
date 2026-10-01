@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -75,9 +76,9 @@ public sealed class AdminViewModel : ViewModelBase
 
 	private string _adminDraftPcDomain = string.Empty;
 
-	private readonly ObservableCollection<AdminCredSetItem> _adminDraftDomainSets = new ObservableCollection<AdminCredSetItem> { new AdminCredSetItem() };
+	private PcAccessSectionViewModel _adminDomainSection = PcAccessSectionBuilder.CreateEmptySection("Domain", null);
 
-	private readonly ObservableCollection<AdminCredSetItem> _adminDraftExtraSets = new ObservableCollection<AdminCredSetItem> { new AdminCredSetItem() };
+	private PcAccessSectionViewModel _adminExtraSection = PcAccessSectionBuilder.CreateEmptySection("VPN", null);
 
 	private string _adminDraftPcComment = string.Empty;
 
@@ -174,6 +175,10 @@ public sealed class AdminViewModel : ViewModelBase
 	public ICommand AddExtraCredSetCommand { get; private set; }
 
 	public ICommand RemoveExtraCredSetCommand { get; private set; }
+
+	public ICommand AddCredentialLineCommand { get; private set; }
+
+	public ICommand RemoveCredentialLineCommand { get; private set; }
 
 	public ICommand SelectAdminPcSiteCommand { get; private set; }
 
@@ -782,6 +787,7 @@ public sealed class AdminViewModel : ViewModelBase
 				RaisePropertyChanged("ShowAdminAuthFields");
 				RaisePropertyChanged("ShowAdminExtraCredFields");
 				RaisePropertyChanged("AdminExtraCredTitle");
+				_adminExtraSection.Title = AdminExtraCredTitle;
 			}
 		}
 	}
@@ -846,9 +852,9 @@ public sealed class AdminViewModel : ViewModelBase
 		}
 	}
 
-	public ObservableCollection<AdminCredSetItem> AdminDraftDomainSets => _adminDraftDomainSets;
+	public ObservableCollection<PcCredentialSetViewModel> AdminDraftDomainSets => _adminDomainSection.Sets;
 
-	public ObservableCollection<AdminCredSetItem> AdminDraftExtraSets => _adminDraftExtraSets;
+	public ObservableCollection<PcCredentialSetViewModel> AdminDraftExtraSets => _adminExtraSection.Sets;
 
 	public bool ShowAdminVpnFields => string.Equals(AdminDraftSite, "RC", StringComparison.OrdinalIgnoreCase) || string.Equals(AdminDraftSite, "MNGHA", StringComparison.OrdinalIgnoreCase);
 
@@ -936,27 +942,41 @@ public sealed class AdminViewModel : ViewModelBase
 		});
 		AddDomainCredSetCommand = new RelayCommand(delegate
 		{
-			_adminDraftDomainSets.Add(new AdminCredSetItem());
+			_adminDomainSection.Sets.Add(PcAccessSectionBuilder.CreateEmptySet(_adminDomainSection, null));
 		});
-		RemoveDomainCredSetCommand = new RelayCommand<AdminCredSetItem>(delegate(AdminCredSetItem item)
+		RemoveDomainCredSetCommand = new RelayCommand<PcCredentialSetViewModel>(delegate(PcCredentialSetViewModel item)
 		{
 			if (item == null)
 				return;
-			_adminDraftDomainSets.Remove(item);
-			if (_adminDraftDomainSets.Count == 0)
-				_adminDraftDomainSets.Add(new AdminCredSetItem());
+			_adminDomainSection.Sets.Remove(item);
+			if (_adminDomainSection.Sets.Count == 0)
+				_adminDomainSection.Sets.Add(PcAccessSectionBuilder.CreateEmptySet(_adminDomainSection, null));
 		});
 		AddExtraCredSetCommand = new RelayCommand(delegate
 		{
-			_adminDraftExtraSets.Add(new AdminCredSetItem());
+			_adminExtraSection.Sets.Add(PcAccessSectionBuilder.CreateEmptySet(_adminExtraSection, null));
 		});
-		RemoveExtraCredSetCommand = new RelayCommand<AdminCredSetItem>(delegate(AdminCredSetItem item)
+		RemoveExtraCredSetCommand = new RelayCommand<PcCredentialSetViewModel>(delegate(PcCredentialSetViewModel item)
 		{
 			if (item == null)
 				return;
-			_adminDraftExtraSets.Remove(item);
-			if (_adminDraftExtraSets.Count == 0)
-				_adminDraftExtraSets.Add(new AdminCredSetItem());
+			_adminExtraSection.Sets.Remove(item);
+			if (_adminExtraSection.Sets.Count == 0)
+				_adminExtraSection.Sets.Add(PcAccessSectionBuilder.CreateEmptySet(_adminExtraSection, null));
+		});
+		AddCredentialLineCommand = new RelayCommand<PcCredentialLineViewModel>(delegate(PcCredentialLineViewModel line)
+		{
+			if (line == null || line.OwnerSet == null)
+				return;
+			if (line.IsIdLine)
+				line.OwnerSet.AddIdLine(null);
+			else
+				line.OwnerSet.AddPwLine(null);
+		});
+		RemoveCredentialLineCommand = new RelayCommand<PcCredentialLineViewModel>(delegate(PcCredentialLineViewModel line)
+		{
+			if (line != null && line.OwnerSet != null)
+				line.OwnerSet.RemoveLine(line);
 		});
 		SelectAdminPcSiteCommand = new RelayCommand<string>(delegate(string site)
 		{
@@ -1586,62 +1606,19 @@ public sealed class AdminViewModel : ViewModelBase
 
 	private void LoadAccessDraftFromPc(AdminPcItemViewModel item)
 	{
-		List<string> list = new List<string>();
-		List<string> list2 = new List<string>();
-		List<string> list3 = new List<string>();
-		List<string> list4 = new List<string>();
-		IList<PcAccessCredential> list5 = PcAccessNoteParser.ParseCredentials(item?.PcNote);
-		if ((list5 == null || list5.Count == 0) && item != null && !string.IsNullOrWhiteSpace(item.PcDomain))
-		{
-			string[] array = item.PcDomain.Split(new char[2] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-			for (int i = 0; i < array.Length; i++)
-			{
-				string text = array[i].Trim();
-				if (text.Length > 0)
-				{
-					list.Add(text);
-				}
-			}
-		}
-		else if (list5 != null)
-		{
-			bool flag = item != null && string.Equals(item.SiteCode, "CMC", StringComparison.OrdinalIgnoreCase);
-			for (int j = 0; j < list5.Count; j++)
-			{
-				PcAccessCredential val = list5[j];
-				if (val != null && !string.IsNullOrWhiteSpace(val.Value))
-				{
-					string item2 = val.Value.Trim();
-					if (string.Equals(val.Kind, "PW", StringComparison.OrdinalIgnoreCase))
-					{
-						list2.Add(item2);
-					}
-					else if (string.Equals(val.Kind, "AUTH_ID", StringComparison.OrdinalIgnoreCase) || (flag && string.Equals(val.Kind, "VPN_ID", StringComparison.OrdinalIgnoreCase)))
-					{
-						list3.Add(item2);
-					}
-					else if (string.Equals(val.Kind, "AUTH_PW", StringComparison.OrdinalIgnoreCase) || (flag && string.Equals(val.Kind, "VPN_PW", StringComparison.OrdinalIgnoreCase)))
-					{
-						list4.Add(item2);
-					}
-					else if (string.Equals(val.Kind, "VPN_ID", StringComparison.OrdinalIgnoreCase))
-					{
-						list3.Add(item2);
-					}
-					else if (string.Equals(val.Kind, "VPN_PW", StringComparison.OrdinalIgnoreCase))
-					{
-						list4.Add(item2);
-					}
-					else
-					{
-						list.Add(item2);
-					}
-				}
-			}
-		}
-		FillCredSets(_adminDraftDomainSets, list, list2);
-		FillCredSets(_adminDraftExtraSets, list3, list4);
-		AdminDraftPcDomain = JoinLines(list);
+		List<PcAccessSectionViewModel> sections = PcAccessSectionBuilder.BuildSections(
+			item?.PcNote, item?.PcDomain, item?.SiteCode, null);
+
+		PcAccessSectionViewModel domain = sections.FirstOrDefault(s => string.Equals(s.Title, "Domain", StringComparison.OrdinalIgnoreCase));
+		PcAccessSectionViewModel extra = sections.FirstOrDefault(s =>
+			string.Equals(s.Title, "VPN", StringComparison.OrdinalIgnoreCase)
+			|| string.Equals(s.Title, "Auth", StringComparison.OrdinalIgnoreCase));
+
+		_adminDomainSection = domain ?? PcAccessSectionBuilder.CreateEmptySection("Domain", null);
+		_adminExtraSection = extra ?? PcAccessSectionBuilder.CreateEmptySection(AdminExtraCredTitle, null);
+		RaiseAdminCredPropertiesChanged();
+
+		AdminDraftPcDomain = PcAccessSectionBuilder.BuildPcDomainSummary(sections) ?? string.Empty;
 		string text2 = item?.PcComment;
 		if (string.IsNullOrWhiteSpace(text2) && item != null)
 		{
@@ -1650,138 +1627,27 @@ public sealed class AdminViewModel : ViewModelBase
 		AdminDraftPcComment = text2 ?? string.Empty;
 	}
 
-	private static string JoinLines(IList<string> lines)
+	private void RaiseAdminCredPropertiesChanged()
 	{
-		if (lines == null || lines.Count == 0)
-		{
-			return string.Empty;
-		}
-		return string.Join(Environment.NewLine, lines);
+		RaisePropertyChanged("AdminDraftDomainSets");
+		RaisePropertyChanged("AdminDraftExtraSets");
 	}
 
 	/// <summary>ID/PW를 줄 번호로만 짝짓던 예전 방식은 한쪽만 편집하면 개수가 어긋났다 —
-	/// 이제는 ID+PW가 한 세트(행)로 묶여 있어 항상 같이 추가/삭제된다.</summary>
+	/// 이제는 섹션이 ID·PW 줄들을 직접 갖고 있어 각자 추가/삭제된다.</summary>
 	private void ResetCredSets()
 	{
-		_adminDraftDomainSets.Clear();
-		_adminDraftDomainSets.Add(new AdminCredSetItem());
-		_adminDraftExtraSets.Clear();
-		_adminDraftExtraSets.Add(new AdminCredSetItem());
-	}
-
-	private static void FillCredSets(ObservableCollection<AdminCredSetItem> target, IList<string> ids, IList<string> pws)
-	{
-		target.Clear();
-		int pairCount = Math.Min(ids.Count, pws.Count);
-		for (int i = 0; i < pairCount; i++)
-		{
-			target.Add(new AdminCredSetItem { Id = ids[i], Pw = pws[i] });
-		}
-		if (target.Count == 0)
-		{
-			target.Add(new AdminCredSetItem());
-		}
-
-		// ID/PW 개수가 안 맞는 예전 데이터(예: ID 1개에 PW 2개)는 남는 줄로 빈 ID/PW 세트를
-		// 새로 만들지 않고, 마지막 세트에 합쳐서 원래처럼 한 덩어리로 유지한다 — 세트는
-		// admin이 "+"를 눌렀을 때만 늘어나야 한다.
-		AdminCredSetItem last = target[target.Count - 1];
-		if (ids.Count > pairCount)
-		{
-			string merged = last.Id ?? string.Empty;
-			for (int i = pairCount; i < ids.Count; i++)
-				merged = merged.Length == 0 ? ids[i] : merged + "\n" + ids[i];
-			last.Id = merged;
-		}
-		if (pws.Count > pairCount)
-		{
-			string merged = last.Pw ?? string.Empty;
-			for (int i = pairCount; i < pws.Count; i++)
-				merged = merged.Length == 0 ? pws[i] : merged + "\n" + pws[i];
-			last.Pw = merged;
-		}
-	}
-
-	/// <summary>ID/PW가 모두 채워진 완성된 세트만 뽑는다 — 절반만 채운 행은 저장 시
-	/// 개수가 어긋난 채로 남는 대신 아예 반영하지 않는다(별도 검증에서 저장을 막는다).</summary>
-	private static void CollectCompleteCredSets(ObservableCollection<AdminCredSetItem> sets, out List<string> ids, out List<string> pws)
-	{
-		ids = new List<string>();
-		pws = new List<string>();
-		foreach (AdminCredSetItem item in sets)
-		{
-			if (item == null)
-				continue;
-			string id = (item.Id ?? string.Empty).Trim();
-			string pw = (item.Pw ?? string.Empty).Trim();
-			if (id.Length == 0 || pw.Length == 0)
-				continue;
-			ids.Add(id);
-			pws.Add(pw);
-		}
-	}
-
-	/// <summary>ID/PW 중 한쪽만 채워진 반쪽짜리 행이 있으면 몇 번째 줄인지 알려준다 —
-	/// 저장을 막고 admin이 마저 채우거나 지우게 하기 위함.</summary>
-	private static bool HasIncompleteCredSet(ObservableCollection<AdminCredSetItem> sets, out int rowNumber)
-	{
-		for (int i = 0; i < sets.Count; i++)
-		{
-			AdminCredSetItem item = sets[i];
-			if (item == null)
-				continue;
-			bool hasId = !string.IsNullOrWhiteSpace(item.Id);
-			bool hasPw = !string.IsNullOrWhiteSpace(item.Pw);
-			if (hasId != hasPw)
-			{
-				rowNumber = i + 1;
-				return true;
-			}
-		}
-		rowNumber = 0;
-		return false;
+		_adminDomainSection = PcAccessSectionBuilder.CreateEmptySection("Domain", null);
+		_adminExtraSection = PcAccessSectionBuilder.CreateEmptySection(AdminExtraCredTitle, null);
+		RaiseAdminCredPropertiesChanged();
 	}
 
 	private string BuildAdminPcNote()
 	{
-		List<string> list = new List<string>();
-		List<string> list2;
-		List<string> list3;
-		List<string> list4;
-		List<string> list5;
-		CollectCompleteCredSets(_adminDraftDomainSets, out list2, out list3);
-		CollectCompleteCredSets(_adminDraftExtraSets, out list4, out list5);
-		if (list2.Count > 0)
-		{
-			list.Add("[ID]\n" + string.Join("\n", list2));
-		}
-		if (list3.Count > 0)
-		{
-			list.Add("[Password]\n" + string.Join("\n", list3));
-		}
-		if (ShowAdminAuthFields)
-		{
-			if (list4.Count > 0)
-			{
-				list.Add("[Auth ID]\n" + string.Join("\n", list4));
-			}
-			if (list5.Count > 0)
-			{
-				list.Add("[Auth Password]\n" + string.Join("\n", list5));
-			}
-		}
-		else if (ShowAdminVpnFields)
-		{
-			if (list4.Count > 0)
-			{
-				list.Add("[VPN ID]\n" + string.Join("\n", list4));
-			}
-			if (list5.Count > 0)
-			{
-				list.Add("[VPN Password]\n" + string.Join("\n", list5));
-			}
-		}
-		return (list.Count == 0) ? null : string.Join("\n\n", list.ToArray());
+		var sections = new List<PcAccessSectionViewModel> { _adminDomainSection };
+		if (ShowAdminExtraCredFields)
+			sections.Add(_adminExtraSection);
+		return PcAccessSectionBuilder.BuildPcNote(sections);
 	}
 
 	private void NewAdminPc()
@@ -1854,23 +1720,21 @@ public sealed class AdminViewModel : ViewModelBase
 			AdminPcStatusMessage = "팀을 입력해 주세요.";
 			return;
 		}
-		int badRow;
-		if (HasIncompleteCredSet(_adminDraftDomainSets, out badRow))
+		var validationSections = new List<PcAccessSectionViewModel> { _adminDomainSection };
+		if (ShowAdminExtraCredFields)
+			validationSections.Add(_adminExtraSection);
+		string badSection;
+		if (!PcAccessSectionBuilder.TryValidate(validationSections, out badSection))
 		{
-			AdminPcStatusMessage = "Domain " + badRow + "번째 줄의 ID/PW를 마저 입력하거나 그 줄을 삭제해 주세요.";
+			AdminPcStatusMessage = badSection + " 섹션의 ID/PW를 마저 입력하거나 그 줄을 삭제해 주세요.";
 			return;
 		}
-		if (HasIncompleteCredSet(_adminDraftExtraSets, out badRow))
-		{
-			AdminPcStatusMessage = AdminExtraCredTitle + " " + badRow + "번째 줄의 ID/PW를 마저 입력하거나 그 줄을 삭제해 주세요.";
-			return;
-		}
-		List<string> domainIds;
-		List<string> domainPws;
-		List<string> extraIds;
-		List<string> extraPws;
-		CollectCompleteCredSets(_adminDraftDomainSets, out domainIds, out domainPws);
-		CollectCompleteCredSets(_adminDraftExtraSets, out extraIds, out extraPws);
+		List<string> domainIds = new List<string>();
+		List<string> domainPws = new List<string>();
+		List<string> extraIds = new List<string>();
+		List<string> extraPws = new List<string>();
+		PcAccessSectionBuilder.Collect(_adminDomainSection, domainIds, domainPws);
+		PcAccessSectionBuilder.Collect(_adminExtraSection, extraIds, extraPws);
 		if (domainIds.Count == 0)
 		{
 			AdminPcStatusMessage = "Domain ID/PW를 입력해 주세요.";

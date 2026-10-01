@@ -17,6 +17,75 @@
             <Setter Property="VerticalScrollBarVisibility" Value="Visible" />
             <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
         </Style>
+        <!-- Domain/VPN/Auth 세트 안 ID 또는 PW 한 줄. 편집 중엔 텍스트박스+줄 삭제,
+             읽기 전용일 땐 선택 가능한 텍스트+복사 버튼. ID/PW 둘 다 이 템플릿을 공유한다. -->
+        <DataTemplate x:Key="PcCredentialLineTemplate">
+            <Grid Height="24" Margin="0,0,0,6" HorizontalAlignment="Left">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="PcCredValueCol" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0" Text="{Binding Value, Mode=OneWay}"
+                           Style="{StaticResource SelectableTextStyle}"
+                           FontSize="12.5"
+                           Foreground="#1E293B"
+                           VerticalAlignment="Center"
+                           TextWrapping="NoWrap"
+                           Visibility="{Binding IsReadOnly, Converter={StaticResource BoolToVis}}" />
+                <TextBox Grid.Column="0"
+                         Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         FontSize="12.5"
+                         Foreground="#1E293B"
+                         VerticalContentAlignment="Center"
+                         MinWidth="80"
+                         BorderThickness="1"
+                         BorderBrush="#D9FFFFFF"
+                         Background="#66FFFFFF"
+                         Padding="4,0"
+                         Height="24"
+                         Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}"
+                         IsTabStop="{Binding IsEditing}" />
+                <Grid Grid.Column="1" Width="24" Height="24" Margin="6,0,0,0"
+                      VerticalAlignment="Center"
+                      Visibility="{Binding DataContext.IsPcAccessReadOnly, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}, ConverterParameter=Hidden}">
+                    <Button Style="{StaticResource HeaderIconButton}"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Center"
+                            ToolTip="복사됨"
+                            IsHitTestVisible="False"
+                            Visibility="{Binding IsCopied, Converter={StaticResource BoolToVis}}">
+                        <Image Source="{StaticResource DoneLightIcon}" Width="14" Height="14" />
+                    </Button>
+                    <Button Style="{StaticResource HeaderIconButton}"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Center"
+                            ToolTip="{Binding Value, StringFormat=복사: {0}}"
+                            Command="{Binding CopyCommand}"
+                            CommandParameter="{Binding}"
+                            Visibility="{Binding ShowCopyIcon, Converter={StaticResource BoolToVis}}">
+                        <Image Source="{StaticResource CopyAltIcon}" Width="14" Height="14" />
+                    </Button>
+                </Grid>
+                <Button Grid.Column="2" Style="{StaticResource HeaderIconButton}"
+                        Width="20" Height="20" Margin="6,0,0,0"
+                        VerticalAlignment="Center" ToolTip="줄 추가"
+                        Command="{Binding DataContext.AddCredentialLineCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        CommandParameter="{Binding}"
+                        Visibility="{Binding DataContext.IsPcAccessEditing, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}, ConverterParameter=Hidden}">
+                    <TextBlock Text="+" FontSize="14" FontWeight="SemiBold" Foreground="#94A3B8" />
+                </Button>
+                <Button Grid.Column="3" Style="{StaticResource HeaderIconButton}"
+                        Width="20" Height="20" Margin="2,0,0,0"
+                        VerticalAlignment="Center" ToolTip="이 줄 삭제"
+                        Command="{Binding DataContext.RemoveCredentialLineCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        CommandParameter="{Binding}"
+                        Visibility="{Binding DataContext.IsPcAccessEditing, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}, ConverterParameter=Hidden}">
+                    <TextBlock Text="−" FontSize="14" FontWeight="SemiBold" Foreground="#94A3B8" />
+                </Button>
+            </Grid>
+        </DataTemplate>
         <DataTemplate x:Key="RemoteComputerCardTemplate">
             <Border Style="{StaticResource RemoteComputerCardStyle}"
                     Margin="16" Padding="8"
@@ -819,7 +888,7 @@
                                             <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top">
                                                 <DockPanel LastChildFill="True">
                                                     <Button DockPanel.Dock="Right" Style="{StaticResource HeaderIconButton}"
-                                                            VerticalAlignment="Center" ToolTip="세트 추가"
+                                                            VerticalAlignment="Center" ToolTip="세트 추가(다른 계정 묶음)"
                                                             Command="{Binding DataContext.AddCredentialSetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             CommandParameter="{Binding}"
                                                             Visibility="{Binding DataContext.IsPcAccessEditing, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}, ConverterParameter=Hidden}">
@@ -829,145 +898,41 @@
                                                                Style="{StaticResource RemoteUsageHistoryColHeader}"
                                                                FontWeight="SemiBold" Margin="0" VerticalAlignment="Center" />
                                                 </DockPanel>
-                                                <ItemsControl ItemsSource="{Binding Sets}"
-                                                              HorizontalAlignment="Left">
+                                                <ItemsControl ItemsSource="{Binding Sets}" HorizontalAlignment="Left">
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate>
                                                             <Border Background="#40FFFFFF" BorderBrush="#D9FFFFFF" BorderThickness="1"
-                                                                    CornerRadius="8" Padding="8,6" Margin="0,0,0,6"
+                                                                    CornerRadius="8" Padding="8,6" Margin="0,4,0,0"
                                                                     HorizontalAlignment="Left">
-                                                            <Grid HorizontalAlignment="Left">
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="Auto" SharedSizeGroup="PcAccLbl" MinWidth="28" />
-                                                                    <ColumnDefinition Width="Auto" />
-                                                                    <ColumnDefinition Width="Auto" />
-                                                                </Grid.ColumnDefinitions>
-                                                                <Grid.RowDefinitions>
-                                                                    <RowDefinition Height="Auto" />
-                                                                    <RowDefinition Height="Auto" />
-                                                                </Grid.RowDefinitions>
-
-                                                                <Border Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,6"
-                                                                        HorizontalAlignment="Left">
-                                                                    <TextBlock Text="ID" FontSize="12.5" FontWeight="SemiBold"
-                                                                               Foreground="#64748B" VerticalAlignment="Center" />
-                                                                </Border>
-                                                                <Grid Grid.Row="0" Grid.Column="1" Height="24" Margin="0,0,0,6"
-                                                                      HorizontalAlignment="Left" DataContext="{Binding Id}">
-                                                                    <Grid.ColumnDefinitions>
-                                                                        <ColumnDefinition Width="Auto" />
-                                                                        <ColumnDefinition Width="Auto" />
-                                                                    </Grid.ColumnDefinitions>
-                                                                    <TextBox Text="{Binding Value, Mode=OneWay}"
-                                                                               Style="{StaticResource SelectableTextStyle}"
-                                                                               FontSize="12.5"
-                                                                               Foreground="#1E293B"
-                                                                               VerticalAlignment="Center"
-                                                                               TextWrapping="NoWrap"
-                                                                               Visibility="{Binding IsReadOnly, Converter={StaticResource BoolToVis}}" />
-                                                                    <TextBox Grid.Column="0"
-                                                                             Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                             FontSize="12.5"
-                                                                             Foreground="#1E293B"
-                                                                             VerticalContentAlignment="Center"
-                                                                             HorizontalAlignment="Left"
-                                                                             BorderThickness="1"
-                                                                             BorderBrush="#D9FFFFFF"
-                                                                             Background="#66FFFFFF"
-                                                                             Padding="4,0"
-                                                                             Height="24"
-                                                                             Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}"
-                                                                             IsTabStop="{Binding IsEditing}" />
-                                                                    <Grid Grid.Column="1" Width="24" Height="24" Margin="6,0,0,0"
-                                                                          VerticalAlignment="Center"
-                                                                          Visibility="{Binding DataContext.IsPcAccessReadOnly, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}, ConverterParameter=Hidden}">
-                                                                        <Button Style="{StaticResource HeaderIconButton}"
-                                                                                VerticalAlignment="Center"
-                                                                                HorizontalAlignment="Center"
-                                                                                ToolTip="복사됨"
-                                                                                IsHitTestVisible="False"
-                                                                                Visibility="{Binding IsCopied, Converter={StaticResource BoolToVis}}">
-                                                                            <Image Source="{StaticResource DoneLightIcon}" Width="14" Height="14" />
-                                                                        </Button>
-                                                                        <Button Style="{StaticResource HeaderIconButton}"
-                                                                                VerticalAlignment="Center"
-                                                                                HorizontalAlignment="Center"
-                                                                                ToolTip="{Binding Value, StringFormat=복사: {0}}"
-                                                                                Command="{Binding CopyCommand}"
-                                                                                CommandParameter="{Binding}"
-                                                                                Visibility="{Binding ShowCopyIcon, Converter={StaticResource BoolToVis}}">
-                                                                            <Image Source="{StaticResource CopyAltIcon}" Width="14" Height="14" />
-                                                                        </Button>
+                                                                <StackPanel HorizontalAlignment="Left">
+                                                                    <Button HorizontalAlignment="Right" Style="{StaticResource HeaderIconButton}"
+                                                                            Width="24" Height="24" Margin="0,0,0,2" ToolTip="이 세트 삭제"
+                                                                            Command="{Binding DataContext.RemoveCredentialSetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                            CommandParameter="{Binding}"
+                                                                            Visibility="{Binding DataContext.IsPcAccessEditing, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}}">
+                                                                        <Image Source="{StaticResource TrashDuotoneIcon}" Width="14" Height="14" />
+                                                                    </Button>
+                                                                    <Grid Margin="0,0,0,4">
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="28" />
+                                                                            <ColumnDefinition Width="Auto" />
+                                                                        </Grid.ColumnDefinitions>
+                                                                        <TextBlock Grid.Column="0" Text="ID" FontSize="12.5" FontWeight="SemiBold"
+                                                                                   Foreground="#64748B" VerticalAlignment="Top" Margin="0,4,0,0" />
+                                                                        <ItemsControl Grid.Column="1" ItemsSource="{Binding Id}" HorizontalAlignment="Left"
+                                                                                      ItemTemplate="{StaticResource PcCredentialLineTemplate}" />
                                                                     </Grid>
-                                                                </Grid>
-                                                                <Button Grid.Row="0" Grid.RowSpan="2" Grid.Column="2" Style="{StaticResource HeaderIconButton}"
-                                                                        VerticalAlignment="Top" HorizontalAlignment="Right" Margin="4,0,0,0" ToolTip="이 세트 삭제"
-                                                                        Command="{Binding DataContext.RemoveCredentialSetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                                        CommandParameter="{Binding}"
-                                                                        Visibility="{Binding DataContext.IsPcAccessEditing, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}, ConverterParameter=Hidden}">
-                                                                    <TextBlock Text="−" FontSize="16" FontWeight="SemiBold" Foreground="#94A3B8" />
-                                                                </Button>
-
-                                                                <Border Grid.Row="1" Grid.Column="0" VerticalAlignment="Top" Margin="0,2,10,0"
-                                                                        HorizontalAlignment="Left">
-                                                                    <TextBlock Text="PW" FontSize="12.5" FontWeight="SemiBold"
-                                                                               Foreground="#64748B" VerticalAlignment="Center" />
-                                                                </Border>
-                                                                <ItemsControl Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Pw}"
-                                                                              HorizontalAlignment="Left">
-                                                                    <ItemsControl.ItemTemplate>
-                                                                        <DataTemplate>
-                                                                            <Grid Height="24" Margin="0,0,0,6" HorizontalAlignment="Left">
-                                                                                <Grid.ColumnDefinitions>
-                                                                                    <ColumnDefinition Width="Auto" />
-                                                                                    <ColumnDefinition Width="Auto" />
-                                                                                </Grid.ColumnDefinitions>
-                                                                                <TextBox Text="{Binding Value, Mode=OneWay}"
-                                                                                           Style="{StaticResource SelectableTextStyle}"
-                                                                                           FontSize="12.5"
-                                                                                           Foreground="#1E293B"
-                                                                                           VerticalAlignment="Center"
-                                                                                           TextWrapping="NoWrap"
-                                                                                           Visibility="{Binding IsReadOnly, Converter={StaticResource BoolToVis}}" />
-                                                                                <TextBox Grid.Column="0"
-                                                                                         Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                                         FontSize="12.5"
-                                                                                         Foreground="#1E293B"
-                                                                                         VerticalContentAlignment="Center"
-                                                                                         HorizontalAlignment="Left"
-                                                                                         BorderThickness="1"
-                                                                                         BorderBrush="#D9FFFFFF"
-                                                                                         Background="#66FFFFFF"
-                                                                                         Padding="4,0"
-                                                                                         Height="24"
-                                                                                         Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}"
-                                                                                         IsTabStop="{Binding IsEditing}" />
-                                                                                <Grid Grid.Column="1" Width="24" Height="24" Margin="6,0,0,0"
-                                                                                      VerticalAlignment="Center"
-                                                                                      Visibility="{Binding DataContext.IsPcAccessReadOnly, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}, ConverterParameter=Hidden}">
-                                                                                    <Button Style="{StaticResource HeaderIconButton}"
-                                                                                            VerticalAlignment="Center"
-                                                                                            HorizontalAlignment="Center"
-                                                                                            ToolTip="복사됨"
-                                                                                            IsHitTestVisible="False"
-                                                                                            Visibility="{Binding IsCopied, Converter={StaticResource BoolToVis}}">
-                                                                                        <Image Source="{StaticResource DoneLightIcon}" Width="14" Height="14" />
-                                                                                    </Button>
-                                                                                    <Button Style="{StaticResource HeaderIconButton}"
-                                                                                            VerticalAlignment="Center"
-                                                                                            HorizontalAlignment="Center"
-                                                                                            ToolTip="{Binding Value, StringFormat=복사: {0}}"
-                                                                                            Command="{Binding CopyCommand}"
-                                                                                            CommandParameter="{Binding}"
-                                                                                            Visibility="{Binding ShowCopyIcon, Converter={StaticResource BoolToVis}}">
-                                                                                        <Image Source="{StaticResource CopyAltIcon}" Width="14" Height="14" />
-                                                                                    </Button>
-                                                                                </Grid>
-                                                                            </Grid>
-                                                                        </DataTemplate>
-                                                                    </ItemsControl.ItemTemplate>
-                                                                </ItemsControl>
-                                                            </Grid>
+                                                                    <Grid>
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="28" />
+                                                                            <ColumnDefinition Width="Auto" />
+                                                                        </Grid.ColumnDefinitions>
+                                                                        <TextBlock Grid.Column="0" Text="PW" FontSize="12.5" FontWeight="SemiBold"
+                                                                                   Foreground="#64748B" VerticalAlignment="Top" Margin="0,4,0,0" />
+                                                                        <ItemsControl Grid.Column="1" ItemsSource="{Binding Pw}" HorizontalAlignment="Left"
+                                                                                      ItemTemplate="{StaticResource PcCredentialLineTemplate}" />
+                                                                    </Grid>
+                                                                </StackPanel>
                                                             </Border>
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>

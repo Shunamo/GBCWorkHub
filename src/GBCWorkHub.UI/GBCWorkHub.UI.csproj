@@ -119,7 +119,6 @@
     <Compile Include="ViewModels\AdminSiteChipItemViewModel.cs" />
     <Compile Include="ViewModels\AdminPcGroupViewModel.cs" />
     <Compile Include="ViewModels\AdminPcItemViewModel.cs" />
-    <Compile Include="ViewModels\AdminCredSetItem.cs" />
     <Compile Include="ViewModels\AdminUserItemViewModel.cs" />
     <Compile Include="ViewModels\AdminOccupancyItemViewModel.cs" />
     <Compile Include="ViewModels\AdminOccupancyStatRowViewModel.cs" />
@@ -130,6 +129,7 @@
     <Compile Include="ViewModels\RemoteWorkspaceViewModel.cs" />
     <Compile Include="ViewModels\RemoteComputerItemViewModel.cs" />
     <Compile Include="ViewModels\PcCredentialItemViewModel.cs" />
+    <Compile Include="ViewModels\PcAccessSectionBuilder.cs" />
     <Compile Include="Services\RemoteSessionController.cs" />
     <Compile Include="Services\RemoteSessionUi.cs" />
     <Compile Include="ViewModels\RdpEventViewModel.cs" />

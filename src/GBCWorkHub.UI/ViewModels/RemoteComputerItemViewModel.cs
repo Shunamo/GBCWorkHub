@@ -130,6 +130,10 @@ namespace GBCWorkHub.UI.ViewModels
 
         private System.Collections.Generic.List<string> GetPcDomainParts()
         {
+            System.Collections.Generic.List<string> fromNote = GetDomainIdsFromNote();
+            if (fromNote != null && fromNote.Count > 0)
+                return fromNote;
+
             if (string.IsNullOrWhiteSpace(PcDomain))
                 return null;
             string[] parts = PcDomain.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
@@ -143,6 +147,27 @@ namespace GBCWorkHub.UI.ViewModels
             return list.Count == 0 ? null : list;
         }
 
+        /// <summary>PC_NOTE가 있으면 거기서 순수 Domain([ID]) 계정만 골라낸다 —
+        /// PC_DOMAIN 요약 필드엔 과거 VPN 계정까지 섞여 저장된 PC가 있어서,
+        /// PC_NOTE 쪽을 우선해 카드에 VPN 계정이 같이 뜨는 걸 막는다.</summary>
+        private System.Collections.Generic.List<string> GetDomainIdsFromNote()
+        {
+            if (string.IsNullOrWhiteSpace(PcNote))
+                return null;
+            System.Collections.Generic.IList<PcAccessCredential> creds = PcAccessNoteParser.ParseCredentials(PcNote);
+            if (creds == null || creds.Count == 0)
+                return null;
+            var list = new System.Collections.Generic.List<string>();
+            for (int i = 0; i < creds.Count; i++)
+            {
+                PcAccessCredential c = creds[i];
+                if (c != null && string.Equals(c.Kind, "ID", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(c.Value))
+                    list.Add(c.Value.Trim());
+            }
+            return list.Count == 0 ? null : list;
+        }
+
         /// <summary>엑셀 ID/Password 섹션([ID]/[Password]).</summary>
         public string PcNote
         {
@@ -150,7 +175,13 @@ namespace GBCWorkHub.UI.ViewModels
             set
             {
                 if (SetProperty(ref _pcNote, value))
+                {
                     RaisePropertyChanged("HasPcNote");
+                    RaisePropertyChanged("HasPcDomain");
+                    RaisePropertyChanged("HasMultiplePcDomains");
+                    RaisePropertyChanged("HasSinglePcDomain");
+                    RaisePropertyChanged("PcDomainDisplay");
+                }
             }
         }
 

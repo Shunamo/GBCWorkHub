@@ -308,6 +308,31 @@
             <Setter Property="Height" Value="36" />
         </Style>
 
+        <!-- Domain/VPN/Auth 세트 안 ID 또는 PW 한 줄 — ID/PW 둘 다 이 템플릿을 공유한다. -->
+        <DataTemplate x:Key="AdminCredLineTemplate">
+            <Grid Margin="0,0,0,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0" Style="{StaticResource AdminCredLineTextBox}"
+                         Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" />
+                <Button Grid.Column="1" Style="{StaticResource HeaderIconButton}"
+                        ToolTip="줄 추가" Margin="4,0,0,0"
+                        Command="{Binding DataContext.AddCredentialLineCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        CommandParameter="{Binding}">
+                    <TextBlock Text="+" FontSize="16" FontWeight="SemiBold" Foreground="#94A3B8" />
+                </Button>
+                <Button Grid.Column="2" Style="{StaticResource HeaderIconButton}"
+                        ToolTip="이 줄 삭제" Margin="2,0,0,0"
+                        Command="{Binding DataContext.RemoveCredentialLineCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        CommandParameter="{Binding}">
+                    <TextBlock Text="−" FontSize="16" FontWeight="SemiBold" Foreground="#94A3B8" />
+                </Button>
+            </Grid>
+        </DataTemplate>
+
         <Style x:Key="AdminPcCardBorder" TargetType="Border" BasedOn="{StaticResource RemoteComputerCardStyle}">
             <Setter Property="Margin" Value="8" />
             <Setter Property="Padding" Value="10,12" />
@@ -757,7 +782,7 @@
                                         <StackPanel>
                                             <DockPanel LastChildFill="True" Margin="0,0,0,6">
                                                 <Button DockPanel.Dock="Right" Style="{StaticResource HeaderIconButton}"
-                                                        VerticalAlignment="Center" ToolTip="세트 추가" Command="{Binding AddDomainCredSetCommand}">
+                                                        VerticalAlignment="Center" ToolTip="세트 추가(다른 계정 묶음)" Command="{Binding AddDomainCredSetCommand}">
                                                     <TextBlock Text="+" FontSize="16" FontWeight="SemiBold" Foreground="#94A3B8" />
                                                 </Button>
                                                 <TextBlock Text="Domain" Style="{StaticResource RemoteUsageHistoryColHeader}" FontWeight="SemiBold"
@@ -766,35 +791,35 @@
                                             <ItemsControl ItemsSource="{Binding AdminDraftDomainSets}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <StackPanel Margin="0,0,0,10">
-                                                            <Grid Margin="0,0,0,6">
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="36" />
-                                                                    <ColumnDefinition Width="*" />
-                                                                    <ColumnDefinition Width="Auto" />
-                                                                </Grid.ColumnDefinitions>
-                                                                <TextBlock Text="ID" FontSize="12.5" FontWeight="SemiBold" Foreground="#64748B"
-                                                                           VerticalAlignment="Center" />
-                                                                <TextBox Grid.Column="1" Style="{StaticResource AdminCredLineTextBox}"
-                                                                         Text="{Binding Id, UpdateSourceTrigger=PropertyChanged}" />
-                                                                <Button Grid.Column="2" Style="{StaticResource HeaderIconButton}"
-                                                                        ToolTip="이 세트 삭제" Margin="4,0,0,0"
+                                                        <Border Background="#40FFFFFF" BorderBrush="#D9FFFFFF" BorderThickness="1"
+                                                                CornerRadius="8" Padding="8,6" Margin="0,0,0,10">
+                                                            <StackPanel>
+                                                                <Button HorizontalAlignment="Right" Style="{StaticResource HeaderIconButton}"
+                                                                        Width="24" Height="24" Margin="0,0,0,2" ToolTip="이 세트 삭제"
                                                                         Command="{Binding DataContext.RemoveDomainCredSetCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                                         CommandParameter="{Binding}">
-                                                                    <TextBlock Text="−" FontSize="16" FontWeight="SemiBold" Foreground="#94A3B8" />
+                                                                    <Image Source="{StaticResource TrashDuotoneIcon}" Width="14" Height="14" />
                                                                 </Button>
-                                                            </Grid>
-                                                            <Grid>
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="36" />
-                                                                    <ColumnDefinition Width="*" />
-                                                                </Grid.ColumnDefinitions>
-                                                                <TextBlock Text="PW" FontSize="12.5" FontWeight="SemiBold" Foreground="#64748B"
-                                                                           VerticalAlignment="Center" />
-                                                                <TextBox Grid.Column="1" Style="{StaticResource AdminCredLineTextBox}"
-                                                                         Text="{Binding Pw, UpdateSourceTrigger=PropertyChanged}" />
-                                                            </Grid>
-                                                        </StackPanel>
+                                                                <Grid Margin="0,0,0,2">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="36" />
+                                                                        <ColumnDefinition Width="*" />
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <TextBlock Text="ID" FontSize="12.5" FontWeight="SemiBold" Foreground="#64748B"
+                                                                               VerticalAlignment="Top" Margin="0,8,0,0" />
+                                                                    <ItemsControl Grid.Column="1" ItemsSource="{Binding Id}" ItemTemplate="{StaticResource AdminCredLineTemplate}" />
+                                                                </Grid>
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="36" />
+                                                                        <ColumnDefinition Width="*" />
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <TextBlock Text="PW" FontSize="12.5" FontWeight="SemiBold" Foreground="#64748B"
+                                                                               VerticalAlignment="Top" Margin="0,8,0,0" />
+                                                                    <ItemsControl Grid.Column="1" ItemsSource="{Binding Pw}" ItemTemplate="{StaticResource AdminCredLineTemplate}" />
+                                                                </Grid>
+                                                            </StackPanel>
+                                                        </Border>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
@@ -806,7 +831,7 @@
                                         <StackPanel>
                                             <DockPanel LastChildFill="True" Margin="0,0,0,6">
                                                 <Button DockPanel.Dock="Right" Style="{StaticResource HeaderIconButton}"
-                                                        VerticalAlignment="Center" ToolTip="세트 추가" Command="{Binding AddExtraCredSetCommand}">
+                                                        VerticalAlignment="Center" ToolTip="세트 추가(다른 계정 묶음)" Command="{Binding AddExtraCredSetCommand}">
                                                     <TextBlock Text="+" FontSize="16" FontWeight="SemiBold" Foreground="#94A3B8" />
                                                 </Button>
                                                 <TextBlock Text="{Binding AdminExtraCredTitle}" Style="{StaticResource RemoteUsageHistoryColHeader}" FontWeight="SemiBold"
@@ -815,35 +840,35 @@
                                             <ItemsControl ItemsSource="{Binding AdminDraftExtraSets}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <StackPanel Margin="0,0,0,10">
-                                                            <Grid Margin="0,0,0,6">
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="36" />
-                                                                    <ColumnDefinition Width="*" />
-                                                                    <ColumnDefinition Width="Auto" />
-                                                                </Grid.ColumnDefinitions>
-                                                                <TextBlock Text="ID" FontSize="12.5" FontWeight="SemiBold" Foreground="#64748B"
-                                                                           VerticalAlignment="Center" />
-                                                                <TextBox Grid.Column="1" Style="{StaticResource AdminCredLineTextBox}"
-                                                                         Text="{Binding Id, UpdateSourceTrigger=PropertyChanged}" />
-                                                                <Button Grid.Column="2" Style="{StaticResource HeaderIconButton}"
-                                                                        ToolTip="이 세트 삭제" Margin="4,0,0,0"
+                                                        <Border Background="#40FFFFFF" BorderBrush="#D9FFFFFF" BorderThickness="1"
+                                                                CornerRadius="8" Padding="8,6" Margin="0,0,0,10">
+                                                            <StackPanel>
+                                                                <Button HorizontalAlignment="Right" Style="{StaticResource HeaderIconButton}"
+                                                                        Width="24" Height="24" Margin="0,0,0,2" ToolTip="이 세트 삭제"
                                                                         Command="{Binding DataContext.RemoveExtraCredSetCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                                         CommandParameter="{Binding}">
-                                                                    <TextBlock Text="−" FontSize="16" FontWeight="SemiBold" Foreground="#94A3B8" />
+                                                                    <Image Source="{StaticResource TrashDuotoneIcon}" Width="14" Height="14" />
                                                                 </Button>
-                                                            </Grid>
-                                                            <Grid>
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="36" />
-                                                                    <ColumnDefinition Width="*" />
-                                                                </Grid.ColumnDefinitions>
-                                                                <TextBlock Text="PW" FontSize="12.5" FontWeight="SemiBold" Foreground="#64748B"
-                                                                           VerticalAlignment="Center" />
-                                                                <TextBox Grid.Column="1" Style="{StaticResource AdminCredLineTextBox}"
-                                                                         Text="{Binding Pw, UpdateSourceTrigger=PropertyChanged}" />
-                                                            </Grid>
-                                                        </StackPanel>
+                                                                <Grid Margin="0,0,0,2">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="36" />
+                                                                        <ColumnDefinition Width="*" />
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <TextBlock Text="ID" FontSize="12.5" FontWeight="SemiBold" Foreground="#64748B"
+                                                                               VerticalAlignment="Top" Margin="0,8,0,0" />
+                                                                    <ItemsControl Grid.Column="1" ItemsSource="{Binding Id}" ItemTemplate="{StaticResource AdminCredLineTemplate}" />
+                                                                </Grid>
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="36" />
+                                                                        <ColumnDefinition Width="*" />
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <TextBlock Text="PW" FontSize="12.5" FontWeight="SemiBold" Foreground="#64748B"
+                                                                               VerticalAlignment="Top" Margin="0,8,0,0" />
+                                                                    <ItemsControl Grid.Column="1" ItemsSource="{Binding Pw}" ItemTemplate="{StaticResource AdminCredLineTemplate}" />
+                                                                </Grid>
+                                                            </StackPanel>
+                                                        </Border>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
