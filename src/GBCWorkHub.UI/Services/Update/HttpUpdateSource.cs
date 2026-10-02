@@ -55,15 +55,29 @@ namespace GBCWorkHub.UI.Services.Update
 
         public async Task<UpdateManifest> GetLatestAsync(CancellationToken cancellationToken)
         {
-            using (var response = await _http.GetAsync(_manifestUrl, cancellationToken).ConfigureAwait(false))
+            // GitHub의 릴리즈 에셋은 CDN을 거쳐 서빙되는데, 캐시 키가 쿼리스트링 없는
+            // URL 그대로라 에셋을 재업로드해도 한동안 예전 내용(비어있던 releaseNotes 등)을
+            // 그대로 돌려주는 걸 직접 겪었다. 매 요청마다 쿼리스트링을 바꿔서 캐시를 우회한다.
+            string url = AppendCacheBuster(_manifestUrl);
+            using (var request = new HttpRequestMessage(HttpMethod.Get, url))
             {
-                response.EnsureSuccessStatusCode();
-                string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                var manifest = JsonConvert.DeserializeObject<UpdateManifest>(json);
-                if (manifest == null || string.IsNullOrWhiteSpace(manifest.Version))
-                    throw new InvalidOperationException("Invalid remote version.json");
-                return manifest;
+                request.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true, NoStore = true };
+                using (var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false))
+                {
+                    response.EnsureSuccessStatusCode();
+                    string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    var manifest = JsonConvert.DeserializeObject<UpdateManifest>(json);
+                    if (manifest == null || string.IsNullOrWhiteSpace(manifest.Version))
+                        throw new InvalidOperationException("Invalid remote version.json");
+                    return manifest;
+                }
             }
+        }
+
+        private static string AppendCacheBuster(string url)
+        {
+            string separator = url.IndexOf('?') >= 0 ? "&" : "?";
+            return url + separator + "_=" + DateTime.UtcNow.Ticks;
         }
 
         public async Task DownloadPackageAsync(UpdateManifest manifest, string destinationFile, CancellationToken cancellationToken)
