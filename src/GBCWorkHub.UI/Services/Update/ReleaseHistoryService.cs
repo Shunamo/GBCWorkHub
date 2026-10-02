@@ -81,12 +81,17 @@ namespace GBCWorkHub.UI.Services.Update
                             Version v;
                             if (!TryParseVersion(r.TagName, out v))
                                 continue;
+                            // 릴리즈 노트가 비어있으면(lightweight 태그 등) 이력 토글에 빈 줄만
+                            // 추가하는 셈이라 아예 건너뛴다.
+                            string notes = (r.Body ?? string.Empty).Trim();
+                            if (string.IsNullOrWhiteSpace(notes))
+                                continue;
                             if (v < beforeV)
                             {
                                 result.Add(new SkippedReleaseNote
                                 {
                                     Version = NormalizeVersionText(r.TagName),
-                                    Notes = (r.Body ?? string.Empty).Trim()
+                                    Notes = notes
                                 });
                             }
                         }
