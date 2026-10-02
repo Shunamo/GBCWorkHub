@@ -44,7 +44,9 @@
                 </Setter>
             </Style>
 
-            <!-- 리스트 한 줄 — 아이콘 + 이름을 누르면 바로가기가 열리는 영역. -->
+            <!-- 리스트 한 줄 — 아이콘 + 이름을 누르면 바로가기가 열리는 영역.
+                 줄 전체 호버 강조는 바깥 행 Border가 담당하므로, 이 버튼 자체는
+                 박스/배경 없이 내용만 투명하게 얹는다(중첩 박스 방지). -->
             <Style x:Key="ExcelShortcutOpenButton" TargetType="Button">
                 <Setter Property="Background" Value="Transparent" />
                 <Setter Property="Cursor" Value="Hand" />
@@ -52,14 +54,7 @@
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="Button">
-                            <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="8" Padding="8,6">
-                                <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" />
-                            </Border>
-                            <ControlTemplate.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="Bd" Property="Background" Value="#33FFFFFF" />
-                                </Trigger>
-                            </ControlTemplate.Triggers>
+                            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" />
                         </ControlTemplate>
                     </Setter.Value>
                 </Setter>
@@ -118,7 +113,9 @@
                         </Grid>
                     </Button>
                 </DockPanel>
-                <ScrollViewer Grid.Row="1" Style="{StaticResource GlassScrollViewer}">
+                <Border Grid.Row="1" Background="#40FFFFFF" BorderBrush="#33FFFFFF" BorderThickness="1"
+                        CornerRadius="14" Padding="10">
+                <ScrollViewer Style="{StaticResource GlassScrollViewer}">
                     <ItemsControl ItemsSource="{Binding ExcelShortcuts}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
@@ -127,8 +124,21 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="#14FFFFFF" BorderBrush="#33FFFFFF" BorderThickness="1"
-                                        CornerRadius="10" Margin="0,4" Padding="12,10">
+                                <Border BorderThickness="1" CornerRadius="10" Margin="0,4" Padding="12,10">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="#14FFFFFF" />
+                                            <Setter Property="BorderBrush" Value="#33FFFFFF" />
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#1676ADFF" />
+                                                </Trigger>
+                                                <DataTrigger Binding="{Binding DataContext.IsExcelShortcutsEditMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False">
+                                                    <Setter Property="Cursor" Value="Hand" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -188,6 +198,7 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </ScrollViewer>
+                </Border>
             </Grid>
         </Border>
     </Grid>

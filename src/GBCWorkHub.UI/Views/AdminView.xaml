@@ -13,6 +13,8 @@
                 <ResourceDictionary Source="/GBCWorkHub.UI;component/Assets/WorkLogEditGlassOverrides.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
+            <conv:ResourceKeyToImageConverter x:Key="KeyToImage" />
+            <conv:StringEmptyToVisibilityConverter x:Key="ErrorToVis" />
 
             <Style x:Key="AdminPickerCard" TargetType="Border">
                 <Setter Property="Background" Value="#FFFFFFFF" />
@@ -649,6 +651,19 @@
                         </Style>
                     </Button.Style>
                 </Button>
+                <Button Content="엑셀 시트" Command="{Binding SelectSectionCommand}" CommandParameter="ExcelShortcuts">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource AdminNavButton}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsExcelShortcutsSection}" Value="True">
+                                    <Setter Property="Background" Value="#CCE8F0FF" />
+                                    <Setter Property="Foreground" Value="#1E293B" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
             </StackPanel>
         </Border>
 
@@ -678,6 +693,111 @@
                                    Visibility="{Binding HasAdminStatusMessage, Converter={StaticResource BoolToVis}}" />
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <ItemsControl ItemsSource="{Binding AdminUsers}" ItemTemplate="{StaticResource AdminUserCardTemplate}" />
+                        </ScrollViewer>
+                    </DockPanel>
+                </Border>
+            </Grid>
+
+            <!-- 엑셀 시트 바로가기 — 사용자 화면의 "엑셀 시트" 탭과 같은 DB를 관리자도 관리. -->
+            <Grid Visibility="{Binding IsExcelShortcutsSection, Converter={StaticResource BoolToVis}}">
+                <Border Style="{StaticResource GlassSurfaceStyle}" Padding="16">
+                    <DockPanel LastChildFill="True">
+                        <DockPanel DockPanel.Dock="Top" Margin="2,2,2,12" LastChildFill="False">
+                            <TextBlock Text="엑셀 시트 바로가기" FontSize="15" FontWeight="SemiBold" Foreground="#1E293B"
+                                       VerticalAlignment="Center" />
+                            <Button DockPanel.Dock="Right" Style="{StaticResource HeaderIconButton}"
+                                    ToolTip="바로가기 추가" Command="{Binding AddExcelShortcutCommand}">
+                                <Image Source="{StaticResource AddRingIcon}" Width="18" Height="18" />
+                            </Button>
+                            <Button DockPanel.Dock="Right" Margin="0,0,4,0"
+                                    Command="{Binding ToggleExcelShortcutsEditModeCommand}">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource HeaderIconButton}">
+                                        <Setter Property="ToolTip" Value="전체 수정" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsExcelShortcutsEditMode}" Value="True">
+                                                <Setter Property="ToolTip" Value="저장" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                                <Grid>
+                                    <Image Source="{StaticResource EditFillIcon}" Width="16" Height="16"
+                                           Visibility="{Binding IsExcelShortcutsEditMode, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
+                                    <Image Source="{StaticResource SaveFillIcon}" Width="16" Height="16"
+                                           Visibility="{Binding IsExcelShortcutsEditMode, Converter={StaticResource BoolToVis}}" />
+                                </Grid>
+                            </Button>
+                        </DockPanel>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding AdminExcelShortcuts}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Vertical" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#A6FFFFFF" BorderBrush="#F2FFFFFF" BorderThickness="1"
+                                                CornerRadius="10" Margin="0,4" Padding="12,10">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- 보기 모드: 아이콘 + 파일명, 누르면 바로가기 열림. -->
+                                                <Button Grid.Column="0" Cursor="Hand" Background="Transparent" BorderThickness="0"
+                                                        HorizontalAlignment="Left" HorizontalContentAlignment="Left"
+                                                        Visibility="{Binding DataContext.IsExcelShortcutsEditMode, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}"
+                                                        Command="{Binding DataContext.OpenExternalLinkCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding Url}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Image Source="{Binding IconKey, Converter={StaticResource KeyToImage}}"
+                                                               Width="22" Height="22" Margin="0,0,10,0" />
+                                                        <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
+                                                                   Foreground="#1E293B" VerticalAlignment="Center" TextWrapping="NoWrap" />
+                                                    </StackPanel>
+                                                </Button>
+
+                                                <!-- 전체 수정 모드: 파일명/URL 인라인 입력. -->
+                                                <StackPanel Grid.Column="0" Orientation="Vertical"
+                                                            Visibility="{Binding DataContext.IsExcelShortcutsEditMode, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}}">
+                                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                                        <TextBlock Text="파일명" FontSize="11" Width="40" Foreground="#64748B" VerticalAlignment="Center" />
+                                                        <Border Background="#F4F6F9" BorderBrush="#D8DEE8" BorderThickness="1" CornerRadius="8" Width="220">
+                                                            <TextBox Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}"
+                                                                     BorderThickness="0" Background="Transparent" Padding="8,5" FontSize="13" />
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="URL" FontSize="11" Width="40" Foreground="#64748B" VerticalAlignment="Center" />
+                                                        <Border Background="#F4F6F9" BorderBrush="#D8DEE8" BorderThickness="1" CornerRadius="8" Width="420">
+                                                            <TextBox Text="{Binding EditUrl, UpdateSourceTrigger=PropertyChanged}"
+                                                                     BorderThickness="0" Background="Transparent" Padding="8,5" FontSize="13" />
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding ErrorMessage}" Foreground="#D23C3C" FontSize="11"
+                                                               Margin="40,4,0,0"
+                                                               Visibility="{Binding ErrorMessage, Converter={StaticResource ErrorToVis}}" />
+                                                </StackPanel>
+
+                                                <!-- 전체 수정 모드일 때만 줄마다 삭제 아이콘. -->
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
+                                                            Visibility="{Binding DataContext.IsExcelShortcutsEditMode, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}}">
+                                                    <Button Width="24" Height="24" Padding="0"
+                                                            Style="{StaticResource HeaderIconButton}"
+                                                            ToolTip="삭제"
+                                                            Command="{Binding DataContext.DeleteExcelShortcutCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}">
+                                                        <Image Source="{StaticResource TrashDuotoneIcon}" Width="14" Height="14" />
+                                                    </Button>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                         </ScrollViewer>
                     </DockPanel>
                 </Border>

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
@@ -10,6 +11,7 @@ using GBCWorkHub.BIZ.WorkLog;
 using GBCWorkHub.DTO;
 using GBCWorkHub.DTO.WorkLog;
 using GBCWorkHub.UI.Models.Popup;
+using GBCWorkHub.UI.Services;
 using GBCWorkHub.UI.Services.Popup;
 using GBCWorkHub.UI.ViewModels.WorkLog;
 
@@ -37,6 +39,9 @@ public sealed class AdminViewModel : ViewModelBase
 	private DispatcherTimer _usageLogRefreshTimer;
 
 	private string _selectedSection = "Pcs";
+
+	private readonly ExcelShortcutBiz _excelShortcutBiz = new ExcelShortcutBiz();
+	private bool _isExcelShortcutsEditMode;
 
 	private string _adminStatusMessage = string.Empty;
 
@@ -150,7 +155,23 @@ public sealed class AdminViewModel : ViewModelBase
 
 	public ObservableCollection<AdminSiteChipItemViewModel> AdminPcSites { get; private set; }
 
+	public ObservableCollection<ExcelShortcutRowViewModel> AdminExcelShortcuts { get; } = new ObservableCollection<ExcelShortcutRowViewModel>();
+
+	public bool IsExcelShortcutsEditMode
+	{
+		get { return _isExcelShortcutsEditMode; }
+		private set { SetProperty(ref _isExcelShortcutsEditMode, value, "IsExcelShortcutsEditMode"); }
+	}
+
 	public ICommand SelectSectionCommand { get; private set; }
+
+	public ICommand OpenExternalLinkCommand { get; private set; }
+
+	public ICommand AddExcelShortcutCommand { get; private set; }
+
+	public ICommand ToggleExcelShortcutsEditModeCommand { get; private set; }
+
+	public ICommand DeleteExcelShortcutCommand { get; private set; }
 
 	public ICommand ReloadAdminUsersCommand { get; private set; }
 
@@ -271,6 +292,7 @@ public sealed class AdminViewModel : ViewModelBase
 				RaisePropertyChanged("IsUsageLogsSection");
 				RaisePropertyChanged("IsWorkLogsSection");
 				RaisePropertyChanged("IsRequestsSection");
+				RaisePropertyChanged("IsExcelShortcutsSection");
 				RaisePropertyChanged("SectionTitle");
 			}
 		}
@@ -287,6 +309,8 @@ public sealed class AdminViewModel : ViewModelBase
 	public bool IsWorkLogsSection => string.Equals(SelectedSection, "WorkLogs", StringComparison.OrdinalIgnoreCase);
 
 	public bool IsRequestsSection => string.Equals(SelectedSection, "Requests", StringComparison.OrdinalIgnoreCase);
+
+	public bool IsExcelShortcutsSection => string.Equals(SelectedSection, "ExcelShortcuts", StringComparison.OrdinalIgnoreCase);
 
 	public string SectionTitle
 	{
@@ -311,6 +335,10 @@ public sealed class AdminViewModel : ViewModelBase
 			if (IsRequestsSection)
 			{
 				return "개선사항 관리";
+			}
+			if (IsExcelShortcutsSection)
+			{
+				return "엑셀 시트 바로가기";
 			}
 			return "사용자";
 		}
@@ -917,6 +945,19 @@ public sealed class AdminViewModel : ViewModelBase
 		SyncSiteChipSelection(UsageLogSites, UsageLogSiteFilter);
 		SyncSiteChipSelection(WorkLogSites, WorkLogSiteFilter);
 		SelectSectionCommand = new RelayCommand<string>(SelectSection);
+		OpenExternalLinkCommand = new RelayCommand<string>(OpenExternalLink);
+		AddExcelShortcutCommand = new RelayCommand(delegate
+		{
+			Task task = AddExcelShortcutAsync();
+		});
+		ToggleExcelShortcutsEditModeCommand = new RelayCommand(delegate
+		{
+			Task task = ToggleExcelShortcutsEditModeAsync();
+		});
+		DeleteExcelShortcutCommand = new RelayCommand<ExcelShortcutRowViewModel>(delegate(ExcelShortcutRowViewModel row)
+		{
+			Task task = DeleteExcelShortcutAsync(row);
+		});
 		ReloadAdminUsersCommand = new RelayCommand(delegate
 		{
 			Task task = ReloadAdminUsersAsync();
@@ -1236,13 +1277,20 @@ public sealed class AdminViewModel : ViewModelBase
 		await ReloadOccupancyAsync().ConfigureAwait(continueOnCapturedContext: true);
 		await ReloadUsageLogsAsync().ConfigureAwait(continueOnCapturedContext: true);
 		await ReloadWorkLogsAsync().ConfigureAwait(continueOnCapturedContext: true);
+		await ReloadAdminExcelShortcutsAsync().ConfigureAwait(continueOnCapturedContext: true);
 	}
 
 	private void SelectSection(string section)
 	{
 		if (!string.IsNullOrWhiteSpace(section))
 		{
+			string previousSection = SelectedSection;
 			SelectedSection = section.Trim();
+
+			if (IsExcelShortcutsEditMode
+				&& !string.Equals(previousSection, SelectedSection, StringComparison.OrdinalIgnoreCase)
+				&& string.Equals(previousSection, "ExcelShortcuts", StringComparison.OrdinalIgnoreCase))
+				DiscardExcelShortcutsEditMode();
 			if (IsUsersSection)
 			{
 				Task task = ReloadAdminUsersAsync();
@@ -1267,12 +1315,153 @@ public sealed class AdminViewModel : ViewModelBase
 					Task task6 = WorkLogListHost.ReloadFromDbAsync(true);
 				}
 			}
+			else if (IsExcelShortcutsSection)
+			{
+				Task task7 = ReloadAdminExcelShortcutsAsync();
+			}
 
 			if (IsUsageLogsSection && _usageLogRefreshTimer != null)
 				_usageLogRefreshTimer.Start();
 			else if (_usageLogRefreshTimer != null)
 				_usageLogRefreshTimer.Stop();
 		}
+	}
+
+	private void OpenExternalLink(string url)
+	{
+		if (string.IsNullOrWhiteSpace(url))
+			return;
+		try
+		{
+			Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+		}
+		catch (Exception ex)
+		{
+			DiagnosticLogger.Error("EXTERNAL_LINK", "Open failed: " + ex.Message);
+		}
+	}
+
+	/// <summary>"엑셀 시트" 탭과 같은 DB(XSUP.MSDWHTKD_EXCEL_SHORTCUT)를 관리자 화면에서도
+	/// 추가/전체수정/삭제할 수 있게 한다 — 운영팀 전체가 보는 공유 목록.</summary>
+	private async Task ReloadAdminExcelShortcutsAsync()
+	{
+		List<ExcelShortcutDto> rows;
+		try
+		{
+			rows = await _excelShortcutBiz.GetAllAsync().ConfigureAwait(continueOnCapturedContext: true);
+		}
+		catch (Exception ex)
+		{
+			AdminStatusMessage = "엑셀 시트 목록 조회 실패: " + ex.Message;
+			return;
+		}
+		AdminExcelShortcuts.Clear();
+		if (rows == null)
+			return;
+		for (int i = 0; i < rows.Count; i++)
+			AdminExcelShortcuts.Add(new ExcelShortcutRowViewModel(rows[i]));
+	}
+
+	private async Task AddExcelShortcutAsync()
+	{
+		if (_popup == null)
+			return;
+
+		string createdBy = OccupancyNameStore.DisplayName;
+		PopupResult result = await _popup.ShowPromptAsync(new PopupRequest
+		{
+			Title = "바로가기 추가",
+			Icon = PopupIconKind.Info,
+			ShowInput = true,
+			InputText = string.Empty,
+			InputLabel = "파일명",
+			InputPlaceholder = string.Empty,
+			ShowSecondaryInput = true,
+			RequireSecondaryInput = true,
+			SecondaryInputLabel = "URL",
+			SecondaryInputText = string.Empty,
+			Buttons = new[]
+			{
+				new PopupButtonDefinition("취소", PopupResultType.Cancel, isCancel: true),
+				new PopupButtonDefinition("추가", PopupResultType.Primary, isDefault: true)
+			},
+			PrimaryValidator = delegate(PopupHostViewModelSnapshot snap)
+			{
+				return _excelShortcutBiz.AddAsync(snap.InputText, snap.SecondaryInputText, "ExcelBrandIcon", createdBy);
+			}
+		}).ConfigureAwait(continueOnCapturedContext: true);
+
+		if (result == null || !result.IsPrimary)
+			return;
+		await ReloadAdminExcelShortcutsAsync().ConfigureAwait(continueOnCapturedContext: true);
+	}
+
+	private async Task ToggleExcelShortcutsEditModeAsync()
+	{
+		if (!IsExcelShortcutsEditMode)
+		{
+			for (int i = 0; i < AdminExcelShortcuts.Count; i++)
+				AdminExcelShortcuts[i].SeedEdit();
+			IsExcelShortcutsEditMode = true;
+			return;
+		}
+
+		bool allSaved = true;
+		for (int i = 0; i < AdminExcelShortcuts.Count; i++)
+		{
+			ExcelShortcutRowViewModel row = AdminExcelShortcuts[i];
+			if (!row.IsChanged)
+				continue;
+			if (string.IsNullOrWhiteSpace(row.EditName) || string.IsNullOrWhiteSpace(row.EditUrl))
+			{
+				row.ErrorMessage = "파일명과 URL을 모두 입력해 주세요.";
+				allSaved = false;
+				continue;
+			}
+			string err = await _excelShortcutBiz.UpdateAsync(row.ShortcutId, row.EditName, row.EditUrl).ConfigureAwait(continueOnCapturedContext: true);
+			if (!string.IsNullOrEmpty(err))
+			{
+				row.ErrorMessage = err;
+				allSaved = false;
+				continue;
+			}
+			row.Apply(row.EditName.Trim(), row.EditUrl.Trim());
+		}
+
+		if (allSaved)
+			IsExcelShortcutsEditMode = false;
+	}
+
+	private void DiscardExcelShortcutsEditMode()
+	{
+		for (int i = 0; i < AdminExcelShortcuts.Count; i++)
+			AdminExcelShortcuts[i].ErrorMessage = null;
+		IsExcelShortcutsEditMode = false;
+	}
+
+	private async Task DeleteExcelShortcutAsync(ExcelShortcutRowViewModel row)
+	{
+		if (_popup == null || row == null)
+			return;
+
+		PopupResult confirm = await _popup.ShowConfirmAsync(new PopupRequest
+		{
+			Title = "바로가기 삭제",
+			Icon = PopupIconKind.Warning,
+			Message = row.Name + " 바로가기를 삭제할까요?",
+			Buttons = new PopupButtonDefinition[2]
+			{
+				new PopupButtonDefinition("취소", PopupResultType.Cancel, isDefault: false, isCancel: true),
+				new PopupButtonDefinition("삭제", PopupResultType.Primary, isDefault: true)
+			}
+		}).ConfigureAwait(continueOnCapturedContext: true);
+		if (confirm == null || !confirm.IsPrimary || confirm.IsCancelOrClosed)
+			return;
+
+		string deleteErr = await _excelShortcutBiz.DeleteAsync(row.ShortcutId).ConfigureAwait(continueOnCapturedContext: true);
+		if (!string.IsNullOrEmpty(deleteErr))
+			return;
+		AdminExcelShortcuts.Remove(row);
 	}
 
 	private async Task ReloadAdminUsersAsync()
