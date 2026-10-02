@@ -67,10 +67,13 @@ jobs:
           # directly at the commit, discarding the annotated tag object. Re-fetch the
           # tag explicitly so we read its message, not the commit's.
           git fetch --force origin "refs/tags/${tag}:refs/tags/${tag}"
-          # 태그가 annotated면(git tag -a vX.Y.Z -m "...") 그 메시지 본문을 그대로 쓴다.
+          # 태그가 annotated면(git tag -a vX.Y.Z -m "...") 그 메시지를 그대로 쓴다.
           # lightweight 태그면 빈 문자열 — 이 경우 앱 내 업데이트 안내 팝업은 뜨지 않는다
           # (PendingReleaseNoticeStore.Save가 빈 텍스트를 무시함).
-          $lines = git tag -l --format='%(contents:body)' $tag
+          # 주의: %(contents:body)는 "첫 줄(제목) + 빈 줄" 다음에 오는 본문만 가리켜서,
+          # 지금처럼 한 줄짜리 -m "..." 메시지는 본문이 없어 항상 빈 문자열이 된다.
+          # %(contents)는 제목까지 포함한 전체 메시지라 한 줄/여러 줄 메시지 모두 제대로 뽑힌다.
+          $lines = git tag -l --format='%(contents)' $tag
           $notesText = if ($lines) { ($lines -join "`n").TrimEnd() } else { "" }
 
           $delimiter = "NOTES_EOF_$([guid]::NewGuid().ToString('N'))"
