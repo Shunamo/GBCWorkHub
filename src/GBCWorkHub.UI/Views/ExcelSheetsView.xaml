@@ -181,12 +181,29 @@
                                                        Visibility="{Binding ErrorMessage, Converter={StaticResource ErrorToVis}}" />
                                         </StackPanel>
 
-                                        <!-- 전체 수정 모드일 때만 줄마다 삭제 아이콘. -->
-                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
-                                                    Visibility="{Binding DataContext.IsExcelShortcutsEditMode, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}}">
+                                        <!-- 핀(개인 로컬 고정)은 항상 보이고, 삭제는 전체 수정 모드일 때만. -->
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Button Width="24" Height="24" Padding="0"
+                                                    Style="{StaticResource HeaderIconButton}" Margin="0,0,2,0"
+                                                    ToolTip="핀 고정/해제"
+                                                    Command="{Binding DataContext.ToggleExcelShortcutPinCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}">
+                                                <Grid>
+                                                    <Image Source="{StaticResource PinFillIcon}" Width="14" Height="14"
+                                                           RenderTransformOrigin="0.5,0.5"
+                                                           Visibility="{Binding IsPinned, Converter={StaticResource BoolToVis}}">
+                                                        <Image.RenderTransform>
+                                                            <RotateTransform Angle="25" />
+                                                        </Image.RenderTransform>
+                                                    </Image>
+                                                    <Image Source="{StaticResource PinOutlineIcon}" Width="14" Height="14"
+                                                           Visibility="{Binding IsPinned, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
+                                                </Grid>
+                                            </Button>
                                             <Button Width="24" Height="24" Padding="0"
                                                     Style="{StaticResource HeaderIconButton}"
                                                     ToolTip="삭제"
+                                                    Visibility="{Binding DataContext.IsExcelShortcutsEditMode, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}}"
                                                     Command="{Binding DataContext.DeleteExcelShortcutCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}">
                                                 <Image Source="{StaticResource TrashDuotoneIcon}" Width="14" Height="14" />

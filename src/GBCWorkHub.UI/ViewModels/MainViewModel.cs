@@ -76,6 +76,7 @@ namespace GBCWorkHub.UI.ViewModels
             OpenExternalLinkCommand = new RelayCommand<string>(OpenExternalLink);
             AddExcelShortcutCommand = new RelayCommand(() => { var _ = AddExcelShortcutAsync(); });
             ToggleExcelShortcutsEditModeCommand = new RelayCommand(() => { var _ = ToggleExcelShortcutsEditModeAsync(); });
+            ToggleExcelShortcutPinCommand = new RelayCommand<ExcelShortcutRowViewModel>(ToggleExcelShortcutPin);
             DeleteExcelShortcutCommand = new RelayCommand<ExcelShortcutRowViewModel>(row => { var _ = DeleteExcelShortcutAsync(row); });
             BackToSitesCommand = new RelayCommand(() => _remoteWorkspace.BackToSitesCommand.Execute(null));
             UpdateCommand = new RelayCommand(() => { var _ = ApplyUpdateAsync(); }, () => IsUpdateAvailable && !IsUpdateBusy);
@@ -321,6 +322,7 @@ namespace GBCWorkHub.UI.ViewModels
         public ICommand OpenExternalLinkCommand { get; private set; }
         public ICommand AddExcelShortcutCommand { get; private set; }
         public ICommand ToggleExcelShortcutsEditModeCommand { get; private set; }
+        public ICommand ToggleExcelShortcutPinCommand { get; private set; }
         public ICommand DeleteExcelShortcutCommand { get; private set; }
         public ICommand BackToSitesCommand { get; private set; }
         public ICommand UpdateCommand { get; private set; }
@@ -1239,8 +1241,42 @@ namespace GBCWorkHub.UI.ViewModels
             ExcelShortcuts.Clear();
             if (rows == null)
                 return;
+
+            var pinnedIds = ExcelShortcutPinStore.LoadPinnedIds();
+            var items = new List<ExcelShortcutRowViewModel>();
             for (int i = 0; i < rows.Count; i++)
-                ExcelShortcuts.Add(new ExcelShortcutRowViewModel(rows[i]));
+            {
+                var row = new ExcelShortcutRowViewModel(rows[i]);
+                row.IsPinned = pinnedIds.Contains(row.ShortcutId);
+                items.Add(row);
+            }
+            SortExcelShortcuts(items);
+            for (int i = 0; i < items.Count; i++)
+                ExcelShortcuts.Add(items[i]);
+        }
+
+        /// <summary>핀 된 항목(개인별 로컬 설정)을 맨 위로, 나머지는 DB SortOrder 순서대로.</summary>
+        private static void SortExcelShortcuts(List<ExcelShortcutRowViewModel> items)
+        {
+            items.Sort(delegate (ExcelShortcutRowViewModel a, ExcelShortcutRowViewModel b)
+            {
+                if (a.IsPinned != b.IsPinned)
+                    return a.IsPinned ? -1 : 1;
+                return a.SortOrder.CompareTo(b.SortOrder);
+            });
+        }
+
+        private void ToggleExcelShortcutPin(ExcelShortcutRowViewModel row)
+        {
+            if (row == null)
+                return;
+            row.IsPinned = ExcelShortcutPinStore.TogglePin(row.ShortcutId);
+
+            var items = new List<ExcelShortcutRowViewModel>(ExcelShortcuts);
+            SortExcelShortcuts(items);
+            ExcelShortcuts.Clear();
+            for (int i = 0; i < items.Count; i++)
+                ExcelShortcuts.Add(items[i]);
         }
 
         private async Task AddExcelShortcutAsync()

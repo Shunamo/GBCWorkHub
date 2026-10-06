@@ -19,6 +19,15 @@ namespace GBCWorkHub.UI.ViewModels
         public string Name { get { return Dto.Name; } }
         public string Url { get { return Dto.Url; } }
         public string IconKey { get { return Dto.IconKey; } }
+        public int SortOrder { get { return Dto.SortOrder; } }
+
+        private bool _isPinned;
+        /// <summary>DB에 저장 안 되는 개인별 로컬 핀 — <see cref="Services.ExcelShortcutPinStore"/>가 관리.</summary>
+        public bool IsPinned
+        {
+            get { return _isPinned; }
+            set { if (_isPinned == value) return; _isPinned = value; OnPropertyChanged(); }
+        }
 
         private string _editName;
         public string EditName
