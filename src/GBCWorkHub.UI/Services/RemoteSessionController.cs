@@ -257,10 +257,17 @@ namespace GBCWorkHub.UI.Services
                 DiagnosticLogger.Info("ViewModel", "Status " + before + " -> 사용 중 (Reserve) remoteIp=" + remoteIp + " token=" + sessionToken);
             });
 
-            string message;
-            bool ok = usePublishedRdp
-                ? _tracker.TryStartPublishedRdp(publishedRdpPath.Trim(), remoteIp, computerName, out message)
-                : _tracker.TryStart(remoteIp, computerName, out message);
+            string message = null;
+            bool ok;
+            if (usePublishedRdp)
+            {
+                ok = await _tracker.TryStartPublishedRdpAsync(
+                    publishedRdpPath.Trim(), remoteIp, computerName, m => message = m).ConfigureAwait(true);
+            }
+            else
+            {
+                ok = _tracker.TryStart(remoteIp, computerName, out message);
+            }
             if (!ok)
             {
                 await _share.ReleaseAsync(remoteIp, sessionToken, "MSTSC_START_FAILED").ConfigureAwait(true);

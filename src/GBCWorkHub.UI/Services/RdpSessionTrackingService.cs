@@ -6,6 +6,7 @@ using System.Linq;
 using System.Management;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows.Threading;
 using GBCWorkHub.BIZ;
 using GBCWorkHub.DTO;
@@ -31,6 +32,9 @@ namespace GBCWorkHub.UI.Services
         private bool _launchPreferMinimized;
         private bool _disposed;
         private bool _endHandled;
+        /// <summary>게시 .rdp 시작의 mstsc 탐지 폴링이 백그라운드에서 도는 동안(IsTracking이
+        /// 아직 true가 되기 전) 다른 시작 호출이 끼어들지 못하게 막는 가드.</summary>
+        private bool _launchInProgress;
         private DateTime _launchTimeUtc;
         private Process _startReturnedProcess;
         private int _sessionGeneration;
@@ -283,51 +287,56 @@ namespace GBCWorkHub.UI.Services
 
         /// <summary>
         /// 게시 .rdp 파일 실행 후 mstsc 추적. shareKey는 DB 점유 키(IP 또는 PC명).
+        /// mstsc 탐지 폴링은 백그라운드 스레드에서 돈다(UI 스레드를 막지 않음) — 다운로드된
+        /// .rdp는 Windows "열기 - 보안 경고" 창을 사용자가 눌러야 떠서, 대기가 수 초 걸릴 수 있다.
         /// </summary>
-        public bool TryStartPublishedRdp(string rdpFilePath, string shareKey, string remoteComputerName, out string message)
+        public Task<bool> TryStartPublishedRdpAsync(
+            string rdpFilePath, string shareKey, string remoteComputerName, Action<string> reportMessage)
         {
-            return TryStartPublishedRdp(
-                rdpFilePath, shareKey, remoteComputerName, RdpLaunchPurpose.UserSession, out message);
+            return TryStartPublishedRdpAsync(
+                rdpFilePath, shareKey, remoteComputerName, RdpLaunchPurpose.UserSession, reportMessage);
         }
 
-        public bool TryStartPublishedRdp(
+        public async Task<bool> TryStartPublishedRdpAsync(
             string rdpFilePath,
             string shareKey,
             string remoteComputerName,
             RdpLaunchPurpose purpose,
-            out string message)
+            Action<string> reportMessage)
         {
-            message = null;
-            int startedGeneration;
             string rdpPath = (rdpFilePath ?? string.Empty).Trim();
             string key = (shareKey ?? string.Empty).Trim();
             string fileNeedle = string.IsNullOrWhiteSpace(rdpPath)
                 ? string.Empty
                 : Path.GetFileName(rdpPath);
 
+            int startedGeneration;
+            Process started;
+            HashSet<int> beforeIds;
+
             lock (_sync)
             {
                 if (_disposed)
                 {
-                    message = "서비스가 종료되었습니다.";
+                    reportMessage("서비스가 종료되었습니다.");
                     return false;
                 }
 
-                if (IsTracking)
+                if (IsTracking || _launchInProgress)
                 {
-                    message = "이미 해당 원격 PC 세션을 추적 중입니다.";
+                    reportMessage("이미 해당 원격 PC 세션을 추적 중입니다.");
                     return false;
                 }
 
                 if (string.IsNullOrWhiteSpace(rdpPath) || !File.Exists(rdpPath))
                 {
-                    message = "RDP 파일이 없습니다.";
+                    reportMessage("RDP 파일이 없습니다.");
                     return false;
                 }
 
                 if (string.IsNullOrWhiteSpace(key))
                 {
-                    message = "점유 키(IP/PC명)가 없습니다.";
+                    reportMessage("점유 키(IP/PC명)가 없습니다.");
                     return false;
                 }
 
@@ -340,6 +349,7 @@ namespace GBCWorkHub.UI.Services
                 _windowGoneTicks = 0;
                 _windowPresentTicks = 0;
                 _everSawRemoteWindow = false;
+                _launchInProgress = true;
 
                 _sessionGeneration++;
                 startedGeneration = _sessionGeneration;
@@ -353,7 +363,7 @@ namespace GBCWorkHub.UI.Services
 
                 try
                 {
-                    var beforeIds = GetMstscProcessIds();
+                    beforeIds = GetMstscProcessIds();
                     _launchTimeUtc = DateTime.UtcNow;
                     LaunchTime = DateTime.Now;
                     ConnectionConfirmedAt = null;
@@ -365,14 +375,13 @@ namespace GBCWorkHub.UI.Services
                         ? "LOCAL_PUBLISHED_RDP_TFS_SYNC"
                         : "LOCAL_PUBLISHED_RDP_START";
 
-                    Process started = Process.Start(new ProcessStartInfo
+                    started = Process.Start(new ProcessStartInfo
                     {
                         FileName = rdpPath,
                         UseShellExecute = true
                     });
 
                     _startReturnedProcess = started;
-                    int startedId = started != null ? started.Id : -1;
 
                     if (started != null)
                     {
@@ -385,92 +394,112 @@ namespace GBCWorkHub.UI.Services
                         {
                         }
                     }
-
-                    // 다운로드된 .rdp(게시 RDP)는 "Mark of the Web" 때문에 Windows가
-                    // "열기 - 보안 경고" 창을 먼저 띄우고, 사용자가 "실행"을 눌러야 그제서야
-                    // mstsc.exe가 뜬다. 한 번만 짧게 자고 끝내면 그 클릭 대기 시간에 걸려
-                    // "후보를 못 찾음"으로 오판하므로, mstsc가 나타날 때까지 짧은 간격으로
-                    // 최대 8초간 폴링하고 찾는 즉시 멈춘다(정상 케이스는 기존처럼 금방 끝남).
-                    const int pollIntervalMs = 400;
-                    const int maxWaitMs = 8000;
-                    int waitedMs = 0;
-                    HashSet<int> afterIds;
-                    var candidateIds = new List<int>();
-
-                    do
-                    {
-                        System.Threading.Thread.Sleep(pollIntervalMs);
-                        waitedMs += pollIntervalMs;
-
-                        afterIds = GetMstscProcessIds();
-                        candidateIds = afterIds.Except(beforeIds).ToList();
-
-                        if (started != null)
-                        {
-                            try
-                            {
-                                if (!started.HasExited && !candidateIds.Contains(started.Id))
-                                    candidateIds.Add(started.Id);
-                            }
-                            catch
-                            {
-                            }
-                        }
-
-                        // .rdp 경로/파일명이 cmdline에 남은 mstsc
-                        if (!string.IsNullOrWhiteSpace(fileNeedle))
-                        {
-                            foreach (var w in QueryMstscByCommandLine(fileNeedle))
-                            {
-                                if (afterIds.Contains(w.ProcessId) && !candidateIds.Contains(w.ProcessId))
-                                    candidateIds.Add(w.ProcessId);
-                            }
-                        }
-                    }
-                    while (candidateIds.Count == 0 && waitedMs < maxWaitMs);
-
-                    if (candidateIds.Count == 0)
-                    {
-                        // 재사용 의심: 파일명 매칭 전체
-                        if (!string.IsNullOrWhiteSpace(fileNeedle))
-                        {
-                            foreach (var w in QueryMstscByCommandLine(fileNeedle))
-                                candidateIds.Add(w.ProcessId);
-                        }
-                    }
-
-                    // 그래도 없으면 새로 뜬 mstsc만 (before 대비 after)
-                    if (candidateIds.Count == 0)
-                        candidateIds.AddRange(afterIds.Except(beforeIds));
-
-                    foreach (var pid in candidateIds.Distinct())
-                        AddCandidateUnlocked(pid, started != null && started.Id == pid ? started : null);
-
-                    if (_tracked.Count == 0)
-                    {
-                        message = "mstsc 후보 프로세스를 찾지 못했습니다. (.rdp)";
-                        RaiseError(message);
-                        ResetTrackingStateUnlocked();
-                        return false;
-                    }
-
-                    IsTracking = true;
-                    StartWatchdogUnlocked();
-                    message = "원격 접속을 시작했습니다. (.rdp)";
                 }
                 catch (Exception ex)
                 {
-                    message = "RDP 실행 실패: " + ex.Message;
-                    RaiseError(message);
+                    string failMessage = "RDP 실행 실패: " + ex.Message;
+                    RaiseError(failMessage);
                     ResetTrackingStateUnlocked();
+                    reportMessage(failMessage);
                     return false;
                 }
+            }
+
+            // 다운로드된 .rdp(게시 RDP)는 "Mark of the Web" 때문에 Windows가 "열기 - 보안 경고"
+            // 창을 먼저 띄우고, 사용자가 "실행"을 눌러야 그제서야 mstsc.exe가 뜬다. 그 대기를
+            // 락 밖·백그라운드 스레드에서 폴링해 UI는 그동안 자유롭게 반응하게 둔다
+            // (찾으면 바로 멈춤 — 정상 케이스는 기존처럼 금방 끝남, 최대 8초).
+            List<int> candidateIds = await Task.Run(
+                () => PollForMstscCandidates(beforeIds, started, fileNeedle)).ConfigureAwait(true);
+
+            lock (_sync)
+            {
+                // 그 사이 서비스가 종료됐거나 다른 세션이 먼저 시작됐으면 이 결과는 버린다.
+                if (_disposed || _sessionGeneration != startedGeneration)
+                {
+                    reportMessage("다른 세션이 먼저 시작되어 취소되었습니다.");
+                    return false;
+                }
+
+                if (candidateIds.Count == 0 && !string.IsNullOrWhiteSpace(fileNeedle))
+                {
+                    // 재사용 의심: 파일명 매칭 전체
+                    foreach (var w in QueryMstscByCommandLine(fileNeedle))
+                        candidateIds.Add(w.ProcessId);
+                }
+
+                // 그래도 없으면 새로 뜬 mstsc만 (before 대비 after)
+                if (candidateIds.Count == 0)
+                {
+                    var afterIds = GetMstscProcessIds();
+                    candidateIds.AddRange(afterIds.Except(beforeIds));
+                }
+
+                foreach (var pid in candidateIds.Distinct())
+                    AddCandidateUnlocked(pid, started != null && started.Id == pid ? started : null);
+
+                if (_tracked.Count == 0)
+                {
+                    string failMessage = "mstsc 후보 프로세스를 찾지 못했습니다. (.rdp)";
+                    RaiseError(failMessage);
+                    ResetTrackingStateUnlocked();
+                    reportMessage(failMessage);
+                    return false;
+                }
+
+                IsTracking = true;
+                _launchInProgress = false;
+                StartWatchdogUnlocked();
+                reportMessage("원격 접속을 시작했습니다. (.rdp)");
             }
 
             var startedHandler = RdpStarted;
             if (startedHandler != null)
                 startedHandler(startedGeneration);
             return true;
+        }
+
+        /// <summary>백그라운드 스레드에서 실행 — mstsc 후보 PID가 나타날 때까지 짧은 간격으로 폴링한다.</summary>
+        private static List<int> PollForMstscCandidates(HashSet<int> beforeIds, Process started, string fileNeedle)
+        {
+            const int pollIntervalMs = 400;
+            const int maxWaitMs = 8000;
+            int waitedMs = 0;
+            var candidateIds = new List<int>();
+
+            do
+            {
+                System.Threading.Thread.Sleep(pollIntervalMs);
+                waitedMs += pollIntervalMs;
+
+                var afterIds = GetMstscProcessIds();
+                candidateIds = afterIds.Except(beforeIds).ToList();
+
+                if (started != null)
+                {
+                    try
+                    {
+                        if (!started.HasExited && !candidateIds.Contains(started.Id))
+                            candidateIds.Add(started.Id);
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                // .rdp 경로/파일명이 cmdline에 남은 mstsc
+                if (!string.IsNullOrWhiteSpace(fileNeedle))
+                {
+                    foreach (var w in QueryMstscByCommandLine(fileNeedle))
+                    {
+                        if (afterIds.Contains(w.ProcessId) && !candidateIds.Contains(w.ProcessId))
+                            candidateIds.Add(w.ProcessId);
+                    }
+                }
+            }
+            while (candidateIds.Count == 0 && waitedMs < maxWaitMs);
+
+            return candidateIds;
         }
 
         /// <summary>
@@ -1316,6 +1345,7 @@ namespace GBCWorkHub.UI.Services
             _windowGoneTicks = 0;
             _windowPresentTicks = 0;
             _everSawRemoteWindow = false;
+            _launchInProgress = false;
         }
 
         private void RaiseError(string message)

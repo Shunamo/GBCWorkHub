@@ -661,17 +661,15 @@ namespace GBCWorkHub.UI.Services.TfsSync
                 await _popup.UpdateProgressAsync("3. 원격 PC 재접속 중").ConfigureAwait(true);
 
                 // AURORA: mstsc /v:IP / RC: 게시 .rdp (점유키가 IP가 아니면)
-                string startMsg;
-                string launchMode;
-                bool started = TryStartTfsReconnectRdp(request, out startMsg, out launchMode);
+                var reconnect = await TryStartTfsReconnectRdpAsync(request).ConfigureAwait(true);
 
-                if (!started)
+                if (!reconnect.Success)
                 {
                     SetState(TfsSyncState.Failed, request, null);
                     await FailAndShowAsync(request, new TfsSyncResult
                     {
                         FailReason = TfsSyncFailReason.RdpStartFailed,
-                        Message = startMsg ?? "원격 재접속 실행 실패"
+                        Message = reconnect.Message ?? "원격 재접속 실행 실패"
                     }).ConfigureAwait(true);
                     return;
                 }
@@ -682,7 +680,7 @@ namespace GBCWorkHub.UI.Services.TfsSync
                     _mstscPid = ids != null && ids.Count > 0 ? ids[0] : -1;
                 }
 
-                DiagnosticLogger.Info("TFS_TEMP_RDP_STARTED", FormatLog(request, null, "launch=" + launchMode));
+                DiagnosticLogger.Info("TFS_TEMP_RDP_STARTED", FormatLog(request, null, "launch=" + reconnect.LaunchMode));
 
                 // Payload waiter를 먼저 걸어 연결 대기 중 도착분도 받는다
                 var waiter = new TaskCompletionSource<AcceptedPayload>();
@@ -1274,17 +1272,23 @@ namespace GBCWorkHub.UI.Services.TfsSync
             return TfsClipboardPayloadService.ClipboardPrefix + json;
         }
 
+        private sealed class TfsReconnectLaunchResult
+        {
+            public bool Success;
+            public string Message;
+            public string LaunchMode = "none";
+        }
+
         /// <summary>
         /// AURORA 등(IP): mstsc /v: / RC(PC명 점유키): 게시 .rdp
         /// </summary>
-        private bool TryStartTfsReconnectRdp(TfsSyncRequest request, out string message, out string launchMode)
+        private async Task<TfsReconnectLaunchResult> TryStartTfsReconnectRdpAsync(TfsSyncRequest request)
         {
-            message = null;
-            launchMode = "none";
+            var result = new TfsReconnectLaunchResult();
             if (request == null)
             {
-                message = "요청이 없습니다.";
-                return false;
+                result.Message = "요청이 없습니다.";
+                return result;
             }
 
             string shareKey = (request.RemoteIp ?? string.Empty).Trim();
@@ -1315,28 +1319,34 @@ namespace GBCWorkHub.UI.Services.TfsSync
 
                 if (!found.Succeeded)
                 {
-                    message = found.Message
+                    result.Message = found.Message
                         ?? "원격 재접속 대상을 찾지 못했습니다.\n"
                         + "AURORA는 PC Host IP가, RC는 게시 .rdp가 필요합니다.";
-                    return false;
+                    return result;
                 }
 
-                launchMode = "published_rdp";
-                return _rdp.TryStartPublishedRdp(
+                result.LaunchMode = "published_rdp";
+                string publishedMessage = null;
+                result.Success = await _rdp.TryStartPublishedRdpAsync(
                     found.Path,
                     shareKey,
                     pcName,
                     RdpLaunchPurpose.TfsSyncReconnect,
-                    out message);
+                    m => publishedMessage = m).ConfigureAwait(true);
+                result.Message = publishedMessage;
+                return result;
             }
 
-            launchMode = "mstsc_/v";
-            return _rdp.TryStart(
+            result.LaunchMode = "mstsc_/v";
+            string mstscMessage;
+            result.Success = _rdp.TryStart(
                 shareKey,
                 pcName,
                 RdpLaunchPurpose.TfsSyncReconnect,
                 startMinimized: false,
-                out message);
+                out mstscMessage);
+            result.Message = mstscMessage;
+            return result;
         }
 
         private static string TryResolveIpv4ForReconnect(string shareKey, string pcName)
