@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Configuration;
 using System.Diagnostics;
 using System.Linq;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -144,7 +145,11 @@ namespace GBCWorkHub.UI.Services
         }
 
         /// <param name="publishedRdpPath">있으면 게시 .rdp 실행+추적, 없으면 mstsc /v:IP</param>
-        public async Task<string> StartRemoteSessionAsync(RemotePcDto pc, string publishedRdpPath)
+        /// <param name="directConnectHost">
+        /// DB 점유 키(remoteIp)와 mstsc 접속 대상이 다를 때(예: RC는 점유 키가 PC명)
+        /// mstsc /v: 에 쓸 실제 접속 주소. 없으면 remoteIp를 그대로 사용.
+        /// </param>
+        public async Task<string> StartRemoteSessionAsync(RemotePcDto pc, string publishedRdpPath, string directConnectHost = null)
         {
             if (pc == null)
                 return "선택된 PC가 없습니다.";
@@ -266,7 +271,8 @@ namespace GBCWorkHub.UI.Services
             }
             else
             {
-                ok = _tracker.TryStart(remoteIp, computerName, out message);
+                string mstscTarget = !string.IsNullOrWhiteSpace(directConnectHost) ? directConnectHost.Trim() : remoteIp;
+                ok = _tracker.TryStart(mstscTarget, computerName, out message);
             }
             if (!ok)
             {
@@ -2166,7 +2172,34 @@ namespace GBCWorkHub.UI.Services
             var rdp = Services.PublishedRdpLauncher.TryFindForPc(item.SiteCode, item.PcName);
             if (!rdp.Succeeded)
             {
-                await OfferRcRdWebAndGuideAsync(pcLabel).ConfigureAwait(true);
+                string probeHost = item != null ? item.HostAddress : null;
+                string directHost = ResolveDirectRcFallbackHost(item);
+                if (string.IsNullOrWhiteSpace(directHost))
+                {
+                    DiagnosticLogger.Info("RC_DIRECT_IP_UNAVAILABLE",
+                        "Pc=" + pcLabel
+                        + " HostAddress=" + (probeHost ?? "-")
+                        + " Reason=" + (string.IsNullOrWhiteSpace(probeHost)
+                            ? "no_host_configured_or_not_ipv4"
+                            : "port_3389_closed_or_unreachable"));
+                    await OfferRcRdWebAndGuideAsync(pcLabel).ConfigureAwait(true);
+                    return;
+                }
+
+                var fallbackDto = item.ToDto();
+                if (string.IsNullOrWhiteSpace(fallbackDto.IpAddress))
+                    fallbackDto.IpAddress = pcLabel;
+
+                _ui.RunOnUi(() => _ui.SetLastReceiveMessage(
+                    "게시 RDP 파일 없음 — 내부 IP(" + directHost + ")로 직접 접속 시도"));
+                DiagnosticLogger.Info("RC_DIRECT_IP_FALLBACK",
+                    "Pc=" + pcLabel + " Host=" + directHost + " (no published .rdp found)");
+
+                string fallbackMessage = await StartRemoteSessionAsync(fallbackDto, null, directHost).ConfigureAwait(true);
+                if (!string.IsNullOrEmpty(fallbackMessage))
+                    await _ui.PopupShowInfoAsync("원격 접속", fallbackMessage).ConfigureAwait(true);
+                else
+                    DiagnosticLogger.Info("RC_DIRECT_IP_STARTED", "Pc=" + pcLabel + " Host=" + directHost);
                 return;
             }
 
@@ -2227,7 +2260,54 @@ namespace GBCWorkHub.UI.Services
             }
         }
 
+        /// <summary>
+        /// 게시 .rdp가 없을 때 내부 IP(RC.{PC}.Host) 3389 포트가 열려 있으면 직접 접속 대상으로 반환.
+        /// 닫혀 있거나 IP를 모르면 null — 호출 쪽은 기존 RD Web 안내로 폴백한다.
+        /// </summary>
+        private static string ResolveDirectRcFallbackHost(RemoteComputerItemViewModel item)
+        {
+            string host = item != null ? item.HostAddress : null;
+            if (!LooksLikeIpv4(host))
+                return null;
 
+            host = host.Trim();
+            return IsTcpPortOpen(host, 3389, 800) ? host : null;
+        }
+
+        private static bool LooksLikeIpv4(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+            var parts = value.Trim().Split('.');
+            if (parts.Length != 4)
+                return false;
+            foreach (var part in parts)
+            {
+                byte b;
+                if (!byte.TryParse(part, out b))
+                    return false;
+            }
+            return true;
+        }
+
+        private static bool IsTcpPortOpen(string host, int port, int timeoutMs)
+        {
+            try
+            {
+                using (var client = new TcpClient())
+                {
+                    var result = client.BeginConnect(host, port, null, null);
+                    if (!result.AsyncWaitHandle.WaitOne(TimeSpan.FromMilliseconds(timeoutMs)))
+                        return false;
+                    client.EndConnect(result);
+                    return client.Connected;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
 
         public async Task<IList<RemotePcUsageLogDto>> GetRecentUsageLogsAsync(string ip, int take)
         {
