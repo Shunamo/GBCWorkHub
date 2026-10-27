@@ -223,18 +223,8 @@
       <DependentUpon>TfsImportHostWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="ViewModels\Popup\PopupHostViewModel.cs" />
-    <Compile Include="ViewModels\Popup\ConfirmProgressResultViewModels.cs" />
     <Compile Include="Views\Popup\PopupHostWindow.xaml.cs">
       <DependentUpon>PopupHostWindow.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Views\Popup\ConfirmPopupView.xaml.cs">
-      <DependentUpon>ConfirmPopupView.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Views\Popup\ProgressPopupView.xaml.cs">
-      <DependentUpon>ProgressPopupView.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Views\Popup\ResultPopupView.xaml.cs">
-      <DependentUpon>ResultPopupView.xaml</DependentUpon>
     </Compile>
     <Compile Include="Services\BundledConfig.cs" />
     <Compile Include="Services\BundledFonts.cs" />
@@ -387,18 +377,6 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Views\Popup\PopupHostWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="Views\Popup\ConfirmPopupView.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="Views\Popup\ProgressPopupView.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="Views\Popup\ResultPopupView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

@@ -48,8 +48,6 @@
     <Compile Include="PcTeamCatalog.cs" />
     <Compile Include="PcNameNaturalSort.cs" />
     <Compile Include="KoreaTime.cs" />
-    <Compile Include="RemoteConnectionRequestDto.cs" />
-    <Compile Include="RemoteConnectionResultDto.cs" />
     <Compile Include="RdpStatusPayload.cs" />
     <Compile Include="RdpEventPayload.cs" />
     <Compile Include="TfsRecentChangesetsPayload.cs" />
