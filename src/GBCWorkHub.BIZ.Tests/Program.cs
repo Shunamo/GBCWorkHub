@@ -39,6 +39,7 @@ namespace GBCWorkHub.BIZ.Tests
             Test_DedupeSamePath(parser, session);
             Test_SameFileNameDifferentPath(parser, session);
             Test_UnclassifiedPreserved(parser, session);
+            Test_FolderItemTypeReported(parser, session);
             Test_TicketTn(parser, session);
             Test_NoFalseTicket(parser, session);
             Test_CandidateRecommendAndExclude(parser, session);
@@ -253,6 +254,29 @@ namespace GBCWorkHub.BIZ.Tests
             AssertTrue("15m skipped has exclude+notcand", draft.SkippedItems.Count >= 3);
         }
 
+        private static void Test_FolderItemTypeReported(ITfsWorkLogParser parser, WorkSessionContext session)
+        {
+            // AURORA 에이전트가 itemType="folder"로 정확히 보고하는 경우(HIS.* 프로젝트 폴더는 이름에 점이 있어
+            // 파일명 추정("점이 있으면 File")으로는 폴더인지 알 수 없다 — 반드시 보고된 itemType을 신뢰해야 한다.
+            var cs = new TfsChangesetItem
+            {
+                ChangesetId = 16,
+                Comment = "TN-16",
+                Files = new List<TfsChangedFileItem>
+                {
+                    File("$/HISSolutions/HIS.MC.DR.UI", "HIS.MC.DR.UI", "rename", "folder"),
+                    File("$/HISSolutions/HIS.MC.DR.UI/Foo.xaml", "Foo.xaml", "edit", "file")
+                }
+            };
+            var draft = parser.Parse(cs, session);
+            AssertTrue("16 folder flagged in warnings",
+                draft.Warnings != null && draft.Warnings.Exists(w => w != null && w.Contains("File이 아닌 항목")));
+            AssertTrue("16 folder flagged in skipped items",
+                draft.SkippedItems != null && draft.SkippedItems.Exists(s => s != null && s.StartsWith("ItemType=Folder", StringComparison.Ordinal)));
+            AssertTrue("16 sibling file still classified",
+                draft.WorkGroups != null && draft.WorkGroups.Sum(g => g.SourceItems.Count) == 1);
+        }
+
         private static void Test_TicketTn(ITfsWorkLogParser parser, WorkSessionContext session)
         {
             var draft = ParseOne(parser, session, 13, "edit",
@@ -356,6 +380,13 @@ namespace GBCWorkHub.BIZ.Tests
                 FileName = name,
                 ChangeType = changeType
             };
+        }
+
+        private static TfsChangedFileItem File(string path, string name, string changeType, string itemType)
+        {
+            var item = File(path, name, changeType);
+            item.ItemType = itemType;
+            return item;
         }
 
         private static WorkGroupDraft FirstGroup(WorkLogDraft draft)

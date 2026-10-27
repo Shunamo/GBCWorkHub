@@ -98,7 +98,7 @@ namespace GBCWorkHub.BIZ.WorkLog
                     if (!string.IsNullOrEmpty(originalPath) && !seenPaths.Add(dedupeKey))
                         continue;
 
-                    string itemType = InferItemType(originalPath, fileName);
+                    string itemType = InferItemType(file.ItemType, originalPath, fileName);
                     if (!string.Equals(itemType, "File", StringComparison.OrdinalIgnoreCase)
                         && !string.Equals(itemType, "Unknown", StringComparison.OrdinalIgnoreCase))
                     {
@@ -403,8 +403,22 @@ namespace GBCWorkHub.BIZ.WorkLog
                 : normalized;
         }
 
-        private static string InferItemType(string path, string fileName)
+        /// <summary>
+        /// TFS가 알려주는 진짜 itemType("file"/"folder")을 우선 신뢰한다(AURORA Client OM 경로는 이미 채워서 보냄).
+        /// 값이 없는 소스(REST 수집기 등)에 한해서만 파일명 추정으로 폴백한다.
+        /// </summary>
+        private static string InferItemType(string reportedItemType, string path, string fileName)
         {
+            if (!string.IsNullOrWhiteSpace(reportedItemType))
+            {
+                string t = reportedItemType.Trim();
+                if (string.Equals(t, "folder", StringComparison.OrdinalIgnoreCase))
+                    return "Folder";
+                if (string.Equals(t, "file", StringComparison.OrdinalIgnoreCase))
+                    return "File";
+                return t;
+            }
+
             string name = fileName ?? string.Empty;
             if (string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(path))
                 name = ExtractFileName(path);
