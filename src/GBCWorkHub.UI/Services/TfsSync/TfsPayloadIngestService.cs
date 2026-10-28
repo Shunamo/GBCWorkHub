@@ -311,15 +311,6 @@ namespace GBCWorkHub.UI.Services.TfsSync
                 }
                 DiagnosticLogger.Info("TFS_REQUEST_ID_MATCHED", FormatContext(result));
             }
-            else if (!string.IsNullOrWhiteSpace(payload.RequestId) && activeRequest != null
-                && !string.IsNullOrWhiteSpace(activeRequest.RequestId)
-                && !string.Equals(activeRequest.RequestId.Trim(), payload.RequestId.Trim(), StringComparison.OrdinalIgnoreCase))
-            {
-                result.ErrorMessage = "requestId mismatch local=" + activeRequest.RequestId
-                    + " remote=" + payload.RequestId;
-                DiagnosticLogger.Warn("TFS_REQUEST_ID_MISMATCH", FormatContext(result));
-                return false;
-            }
             else
             {
                 DiagnosticLogger.Info("TFS_REQUEST_ID_MATCHED", FormatContext(result)
@@ -347,7 +338,7 @@ namespace GBCWorkHub.UI.Services.TfsSync
                 && !string.Equals(payload.DeliveryMode, "DISCONNECT", StringComparison.OrdinalIgnoreCase))
             {
                 result.ErrorMessage = "deliveryMode mismatch: " + payload.DeliveryMode;
-                DiagnosticLogger.Warn("TFS_DELIVERY_MODE_MATCHED", FormatContext(result) + " ok=False");
+                DiagnosticLogger.Warn("TFS_DELIVERY_MODE_MISMATCH", FormatContext(result) + " ok=False");
                 return false;
             }
 
