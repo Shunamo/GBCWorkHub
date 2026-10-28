@@ -53,7 +53,6 @@
     <Compile Include="RdpStatusPayload.cs" />
     <Compile Include="RdpEventPayload.cs" />
     <Compile Include="TfsRecentChangesetsPayload.cs" />
-    <Compile Include="TfsWorkLogModels.cs" />
     <Compile Include="TfsSyncRequestClipboardDto.cs" />
     <Compile Include="WorkLog\WorkLogConstants.cs" />
     <Compile Include="WorkLog\WorkSessionContext.cs" />

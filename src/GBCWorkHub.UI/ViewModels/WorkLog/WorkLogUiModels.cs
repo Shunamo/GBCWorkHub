@@ -1852,30 +1852,4 @@ namespace GBCWorkHub.UI.ViewModels.WorkLog
             get { return !string.IsNullOrWhiteSpace(Body); }
         }
     }
-
-    public sealed class WorkGroupPreviewItem : ViewModelBase
-    {
-        public string Type { get; set; }
-        public string Category { get; set; }
-        public int Count { get; set; }
-        public string Label
-        {
-            get
-            {
-                string t = string.IsNullOrEmpty(Type)
-                    || string.Equals(Type, WorkLogFieldMasters.Unselected, System.StringComparison.Ordinal)
-                    ? WorkLogFieldMasters.Unselected
-                    : Type;
-                string c = string.IsNullOrEmpty(Category)
-                    || string.Equals(Category, WorkLogFieldMasters.Unselected, System.StringComparison.Ordinal)
-                    ? ""
-                    : " / " + Category;
-                return t + c;
-            }
-        }
-        public string CountText
-        {
-            get { return Count + "개"; }
-        }
-    }
 }
