@@ -112,6 +112,7 @@
     <Compile Include="TfsClipboardPayloadService.cs" />
     <Compile Include="TfsWorkLogBiz.cs" />
     <Compile Include="WorkLog\TfsPathClassifier.cs" />
+    <Compile Include="WorkLog\TfsPathUtils.cs" />
     <Compile Include="WorkLog\TfsWorkLogCandidateClassifier.cs" />
     <Compile Include="WorkLog\TfsWorkLogParser.cs" />
     <Compile Include="WorkLog\WorkLogBiz.cs" />

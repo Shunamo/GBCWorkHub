@@ -787,18 +787,7 @@ namespace GBCWorkHub.BIZ
 
         private static bool LooksLikeIpv4(string value)
         {
-            if (string.IsNullOrWhiteSpace(value))
-                return false;
-            string[] parts = value.Trim().Split('.');
-            if (parts.Length != 4)
-                return false;
-            int n;
-            foreach (string p in parts)
-            {
-                if (!int.TryParse(p, out n) || n < 0 || n > 255)
-                    return false;
-            }
-            return true;
+            return NetworkAddressUtils.LooksLikeIpv4(value);
         }
     }
 }

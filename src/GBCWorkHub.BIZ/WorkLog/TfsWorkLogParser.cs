@@ -394,13 +394,7 @@ namespace GBCWorkHub.BIZ.WorkLog
 
         private static string ExtractFileName(string path)
         {
-            if (string.IsNullOrWhiteSpace(path))
-                return string.Empty;
-            string normalized = path.Replace('/', '\\').TrimEnd('\\');
-            int idx = normalized.LastIndexOf('\\');
-            return idx >= 0 && idx < normalized.Length - 1
-                ? normalized.Substring(idx + 1)
-                : normalized;
+            return TfsPathUtils.ExtractFileName(path);
         }
 
         /// <summary>

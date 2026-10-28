@@ -1393,18 +1393,7 @@ namespace GBCWorkHub.UI.Services.TfsSync
 
         private static bool LooksLikeIpv4(string value)
         {
-            if (string.IsNullOrWhiteSpace(value))
-                return false;
-            string[] parts = value.Trim().Split('.');
-            if (parts.Length != 4)
-                return false;
-            for (int i = 0; i < 4; i++)
-            {
-                int n;
-                if (!int.TryParse(parts[i], out n) || n < 0 || n > 255)
-                    return false;
-            }
-            return true;
+            return NetworkAddressUtils.LooksLikeIpv4(value);
         }
 
         private static string BuildDetail(TfsSyncRequest request)

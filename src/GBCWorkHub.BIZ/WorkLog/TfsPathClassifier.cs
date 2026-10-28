@@ -488,11 +488,7 @@ namespace GBCWorkHub.BIZ.WorkLog
 
         private static string ExtractFileName(string path)
         {
-            if (string.IsNullOrWhiteSpace(path))
-                return string.Empty;
-            string n = path.Replace('\\', '/').TrimEnd('/');
-            int idx = n.LastIndexOf('/');
-            return idx >= 0 && idx < n.Length - 1 ? n.Substring(idx + 1) : n;
+            return TfsPathUtils.ExtractFileName(path);
         }
 
         private sealed class ClassificationResult

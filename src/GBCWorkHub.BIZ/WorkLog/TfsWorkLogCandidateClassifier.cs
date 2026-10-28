@@ -207,25 +207,12 @@ namespace GBCWorkHub.BIZ.WorkLog
 
         private static bool HasPathSegment(string pathLower, string segment)
         {
-            if (string.IsNullOrEmpty(pathLower) || string.IsNullOrEmpty(segment))
-                return false;
-
-            string s = segment.ToLowerInvariant();
-            foreach (var part in pathLower.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                if (string.Equals(part, s, StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-            return false;
+            return TfsPathUtils.HasSegment(pathLower, segment);
         }
 
         private static string ExtractFileName(string path)
         {
-            if (string.IsNullOrWhiteSpace(path))
-                return string.Empty;
-            string n = path.Replace('\\', '/').TrimEnd('/');
-            int idx = n.LastIndexOf('/');
-            return idx >= 0 && idx < n.Length - 1 ? n.Substring(idx + 1) : n;
+            return TfsPathUtils.ExtractFileName(path);
         }
     }
 }

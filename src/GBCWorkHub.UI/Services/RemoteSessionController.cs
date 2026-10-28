@@ -2276,18 +2276,7 @@ namespace GBCWorkHub.UI.Services
 
         private static bool LooksLikeIpv4(string value)
         {
-            if (string.IsNullOrWhiteSpace(value))
-                return false;
-            var parts = value.Trim().Split('.');
-            if (parts.Length != 4)
-                return false;
-            foreach (var part in parts)
-            {
-                byte b;
-                if (!byte.TryParse(part, out b))
-                    return false;
-            }
-            return true;
+            return NetworkAddressUtils.LooksLikeIpv4(value);
         }
 
         private static bool IsTcpPortOpen(string host, int port, int timeoutMs)
